@@ -6,12 +6,14 @@ import gleam/list
 import gleam/result
 import gleam/set.{type Set}
 import lustre
-import lustre/attribute.{type Attribute}
+import lustre/attribute.{type Attribute, attribute as attr}
 import lustre/effect.{type Effect}
 import lustre/element
 import lustre/element/html
 import lustre/element/svg
 import lustre/event
+
+import graph_utils.{type Position, Position, translate_node}
 
 pub type ResizeEvent
 
@@ -55,24 +57,23 @@ type NodeId =
   Int
 
 type Node {
-  Node(x: Int, y: Int, id: NodeId, selected: Bool)
-}
-
-type Cursor {
-  Cursor(x: Float, y: Float)
+  Node(position: Position, id: NodeId, selected: Bool)
 }
 
 type MouseEvent {
-  MouseEvent(position: #(Float, Float), shift_key_active: Bool)
+  MouseEvent(position: #(Int, Int), shift_key_active: Bool)
 }
 
 type Model {
   Model(
     nodes: List(Node),
     nodes_selected: Set(NodeId),
-    cursor: Cursor,
+    cursor: Position,
+    clicked_point: Position,
+    clicked_node: NodeId,
     resolution: Resolution,
     offset: Offset,
+    mouse_down: Bool,
   )
 }
 
@@ -88,13 +89,16 @@ fn init(_flags) -> #(Model, Effect(Msg)) {
   #(
     Model(
       [
-        Node(x: 0, y: 0, id: 0, selected: False),
-        Node(x: 300, y: 300, id: 1, selected: False),
+        Node(position: Position(x: 0, y: 0), id: 0, selected: False),
+        Node(position: Position(x: 300, y: 300), id: 1, selected: False),
       ],
       set.new(),
-      Cursor(x: 0.0, y: 0.0),
+      Position(x: 0, y: 0),
+      Position(x: 0, y: 0),
+      -1,
       get_window_size(),
       Offset(x: 0, y: 0),
+      False,
     ),
     effect.none(),
   )
@@ -102,8 +106,9 @@ fn init(_flags) -> #(Model, Effect(Msg)) {
 
 pub opaque type Msg {
   UserAddedNode(Node)
-  UserMovedMouse(Cursor)
+  UserMovedMouse(Position)
   UserClickedNode(NodeId, MouseEvent)
+  UserUnclickedNode(NodeId)
   UserClickedGraph
   GraphAddNodeToSelection(NodeId)
   GraphSetNodeAsSelection(NodeId)
@@ -117,12 +122,22 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       effect.none(),
     )
     UserMovedMouse(cursor) -> #(
-      Model(..model, cursor: Cursor(cursor.x, cursor.y)),
+      Model(..model, cursor: Position(cursor.x, cursor.y))
+        |> update_node_positions,
       effect.none(),
     )
     UserClickedNode(node_id, mouse_event) -> #(
-      model,
+      Model(
+        ..model,
+        clicked_point: Position(mouse_event.position.0, mouse_event.position.1),
+        clicked_node: node_id,
+        mouse_down: True,
+      ),
       update_node_selection(mouse_event, node_id),
+    )
+    UserUnclickedNode(_node_id) -> #(
+      Model(..model, mouse_down: False),
+      effect.none(),
     )
     GraphAddNodeToSelection(node_id) -> #(
       Model(
@@ -146,6 +161,34 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
   }
 }
 
+fn diff(a: Position, b: Position) -> Position {
+   Position(x: a.x - b.x, y: a.y - b.y) 
+}
+
+fn add(a: Position, b: Position) -> Position {
+  Position(x: a.x + b.x, y: a.y + b.y)
+}
+
+fn update_node_positions(model: Model) -> Model {
+  case list.find(model.nodes, fn(n) { n.id == model.clicked_node }) {
+    Error(Nil) -> model
+    Ok(node) -> {
+      let offset = Position(x: node.position.x - model.clicked_point.x, y: node.position.y - model.clicked_point.y)
+      let updated_nodes =
+        model.nodes
+        |> list.map(fn(node) {
+          case set.contains(model.nodes_selected, node.id) {
+            False -> node
+            // True -> Node(..node, position: translate_node(model.clicked_point, model.cursor, offset))
+            True -> Node(..node, position: diff(model.clicked_point, model.cursor) |> add(node.position))
+          }
+        })
+
+      Model(..model, nodes: updated_nodes)
+    }
+  }
+}
+
 fn update_node_selection(event: MouseEvent, node_id: NodeId) -> Effect(Msg) {
   effect.from(fn(dispatch) {
     case event.shift_key_active {
@@ -162,7 +205,7 @@ fn mouse_event_decoder(e) -> Result(MouseEvent, List(DecodeError)) {
   use shift_key <- result.try(dynamic.field("shiftKey", dynamic.bool)(e))
   use position <- result.try(event.mouse_position(e))
 
-  Ok(MouseEvent(position: position, shift_key_active: shift_key))
+  Ok(MouseEvent(position: #(float.round(position.0), float.round(position.1)), shift_key_active: shift_key))
 }
 
 pub fn on_mouse_move(msg: msg) -> Attribute(msg) {
@@ -183,16 +226,16 @@ fn attr_viewbox(offset: Offset, resolution: Resolution) -> Attribute(Msg) {
   |> list.reduce(fn(a, b) { a <> " " <> b })
   |> fn(result) {
     case result {
-      Ok(res) -> attribute.attribute("viewBox", res)
-      Error(_) -> attribute.attribute("viewBox", "0 0 100 100")
+      Ok(res) -> attr("viewBox", res)
+      Error(_) -> attr("viewBox", "0 0 100 100")
     }
   }
 }
 
 fn view_node(node: Node, selection: Set(NodeId)) -> element.Element(Msg) {
   let node_selected_attr = case set.contains(selection, node.id) {
-    True -> attribute.attribute("stroke-width", "2")
-    False -> attribute.attribute("stroke-width", "0")
+    True -> attr("stroke-width", "2")
+    False -> attr("stroke-width", "0")
   }
 
   let mousedown = fn(e) -> Result(Msg, List(DecodeError)) {
@@ -203,23 +246,24 @@ fn view_node(node: Node, selection: Set(NodeId)) -> element.Element(Msg) {
 
   svg.rect([
     attribute.id(int.to_string(node.id)),
-    attribute.attribute("width", "200"),
-    attribute.attribute("height", "150"),
-    attribute.attribute("rx", "25"),
-    attribute.attribute("ry", "25"),
-    attribute.attribute("fill", "currentColor"),
-    attribute.attribute("stroke", "currentColor"),
-    attribute.attribute("transform", translate(node.x, node.y)),
+    attr("width", "200"),
+    attr("height", "150"),
+    attr("rx", "25"),
+    attr("ry", "25"),
+    attr("fill", "currentColor"),
+    attr("stroke", "currentColor"),
+    attr("transform", translate(node.position.x, node.position.y)),
     node_selected_attr,
     attribute.class("text-gray-300 stroke-gray-400"),
     event.on("mousedown", mousedown),
+    event.on_mouse_up(UserUnclickedNode(node.id)),
   ])
 }
 
 fn view(model: Model) -> element.Element(Msg) {
   let user_moved_mouse = fn(e) -> Result(Msg, List(DecodeError)) {
     result.try(event.mouse_position(e), fn(pos) {
-      Ok(UserMovedMouse(Cursor(x: pos.0, y: pos.1)))
+      Ok(UserMovedMouse(Position(x: float.round(pos.0), y: float.round(pos.1))))
     })
   }
 
@@ -228,8 +272,11 @@ fn view(model: Model) -> element.Element(Msg) {
       [
         attribute.id("graph"),
         attr_viewbox(model.offset, model.resolution),
-        attribute.attribute("contentEditable", "true"),
-        attribute.attribute("graph-pos", float.to_string(model.cursor.x)),
+        attr("contentEditable", "true"),
+        attr("graph-pos-x", int.to_string(model.cursor.x)),
+        attr("graph-pos-y", int.to_string(model.cursor.y)),
+        attr("graph-clicked-x", int.to_string(model.clicked_point.x)),
+        attr("graph-clicked-y", int.to_string(model.clicked_point.y)),
         event.on("mousemove", user_moved_mouse),
         event.on_mouse_down(UserClickedGraph),
       ],
