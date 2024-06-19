@@ -4,7 +4,7 @@ import gleam/int
 import gleam/io
 import gleam/list.{filter, map}
 import gleam/result
-import gleam/set.{type Set, to_list, from_list}
+import gleam/set.{type Set}
 import lustre
 import lustre/attribute.{type Attribute, attribute as attr}
 import lustre/effect.{type Effect}
@@ -56,20 +56,16 @@ pub fn main() {
 }
 
 type MouseEvent {
-  MouseEvent(position: #(Int, Int), shift_key_active: Bool)
+  MouseEvent(position: Vector, shift_key_active: Bool)
 }
 
 type Model {
   Model(
     nodes: List(Node),
     nodes_selected: Set(NodeId),
-    // cursor: Vector,
-    // clicked_point: Vector,
-    // clicked_node: NodeId,
     resolution: Resolution,
     offset: Offset,
     navigator: Navigator
-    // mouse_down: Bool,
   )
 }
 
@@ -85,17 +81,13 @@ fn init(_flags) -> #(Model, Effect(Msg)) {
   #(
     Model(
       nodes: [
-        Node(position: Vector(x: 0, y: 0), id: 0),
-        Node(position: Vector(x: 300, y: 300), id: 1),
+        Node(position: Vector(0, 0), offset: Vector(0, 0), id: 0),
+        Node(position: Vector(300, 300), offset: Vector(0, 0), id: 1),
       ],
       nodes_selected: set.new(),
-      // Vector(x: 0, y: 0),
-      // Vector(x: 0, y: 0),
-      // -1,
       resolution: get_window_size(),
       offset: Offset(x: 0, y: 0),
       navigator: Navigator(Vector(0, 0), Vector(0, 0), Vector(0, 0), False)
-      // False,
     ),
     effect.none(),
   )
@@ -118,22 +110,20 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       Model(..model, nodes: list.append(model.nodes, [node])),
       effect.none(),
     )
-    UserMovedMouse(cursor) -> #(
-      Model(..model, cursor: Vector(cursor.x, cursor.y))
-        |> update_node_positions,
+    UserMovedMouse(point) -> #(
+      model
+      |> update_navigator_on_moved_mouse(point)
+      |> update_node_positions,
       effect.none(),
     )
     UserClickedNode(node_id, mouse_event) -> #(
-      Model(
-        ..model,
-        clicked_point: Vector(mouse_event.position.0, mouse_event.position.1),
-        clicked_node: node_id,
-        mouse_down: True,
-      ),
+      model 
+      |> update_navigator_on_clicked_node(mouse_event)
+      |> update_nodes_offset_on_clicked_node,
       update_node_selection(mouse_event, node_id),
     )
     UserUnclickedNode(_node_id) -> #(
-      Model(..model, mouse_down: False),
+      Model(..model, navigator: Navigator(..model.navigator, mouse_down: False)),
       effect.none(),
     )
     GraphAddNodeToSelection(node_id) -> #(
@@ -158,45 +148,39 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
   }
 }
 
+
+fn update_navigator_on_moved_mouse(model: Model, point: Vector) -> Model {
+  point
+  |> fn(p) { Navigator(..model.navigator, cursor_point: p) }
+  |> fn(nav) { Model(..model, navigator: nav) }
+}
+
+fn update_navigator_on_clicked_node(model: Model, mouse_event: MouseEvent) -> Model {
+  mouse_event.position
+  |> fn(pos) { Navigator(..model.navigator, clicked_point: pos, mouse_down: True) }
+  |> fn(nav) { Model(..model, navigator: nav) }
+}
+
+fn update_nodes_offset_on_clicked_node(model: Model) -> Model {
+  model.nodes
+  |> map(nd.update_offset(_, model.navigator.clicked_point))
+  |> fn(x) { Model(..model, nodes: x) }
+}
+
 fn update_node_positions(model: Model) -> Model {
-  // 1. filter nodes by selected
-  // 2. map over each node, update position
-  // 3. concat to original
-  // 4. deduplicate (convert to set and back)
-  // TODO: Consider using sets for nodes. Sets have no map, unfortunately
+  let is_selected = fn(node: Node) { set.contains(model.nodes_selected, node.id) }
+  let unselected = model.nodes |> filter(fn(x) { !is_selected(x) })
 
   model.nodes
-  |> filter(fn(x) { set.contains(model.nodes_selected, x.id) })
-  |> map(nd.)
-
-  case list.find(model.nodes, fn(n) { n.id == model.clicked_node }) {
-    Error(Nil) -> model
-    Ok(node) -> {
-      // Calculate offset once, on mousedown
-      let offset =
-        Vector(
-          x: node.position.x - model.clicked_point.x,
-          y: node.position.y - model.clicked_point.y,
-        )
-      let updated_nodes =
-        model.nodes
-        |> list.map(fn(node) {
-          case set.contains(model.nodes_selected, node.id) {
-            False -> node
-            // True -> Node(..node, position: translate_node(model.clicked_point, model.cursor, offset))
-            // TODO: make a position module instead of the generic "graph_utils"
-            True ->
-              Node(
-                ..node,
-                position: vector.subtract(model.clicked_point, model.cursor)
-                  |> vector.add(node.position),
-              )
-          }
-        })
-
-      Model(..model, nodes: updated_nodes)
+  |> filter(is_selected)
+  |> map(fn(node) {
+    case model.navigator.mouse_down {
+      False -> node
+      True -> Node(..node, position: navigator.calc_position(model.navigator, node.offset))
     }
-  }
+  })
+  |> fn(nodes) { [unselected, nodes] |> list.concat }
+  |> fn(nodes) { Model(..model, nodes: nodes) }
 }
 
 fn update_node_selection(event: MouseEvent, node_id: NodeId) -> Effect(Msg) {
@@ -216,7 +200,7 @@ fn mouse_event_decoder(e) -> Result(MouseEvent, List(DecodeError)) {
   use position <- result.try(event.mouse_position(e))
 
   Ok(MouseEvent(
-    position: #(float.round(position.0), float.round(position.1)),
+    position: Vector(float.round(position.0), float.round(position.1)),
     shift_key_active: shift_key,
   ))
 }
@@ -286,10 +270,10 @@ fn view(model: Model) -> element.Element(Msg) {
         attribute.id("graph"),
         attr_viewbox(model.offset, model.resolution),
         attr("contentEditable", "true"),
-        attr("graph-pos-x", int.to_string(model.cursor.x)),
-        attr("graph-pos-y", int.to_string(model.cursor.y)),
-        attr("graph-clicked-x", int.to_string(model.clicked_point.x)),
-        attr("graph-clicked-y", int.to_string(model.clicked_point.y)),
+        attr("graph-pos-x", int.to_string(model.navigator.cursor_point.x)),
+        attr("graph-pos-y", int.to_string(model.navigator.cursor_point.y)),
+        attr("graph-clicked-x", int.to_string(model.navigator.clicked_point.x)),
+        attr("graph-clicked-y", int.to_string(model.navigator.clicked_point.y)),
         event.on("mousemove", user_moved_mouse),
         event.on_mouse_down(UserClickedGraph),
       ],

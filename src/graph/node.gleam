@@ -1,15 +1,13 @@
-import graph/position.{type Position}
-import graph/navigator.{type Navigator}
+import graph/vector.{type Vector}
 
 pub type NodeId =
   Int
 
 pub type Node {
-  Node(position: Position, id: NodeId)
+  Node(position: Vector, offset: Vector, id: NodeId)
 }
 
-// TODO: Maybe do this in navigator module?
-// It's really just calculating a Point where the start point varies (e.g. depending on the node)
-// This is not really "node" logic, but more navigator logic.
-pub fn calc_position(node: Node, navigator: Navigator) -> Node {
+
+pub fn update_offset(node: Node, point: Vector) -> Node {
+  Node(..node, offset: vector.subtract(node.position, point))
 }
