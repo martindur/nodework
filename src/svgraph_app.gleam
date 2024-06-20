@@ -229,6 +229,9 @@ fn attr_viewbox(offset: Offset, resolution: Resolution) -> Attribute(Msg) {
   }
 }
 
+// TODO: Dragging multiple nodes requires holding down shift.
+// Dragging should be done with "mousedown(no shift)" |> "mousemove"
+// Find a way to make this work. The main problem is that when you do "mousedown", it unselects other nodes.
 fn view_node(node: Node, selection: Set(NodeId)) -> element.Element(Msg) {
   let node_selected_attr = case set.contains(selection, node.id) {
     True -> attr("stroke-width", "2")
