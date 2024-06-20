@@ -81,8 +81,8 @@ fn init(_flags) -> #(Model, Effect(Msg)) {
   #(
     Model(
       nodes: [
-        Node(position: Vector(0, 0), offset: Vector(0, 0), id: 0, inputs: ["foo", "bar", "baz"]),
-        Node(position: Vector(300, 300), offset: Vector(0, 0), id: 1, inputs: ["bob"]),
+        Node(position: Vector(0, 0), offset: Vector(0, 0), id: 0, inputs: ["foo", "bar", "baz"], name: "Rect"),
+        Node(position: Vector(300, 300), offset: Vector(0, 0), id: 1, inputs: ["bob"], name: "Circle"),
       ],
       nodes_selected: set.new(),
       resolution: get_window_size(),
@@ -270,15 +270,14 @@ fn view_node_input(input: String, index: Int) -> element.Element(Msg) {
   ])
 }
 
+fn view_node_output() -> element.Element(Msg) {
+  svg.circle([attr("cx", "200"), attr("cy", "50"), attr("r", "8"), attr("fill", "currentColor"), attribute.class("text-gray-500")])
+}
+
 // TODO: Dragging multiple nodes requires holding down shift.
 // Dragging should be done with "mousedown(no shift)" |> "mousemove"
 // Find a way to make this work. The main problem is that when you do "mousedown", it unselects other nodes.
 fn view_node(node: Node, selection: Set(NodeId)) -> element.Element(Msg) {
-  // let node_selected_attr = case set.contains(selection, node.id) {
-  //   True -> attr("stroke-width", "2")
-  //   False -> attr("stroke-width", "0")
-  // }
-
   let node_selected_class = case set.contains(selection, node.id) {
     True -> attribute.class("text-gray-300 stroke-gray-400")
     False -> attribute.class("text-gray-300 stroke-gray-300")
@@ -291,6 +290,7 @@ fn view_node(node: Node, selection: Set(NodeId)) -> element.Element(Msg) {
   }
 
   svg.g([
+    attribute.id("node-" <> int.to_string(node.id)),
     attr("transform", translate(node.position.x, node.position.y)),
     attribute.class("select-none")
   ],
@@ -304,13 +304,12 @@ fn view_node(node: Node, selection: Set(NodeId)) -> element.Element(Msg) {
       attr("fill", "currentColor"),
       attr("stroke", "currentColor"),
       attr("stroke-width", "2"),
-      // node_selected_attr,
-      // attribute.class("text-gray-300 stroke-gray-400"),
       node_selected_class,
       event.on("mousedown", mousedown),
       event.on_mouse_up(UserUnclickedNode(node.id)),
     ]),
-    svg.text([attr("x", "20"), attr("y", "24"), attr("font-size", "16"), attr("fill", "currentColor"), attribute.class("text-gray-900")], "TITLE"),
+    svg.text([attr("x", "20"), attr("y", "24"), attr("font-size", "16"), attr("fill", "currentColor"), attribute.class("text-gray-900")], node.name),
+    view_node_output()
   ],
     list.index_map(node.inputs, fn(input, i) {
       view_node_input(input, i)
