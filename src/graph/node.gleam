@@ -27,6 +27,7 @@ pub type Node {
   )
 }
 
+/// Update a Node offset vector by subtracting its current position with a given point
 pub fn update_offset(node: Node, point: Vector) -> Node {
   Node(..node, offset: vector.subtract(node.position, point))
 }
