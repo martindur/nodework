@@ -81,8 +81,20 @@ fn init(_flags) -> #(Model, Effect(Msg)) {
   #(
     Model(
       nodes: [
-        Node(position: Vector(0, 0), offset: Vector(0, 0), id: 0, inputs: ["foo", "bar", "baz"], name: "Rect"),
-        Node(position: Vector(300, 300), offset: Vector(0, 0), id: 1, inputs: ["bob"], name: "Circle"),
+        Node(
+          position: Vector(0, 0),
+          offset: Vector(0, 0),
+          id: 0,
+          inputs: ["foo", "bar", "baz"],
+          name: "Rect",
+        ),
+        Node(
+          position: Vector(300, 300),
+          offset: Vector(0, 0),
+          id: 1,
+          inputs: ["bob"],
+          name: "Circle",
+        ),
       ],
       nodes_selected: set.new(),
       resolution: get_window_size(),
@@ -239,39 +251,66 @@ fn attr_viewbox(offset: Offset, resolution: Resolution) -> Attribute(Msg) {
   }
 }
 
-    // <g transform={"translate(0.15, #{5 + (@offset * 3)})"}>
-    //   <circle
-    //     id={"#{@node_id}-#{@label}"}
-    //     cx="0"
-    //     cy="0"
-    //     r="1"
-    //     fill="currentColor"
-    //     class="text-gray-500"
-    //   />
-    //   <text
-    //     x="2"
-    //     y="0"
-    //     font-size="1.25"
-    //     dominant-baseline="middle"
-    //     fill="currentColor"
-    //     class="text-gray-900"
-    //   >
-    //     <%= @label %>
-    //   </text>
-    // </g>
+// <g transform={"translate(0.15, #{5 + (@offset * 3)})"}>
+//   <circle
+//     id={"#{@node_id}-#{@label}"}
+//     cx="0"
+//     cy="0"
+//     r="1"
+//     fill="currentColor"
+//     class="text-gray-500"
+//   />
+//   <text
+//     x="2"
+//     y="0"
+//     font-size="1.25"
+//     dominant-baseline="middle"
+//     fill="currentColor"
+//     class="text-gray-900"
+//   >
+//     <%= @label %>
+//   </text>
+// </g>
 
 fn view_node_input(input: String, index: Int) -> element.Element(Msg) {
-  svg.g([
-    attr("transform", "translate(0, " <> {50 + index * 30} |> int.to_string() <> ")")
-  ],
-  [
-    svg.circle([attr("cx", "0"), attr("cy", "0"), attr("r", "8"), attr("fill", "currentColor"), attribute.class("text-gray-500")]),
-    svg.text([attr("x", "16"), attr("y", "0"), attr("font-size", "16"), attr("dominant-baseline", "middle"), attr("fill", "currentColor"), attribute.class("text-gray-900")], input)
-  ])
+  svg.g(
+    [
+      attr(
+        "transform",
+        "translate(0, " <> { 50 + index * 30 } |> int.to_string() <> ")",
+      ),
+    ],
+    [
+      svg.circle([
+        attr("cx", "0"),
+        attr("cy", "0"),
+        attr("r", "8"),
+        attr("fill", "currentColor"),
+        attribute.class("text-gray-500"),
+      ]),
+      svg.text(
+        [
+          attr("x", "16"),
+          attr("y", "0"),
+          attr("font-size", "16"),
+          attr("dominant-baseline", "middle"),
+          attr("fill", "currentColor"),
+          attribute.class("text-gray-900"),
+        ],
+        input,
+      ),
+    ],
+  )
 }
 
 fn view_node_output() -> element.Element(Msg) {
-  svg.circle([attr("cx", "200"), attr("cy", "50"), attr("r", "8"), attr("fill", "currentColor"), attribute.class("text-gray-500")])
+  svg.circle([
+    attr("cx", "200"),
+    attr("cy", "50"),
+    attr("r", "8"),
+    attr("fill", "currentColor"),
+    attribute.class("text-gray-500"),
+  ])
 }
 
 // TODO: Dragging multiple nodes requires holding down shift.
@@ -289,71 +328,78 @@ fn view_node(node: Node, selection: Set(NodeId)) -> element.Element(Msg) {
     Ok(UserClickedNode(node.id, decoded_event))
   }
 
-  svg.g([
-    attribute.id("node-" <> int.to_string(node.id)),
-    attr("transform", translate(node.position.x, node.position.y)),
-    attribute.class("select-none")
-  ],
-  list.concat([[
-    svg.rect([
-      attribute.id(int.to_string(node.id)),
-      attr("width", "200"),
-      attr("height", "150"),
-      attr("rx", "25"),
-      attr("ry", "25"),
-      attr("fill", "currentColor"),
-      attr("stroke", "currentColor"),
-      attr("stroke-width", "2"),
-      node_selected_class,
-      event.on("mousedown", mousedown),
-      event.on_mouse_up(UserUnclickedNode(node.id)),
+  svg.g(
+    [
+      attribute.id("node-" <> int.to_string(node.id)),
+      attr("transform", translate(node.position.x, node.position.y)),
+      attribute.class("select-none"),
+    ],
+    list.concat([
+      [
+        svg.rect([
+          attribute.id(int.to_string(node.id)),
+          attr("width", "200"),
+          attr("height", "150"),
+          attr("rx", "25"),
+          attr("ry", "25"),
+          attr("fill", "currentColor"),
+          attr("stroke", "currentColor"),
+          attr("stroke-width", "2"),
+          node_selected_class,
+          event.on("mousedown", mousedown),
+          event.on_mouse_up(UserUnclickedNode(node.id)),
+        ]),
+        svg.text(
+          [
+            attr("x", "20"),
+            attr("y", "24"),
+            attr("font-size", "16"),
+            attr("fill", "currentColor"),
+            attribute.class("text-gray-900"),
+          ],
+          node.name,
+        ),
+        view_node_output(),
+      ],
+      list.index_map(node.inputs, fn(input, i) { view_node_input(input, i) }),
     ]),
-    svg.text([attr("x", "20"), attr("y", "24"), attr("font-size", "16"), attr("fill", "currentColor"), attribute.class("text-gray-900")], node.name),
-    view_node_output()
-  ],
-    list.index_map(node.inputs, fn(input, i) {
-      view_node_input(input, i)
-    })
-  ])
   )
 }
 
-
-
-    // <g
-    //   id={@id}
-    //   phx-hook="Node"
-    //   sub-active="false"
-    //   transform={"translate(#{@x}, #{@y})"}
-    //   class="select-none"
-    // >
-    //   <rect
-    //     id={"#{@id}-rect"}
-    //     phx-mousedown={select("self") |> make_movable("true", "##{@id}")}
-    //     phx-mouseup={
-    //       make_movable("false", "##{@id}") |> JS.push("update-node", value: %{node_id: @id})
-    //     }
-    //     graph-mousemove={move_node("##{@id}")}
-    //     phx-click-away={unselect("self")}
-    //     phx-value-x={@x}
-    //     phx-value-y={@y}
-    //     width="20"
-    //     height="15"
-    //     rx="2"
-    //     ry="2"
-    //     fill="currentColor"
-    //     stroke="currentColor"
-    //     stroke-width="0"
-    //     class="text-gray-300 stroke-gray-400"
-    //   />
-    //   <text x="2" y="3" font-size="2" fill="currentColor" class="text-gray-900">
-    //     <%= @title %>
-    //   </text>
-    //   <%= for {input, idx} <- Enum.with_index(@inputs) do %>
-    //     <.graph_input node_id={"node-#{@id}"} label={input} offset={idx} />
-    //   <% end %>
-    //   <.graph_output id={"node-#{@id}-output"} />
-    // </g>
+// <g
+//   id={@id}
+//   phx-hook="Node"
+//   sub-active="false"
+//   transform={"translate(#{@x}, #{@y})"}
+//   class="select-none"
+// >
+//   <rect
+//     id={"#{@id}-rect"}
+//     phx-mousedown={select("self") |> make_movable("true", "##{@id}")}
+//     phx-mouseup={
+//       make_movable("false", "##{@id}") |> JS.push("update-node", value: %{node_id: @id})
+//     }
+//     graph-mousemove={move_node("##{@id}")}
+//     phx-click-away={unselect("self")}
+//     phx-value-x={@x}
+//     phx-value-y={@y}
+//     width="20"
+//     height="15"
+//     rx="2"
+//     ry="2"
+//     fill="currentColor"
+//     stroke="currentColor"
+//     stroke-width="0"
+//     class="text-gray-300 stroke-gray-400"
+//   />
+//   <text x="2" y="3" font-size="2" fill="currentColor" class="text-gray-900">
+//     <%= @title %>
+//   </text>
+//   <%= for {input, idx} <- Enum.with_index(@inputs) do %>
+//     <.graph_input node_id={"node-#{@id}"} label={input} offset={idx} />
+//   <% end %>
+//   <.graph_output id={"node-#{@id}-output"} />
+// </g>
 
 fn view(model: Model) -> element.Element(Msg) {
   let user_moved_mouse = fn(e) -> Result(Msg, List(DecodeError)) {

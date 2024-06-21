@@ -18,7 +18,13 @@ pub type NodeId =
 // }
 
 pub type Node {
-  Node(position: Vector, offset: Vector, id: NodeId, inputs: List(String), name: String)
+  Node(
+    position: Vector,
+    offset: Vector,
+    id: NodeId,
+    inputs: List(String),
+    name: String,
+  )
 }
 
 pub fn update_offset(node: Node, point: Vector) -> Node {
