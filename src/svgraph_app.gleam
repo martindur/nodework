@@ -415,8 +415,54 @@ fn view(model: Model) -> element.Element(Msg) {
         event.on("mousedown", mousedown),
         event.on_mouse_up(GraphSetNormalMode),
       ],
-      model.nodes
-        |> list.map(fn(node: Node) { view_node(node, model.nodes_selected) }),
+      [
+        svg.defs([], [
+          svg.pattern(
+            [
+              attribute.id("smallGrid"),
+              attr("width", "8"),
+              attr("height", "8"),
+              attr("patternUnits", "userSpaceOnUse"),
+            ],
+            [
+              svg.path([
+                attr("d", "M 8 0 L 0 0 0 8"),
+                attr("fill", "none"),
+                attr("stroke", "gray"),
+                attr("stroke-width", "0.5"),
+              ]),
+            ],
+          ),
+          svg.pattern(
+            [
+              attribute.id("grid"),
+              attr("width", "80"),
+              attr("height", "80"),
+              attr("patternUnits", "userSpaceOnUse"),
+            ],
+            [
+              svg.rect([
+                attr("width", "80"),
+                attr("height", "80"),
+                attr("fill", "url(#smallGrid)"),
+              ]),
+              svg.path([
+                attr("d", "M 80 0 L 0 0 0 80"),
+                attr("fill", "none"),
+                attr("stroke", "gray"),
+                attr("stroke-width", "1"),
+              ]),
+            ],
+          ),
+        ]),
+        svg.rect([
+          attr("width", "500%"),
+          attr("height", "500%"),
+          attr("fill", "url(#grid)"),
+        ]),
+        ..model.nodes
+        |> list.map(fn(node: Node) { view_node(node, model.nodes_selected) })
+      ],
     ),
   ])
 }
