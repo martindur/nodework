@@ -99,7 +99,7 @@ fn init(_flags) -> #(Model, Effect(Msg)) {
       nodes_selected: set.new(),
       resolution: get_window_size(),
       offset: Offset(x: 0, y: 0),
-      navigator: Navigator(Vector(0, 0), Vector(0, 0), Vector(0, 0), False),
+      navigator: Navigator(Vector(0, 0), False),
     ),
     effect.none(),
   )
@@ -130,8 +130,8 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     )
     UserClickedNode(node_id, mouse_event) -> #(
       model
-        |> update_navigator_on_clicked_node(mouse_event)
-        |> update_nodes_offset_on_clicked_node,
+        |> update_navigator_on_clicked_node
+        |> update_nodes_offset_on_clicked_node(mouse_event),
       update_node_selection(mouse_event, node_id),
     )
     UserUnclickedNode(_node_id) -> #(
@@ -166,20 +166,17 @@ fn update_navigator_on_moved_mouse(model: Model, point: Vector) -> Model {
   |> fn(nav) { Model(..model, navigator: nav) }
 }
 
-fn update_navigator_on_clicked_node(
-  model: Model,
-  mouse_event: MouseEvent,
-) -> Model {
-  mouse_event.position
-  |> fn(pos) {
-    Navigator(..model.navigator, clicked_point: pos, mouse_down: True)
-  }
+fn update_navigator_on_clicked_node(model: Model) -> Model {
+  Navigator(..model.navigator, mouse_down: True)
   |> fn(nav) { Model(..model, navigator: nav) }
 }
 
-fn update_nodes_offset_on_clicked_node(model: Model) -> Model {
+fn update_nodes_offset_on_clicked_node(
+  model: Model,
+  mouse_event: MouseEvent,
+) -> Model {
   model.nodes
-  |> map(nd.update_offset(_, model.navigator.clicked_point))
+  |> map(nd.update_offset(_, mouse_event.position))
   |> fn(x) { Model(..model, nodes: x) }
 }
 
@@ -416,8 +413,6 @@ fn view(model: Model) -> element.Element(Msg) {
         attr("contentEditable", "true"),
         attr("graph-pos-x", int.to_string(model.navigator.cursor_point.x)),
         attr("graph-pos-y", int.to_string(model.navigator.cursor_point.y)),
-        attr("graph-clicked-x", int.to_string(model.navigator.clicked_point.x)),
-        attr("graph-clicked-y", int.to_string(model.navigator.clicked_point.y)),
         event.on("mousemove", user_moved_mouse),
         event.on_mouse_down(UserClickedGraph),
       ],
