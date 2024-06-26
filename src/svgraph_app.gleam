@@ -19,6 +19,11 @@ import graph/vector.{type Vector, Vector}
 
 pub type ResizeEvent
 
+type GraphMode {
+  Normal
+  Drag
+}
+
 @external(javascript, "./resize.ffi.mjs", "windowSize")
 fn window_size() -> #(Int, Int)
 
@@ -64,17 +69,15 @@ type Model {
     nodes: List(Node),
     nodes_selected: Set(NodeId),
     resolution: Resolution,
-    offset: Offset,
+    offset: Vector,
     navigator: Navigator,
+    mode: GraphMode,
+    last_clicked_point: Vector
   )
 }
 
 type Resolution {
   Resolution(x: Int, y: Int)
-}
-
-type Offset {
-  Offset(x: Int, y: Int)
 }
 
 fn init(_flags) -> #(Model, Effect(Msg)) {
@@ -98,8 +101,10 @@ fn init(_flags) -> #(Model, Effect(Msg)) {
       ],
       nodes_selected: set.new(),
       resolution: get_window_size(),
-      offset: Offset(x: 0, y: 0),
+      offset: Vector(0, 0),
       navigator: Navigator(Vector(0, 0), False),
+      mode: Normal,
+      last_clicked_point: Vector(0, 0)
     ),
     effect.none(),
   )
@@ -110,7 +115,10 @@ pub opaque type Msg {
   UserMovedMouse(Vector)
   UserClickedNode(NodeId, MouseEvent)
   UserUnclickedNode(NodeId)
-  UserClickedGraph
+  UserClickedGraph(MouseEvent)
+  GraphClearSelection
+  GraphSetDragMode
+  GraphSetNormalMode
   GraphAddNodeToSelection(NodeId)
   GraphSetNodeAsSelection(NodeId)
   GraphResizeViewBox(Resolution)
@@ -124,20 +132,28 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     )
     UserMovedMouse(point) -> #(
       model
-        |> update_navigator_on_moved_mouse(point)
+        |> update_navigator_cursor_point(point)
+        |> update_graph_offset
         |> update_node_positions,
       effect.none(),
     )
     UserClickedNode(node_id, mouse_event) -> #(
       model
-        |> update_navigator_on_clicked_node
-        |> update_nodes_offset_on_clicked_node(mouse_event),
-      update_node_selection(mouse_event, node_id),
+        |> set_navigator_mouse_down
+        |> update_all_node_offsets(mouse_event),
+      update_selected_nodes(mouse_event, node_id),
     )
     UserUnclickedNode(_node_id) -> #(
       Model(..model, navigator: Navigator(..model.navigator, mouse_down: False)),
       effect.none(),
     )
+    UserClickedGraph(mouse_event) -> #(model |> update_last_clicked_point(mouse_event), user_clicked_graph(mouse_event))
+    GraphClearSelection -> #(
+      Model(..model, nodes_selected: set.new()),
+      effect.none(),
+    )
+    GraphSetDragMode -> #(Model(..model, mode: Drag), effect.none())
+    GraphSetNormalMode -> #(Model(..model, mode: Normal), effect.none())
     GraphAddNodeToSelection(node_id) -> #(
       Model(
         ..model,
@@ -149,10 +165,6 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       Model(..model, nodes_selected: set.new() |> set.insert(node_id)),
       effect.none(),
     )
-    UserClickedGraph -> #(
-      Model(..model, nodes_selected: set.new()),
-      effect.none(),
-    )
     GraphResizeViewBox(resolution) -> #(
       Model(..model, resolution: resolution),
       effect.none(),
@@ -160,24 +172,39 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
   }
 }
 
-fn update_navigator_on_moved_mouse(model: Model, point: Vector) -> Model {
+
+
+fn update_navigator_cursor_point(model: Model, point: Vector) -> Model {
   point
   |> fn(p) { Navigator(..model.navigator, cursor_point: p) }
   |> fn(nav) { Model(..model, navigator: nav) }
 }
 
-fn update_navigator_on_clicked_node(model: Model) -> Model {
+fn set_navigator_mouse_down(model: Model) -> Model {
   Navigator(..model.navigator, mouse_down: True)
   |> fn(nav) { Model(..model, navigator: nav) }
 }
 
-fn update_nodes_offset_on_clicked_node(
-  model: Model,
-  mouse_event: MouseEvent,
-) -> Model {
+fn update_last_clicked_point(model: Model, event: MouseEvent) -> Model {
+  event.position
+  |> fn(p) { Model(..model, last_clicked_point: vector.add(model.offset, p)) }
+}
+
+fn update_all_node_offsets(model: Model, event: MouseEvent) -> Model {
   model.nodes
-  |> map(nd.update_offset(_, mouse_event.position))
+  |> map(nd.update_offset(_, event.position))
   |> fn(x) { Model(..model, nodes: x) }
+}
+
+fn update_graph_offset(model: Model) -> Model {
+  case model.mode {
+    Normal -> model
+    Drag ->
+      Model(
+        ..model,
+        offset: navigator.calc_position(model.navigator, model.last_clicked_point) |> navigator.inverse
+      )
+  }
 }
 
 fn update_node_positions(model: Model) -> Model {
@@ -202,11 +229,21 @@ fn update_node_positions(model: Model) -> Model {
   |> fn(nodes) { Model(..model, nodes: nodes) }
 }
 
-fn update_node_selection(event: MouseEvent, node_id: NodeId) -> Effect(Msg) {
+fn update_selected_nodes(event: MouseEvent, node_id: NodeId) -> Effect(Msg) {
   effect.from(fn(dispatch) {
     case event.shift_key_active {
       True -> GraphAddNodeToSelection(node_id)
       False -> GraphSetNodeAsSelection(node_id)
+    }
+    |> dispatch
+  })
+}
+
+fn user_clicked_graph(event: MouseEvent) -> Effect(Msg) {
+  effect.from(fn(dispatch) {
+    case event.shift_key_active {
+      True -> GraphSetDragMode
+      False -> GraphClearSelection
     }
     |> dispatch
   })
@@ -236,7 +273,7 @@ fn translate(x: Int, y: Int) -> String {
   "translate(" <> x_string <> "," <> y_string <> ")"
 }
 
-fn attr_viewbox(offset: Offset, resolution: Resolution) -> Attribute(Msg) {
+fn attr_viewbox(offset: Vector, resolution: Resolution) -> Attribute(Msg) {
   [offset.x, offset.y, resolution.x, resolution.y]
   |> list.map(int.to_string)
   |> list.reduce(fn(a, b) { a <> " " <> b })
@@ -247,27 +284,6 @@ fn attr_viewbox(offset: Offset, resolution: Resolution) -> Attribute(Msg) {
     }
   }
 }
-
-// <g transform={"translate(0.15, #{5 + (@offset * 3)})"}>
-//   <circle
-//     id={"#{@node_id}-#{@label}"}
-//     cx="0"
-//     cy="0"
-//     r="1"
-//     fill="currentColor"
-//     class="text-gray-500"
-//   />
-//   <text
-//     x="2"
-//     y="0"
-//     font-size="1.25"
-//     dominant-baseline="middle"
-//     fill="currentColor"
-//     class="text-gray-900"
-//   >
-//     <%= @label %>
-//   </text>
-// </g>
 
 fn view_node_input(input: String, index: Int) -> element.Element(Msg) {
   svg.g(
@@ -363,41 +379,6 @@ fn view_node(node: Node, selection: Set(NodeId)) -> element.Element(Msg) {
   )
 }
 
-// <g
-//   id={@id}
-//   phx-hook="Node"
-//   sub-active="false"
-//   transform={"translate(#{@x}, #{@y})"}
-//   class="select-none"
-// >
-//   <rect
-//     id={"#{@id}-rect"}
-//     phx-mousedown={select("self") |> make_movable("true", "##{@id}")}
-//     phx-mouseup={
-//       make_movable("false", "##{@id}") |> JS.push("update-node", value: %{node_id: @id})
-//     }
-//     graph-mousemove={move_node("##{@id}")}
-//     phx-click-away={unselect("self")}
-//     phx-value-x={@x}
-//     phx-value-y={@y}
-//     width="20"
-//     height="15"
-//     rx="2"
-//     ry="2"
-//     fill="currentColor"
-//     stroke="currentColor"
-//     stroke-width="0"
-//     class="text-gray-300 stroke-gray-400"
-//   />
-//   <text x="2" y="3" font-size="2" fill="currentColor" class="text-gray-900">
-//     <%= @title %>
-//   </text>
-//   <%= for {input, idx} <- Enum.with_index(@inputs) do %>
-//     <.graph_input node_id={"node-#{@id}"} label={input} offset={idx} />
-//   <% end %>
-//   <.graph_output id={"node-#{@id}-output"} />
-// </g>
-
 fn view(model: Model) -> element.Element(Msg) {
   let user_moved_mouse = fn(e) -> Result(Msg, List(DecodeError)) {
     result.try(event.mouse_position(e), fn(pos) {
@@ -405,7 +386,19 @@ fn view(model: Model) -> element.Element(Msg) {
     })
   }
 
+  let mousedown = fn(e) -> Result(Msg, List(DecodeError)) {
+    use decoded_event <- result.try(mouse_event_decoder(e))
+
+    Ok(UserClickedGraph(decoded_event))
+  }
+
   html.div([], [
+    html.p([attribute.class("absolute right-2 top-2 select-none")], [
+      case model.mode {
+        Normal -> element.text("NORMAL")
+        Drag -> element.text("DRAG")
+      },
+    ]),
     svg.svg(
       [
         attribute.id("graph"),
@@ -414,7 +407,8 @@ fn view(model: Model) -> element.Element(Msg) {
         attr("graph-pos-x", int.to_string(model.navigator.cursor_point.x)),
         attr("graph-pos-y", int.to_string(model.navigator.cursor_point.y)),
         event.on("mousemove", user_moved_mouse),
-        event.on_mouse_down(UserClickedGraph),
+        event.on("mousedown", mousedown),
+        event.on_mouse_up(GraphSetNormalMode),
       ],
       model.nodes
         |> list.map(fn(node: Node) { view_node(node, model.nodes_selected) }),
