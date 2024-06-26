@@ -72,7 +72,7 @@ type Model {
     offset: Vector,
     navigator: Navigator,
     mode: GraphMode,
-    last_clicked_point: Vector
+    last_clicked_point: Vector,
   )
 }
 
@@ -104,7 +104,7 @@ fn init(_flags) -> #(Model, Effect(Msg)) {
       offset: Vector(0, 0),
       navigator: Navigator(Vector(0, 0), False),
       mode: Normal,
-      last_clicked_point: Vector(0, 0)
+      last_clicked_point: Vector(0, 0),
     ),
     effect.none(),
   )
@@ -147,7 +147,10 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       Model(..model, navigator: Navigator(..model.navigator, mouse_down: False)),
       effect.none(),
     )
-    UserClickedGraph(mouse_event) -> #(model |> update_last_clicked_point(mouse_event), user_clicked_graph(mouse_event))
+    UserClickedGraph(mouse_event) -> #(
+      model |> update_last_clicked_point(mouse_event),
+      user_clicked_graph(mouse_event),
+    )
     GraphClearSelection -> #(
       Model(..model, nodes_selected: set.new()),
       effect.none(),
@@ -171,8 +174,6 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     )
   }
 }
-
-
 
 fn update_navigator_cursor_point(model: Model, point: Vector) -> Model {
   point
@@ -202,7 +203,11 @@ fn update_graph_offset(model: Model) -> Model {
     Drag ->
       Model(
         ..model,
-        offset: navigator.calc_position(model.navigator, model.last_clicked_point) |> navigator.inverse
+        offset: navigator.calc_position(
+            model.navigator,
+            model.last_clicked_point,
+          )
+          |> navigator.inverse,
       )
   }
 }
