@@ -210,7 +210,7 @@ fn update_graph_offset(model: Model) -> Model {
             model.last_clicked_point,
           )
           |> vector.inverse
-          |> vector.bounded_vector(graph_limit)
+          |> vector.bounded_vector(graph_limit),
       )
   }
 }

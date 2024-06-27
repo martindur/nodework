@@ -10,4 +10,3 @@ pub fn calc_position(navigator: Navigator, offset: Vector) -> Vector {
   navigator.cursor_point
   |> vector.subtract(offset, _)
 }
-
