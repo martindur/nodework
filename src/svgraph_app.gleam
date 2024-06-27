@@ -24,6 +24,8 @@ type GraphMode {
   Drag
 }
 
+const graph_limit = 500
+
 @external(javascript, "./resize.ffi.mjs", "windowSize")
 fn window_size() -> #(Int, Int)
 
@@ -207,7 +209,8 @@ fn update_graph_offset(model: Model) -> Model {
             model.navigator,
             model.last_clicked_point,
           )
-          |> navigator.inverse,
+          |> vector.inverse
+          |> vector.bounded_vector(graph_limit),
       )
   }
 }
@@ -409,14 +412,60 @@ fn view(model: Model) -> element.Element(Msg) {
         attribute.id("graph"),
         attr_viewbox(model.offset, model.resolution),
         attr("contentEditable", "true"),
-        attr("graph-pos-x", int.to_string(model.navigator.cursor_point.x)),
-        attr("graph-pos-y", int.to_string(model.navigator.cursor_point.y)),
         event.on("mousemove", user_moved_mouse),
         event.on("mousedown", mousedown),
         event.on_mouse_up(GraphSetNormalMode),
       ],
-      model.nodes
-        |> list.map(fn(node: Node) { view_node(node, model.nodes_selected) }),
+      [
+        svg.defs([], [
+          svg.pattern(
+            [
+              attribute.id("smallGrid"),
+              attr("width", "8"),
+              attr("height", "8"),
+              attr("patternUnits", "userSpaceOnUse"),
+            ],
+            [
+              svg.path([
+                attr("d", "M 8 0 L 0 0 0 8"),
+                attr("fill", "none"),
+                attr("stroke", "gray"),
+                attr("stroke-width", "0.5"),
+              ]),
+            ],
+          ),
+          svg.pattern(
+            [
+              attribute.id("grid"),
+              attr("width", "80"),
+              attr("height", "80"),
+              attr("patternUnits", "userSpaceOnUse"),
+            ],
+            [
+              svg.rect([
+                attr("width", "80"),
+                attr("height", "80"),
+                attr("fill", "url(#smallGrid)"),
+              ]),
+              svg.path([
+                attr("d", "M 80 0 L 0 0 0 80"),
+                attr("fill", "none"),
+                attr("stroke", "gray"),
+                attr("stroke-width", "1"),
+              ]),
+            ],
+          ),
+        ]),
+        svg.rect([
+          attr("x", "-250%"),
+          attr("y", "-250%"),
+          attr("width", "500%"),
+          attr("height", "500%"),
+          attr("fill", "url(#grid)"),
+        ]),
+        ..model.nodes
+        |> list.map(fn(node: Node) { view_node(node, model.nodes_selected) })
+      ],
     ),
   ])
 }
