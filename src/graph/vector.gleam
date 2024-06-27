@@ -13,6 +13,19 @@ pub fn add(a: Vector, b: Vector) -> Vector {
   Vector(x: a.x + b.x, y: a.y + b.y)
 }
 
+pub fn map_vector(vec: Vector, f: fn(Int) -> Int) -> Vector {
+  Vector(x: f(vec.x), y: f(vec.y))
+}
+
+pub fn bounded_vector(vec: Vector, bound: Int) -> Vector {
+  vec
+  |> map_vector(fn(val) { int.min(val, bound) |> int.max({ bound * -1 }) })
+}
+
+pub fn inverse(p: Vector) -> Vector {
+  Vector(p.x * -1, p.y * -1)
+}
+
 pub fn get_path(start_point: Vector, end_point: Vector) -> String {
   let halfway_diff = int.absolute_value(start_point.x - end_point.y) / 2
 
