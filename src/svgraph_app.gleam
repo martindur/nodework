@@ -26,14 +26,18 @@ type GraphMode {
 
 const graph_limit = 500
 
+const scroll_step = 120.0
+
+const scroll_factor = 0.1
+
 @external(javascript, "./resize.ffi.mjs", "windowSize")
 fn window_size() -> #(Int, Int)
 
-fn get_window_size() -> Resolution {
+fn get_window_size() -> Vector {
   window_size()
   |> fn(z) {
     let #(x, y) = z
-    Resolution(x: x, y: y)
+    Vector(x: x, y: y)
   }
 }
 
@@ -70,16 +74,13 @@ type Model {
   Model(
     nodes: List(Node),
     nodes_selected: Set(NodeId),
-    resolution: Resolution,
+    resolution: Vector,
     offset: Vector,
     navigator: Navigator,
     mode: GraphMode,
     last_clicked_point: Vector,
+    zoom_level: Float,
   )
-}
-
-type Resolution {
-  Resolution(x: Int, y: Int)
 }
 
 fn init(_flags) -> #(Model, Effect(Msg)) {
@@ -107,6 +108,7 @@ fn init(_flags) -> #(Model, Effect(Msg)) {
       navigator: Navigator(Vector(0, 0), False),
       mode: Normal,
       last_clicked_point: Vector(0, 0),
+      zoom_level: 1.0,
     ),
     effect.none(),
   )
@@ -118,12 +120,13 @@ pub opaque type Msg {
   UserClickedNode(NodeId, MouseEvent)
   UserUnclickedNode(NodeId)
   UserClickedGraph(MouseEvent)
+  UserScrolled(Float)
   GraphClearSelection
   GraphSetDragMode
   GraphSetNormalMode
   GraphAddNodeToSelection(NodeId)
   GraphSetNodeAsSelection(NodeId)
-  GraphResizeViewBox(Resolution)
+  GraphResizeViewBox(Vector)
 }
 
 fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
@@ -153,6 +156,10 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       model |> update_last_clicked_point(mouse_event),
       user_clicked_graph(mouse_event),
     )
+    UserScrolled(delta_y) -> #(
+      model |> update_zoom_level(delta_y) |> update_resolution_with_zoom_level,
+      effect.none(),
+    )
     GraphClearSelection -> #(
       Model(..model, nodes_selected: set.new()),
       effect.none(),
@@ -171,10 +178,21 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       effect.none(),
     )
     GraphResizeViewBox(resolution) -> #(
-      Model(..model, resolution: resolution),
+      Model(..model, resolution: resolution) |> update_resolution_with_zoom_level,
       effect.none(),
     )
   }
+}
+
+fn update_zoom_level(model: Model, delta_y: Float) -> Model {
+  delta_y
+  |> fn(d) { { d /. scroll_step } *. scroll_factor }
+  |> fn(d) { Model(..model, zoom_level: model.zoom_level +. d) }
+}
+
+fn update_resolution_with_zoom_level(model: Model) -> Model {
+  vector.scalar(model.resolution, model.zoom_level)
+  |> fn(vec) { Model(..model, resolution: vec) }
 }
 
 fn update_navigator_cursor_point(model: Model, point: Vector) -> Model {
@@ -281,7 +299,7 @@ fn translate(x: Int, y: Int) -> String {
   "translate(" <> x_string <> "," <> y_string <> ")"
 }
 
-fn attr_viewbox(offset: Vector, resolution: Resolution) -> Attribute(Msg) {
+fn attr_viewbox(offset: Vector, resolution: Vector) -> Attribute(Msg) {
   [offset.x, offset.y, resolution.x, resolution.y]
   |> list.map(int.to_string)
   |> list.reduce(fn(a, b) { a <> " " <> b })
@@ -400,6 +418,14 @@ fn view(model: Model) -> element.Element(Msg) {
     Ok(UserClickedGraph(decoded_event))
   }
 
+  let wheel = fn(e) -> Result(Msg, List(DecodeError)) {
+    use delta_y <- result.try(dynamic.field("deltaY", dynamic.float)(e))
+
+    io.debug(delta_y)
+
+    Ok(UserScrolled(delta_y))
+  }
+
   html.div([], [
     html.p([attribute.class("absolute right-2 top-2 select-none")], [
       case model.mode {
@@ -415,6 +441,7 @@ fn view(model: Model) -> element.Element(Msg) {
         event.on("mousemove", user_moved_mouse),
         event.on("mousedown", mousedown),
         event.on_mouse_up(GraphSetNormalMode),
+        event.on("wheel", wheel),
       ],
       [
         svg.defs([], [
