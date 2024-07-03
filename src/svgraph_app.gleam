@@ -30,6 +30,10 @@ const scroll_step = 120.0
 
 const scroll_factor = 0.1
 
+const limit_zoom_in = 0.5
+
+const limit_zoom_out = 3.0
+
 @external(javascript, "./resize.ffi.mjs", "windowSize")
 fn window_size() -> #(Int, Int)
 
@@ -74,7 +78,8 @@ type Model {
   Model(
     nodes: List(Node),
     nodes_selected: Set(NodeId),
-    resolution: Vector,
+    window_resolution: Vector,
+    active_resolution: Vector,
     offset: Vector,
     navigator: Navigator,
     mode: GraphMode,
@@ -103,7 +108,8 @@ fn init(_flags) -> #(Model, Effect(Msg)) {
         ),
       ],
       nodes_selected: set.new(),
-      resolution: get_window_size(),
+      window_resolution: get_window_size(),
+      active_resolution: get_window_size(),
       offset: Vector(0, 0),
       navigator: Navigator(Vector(0, 0), False),
       mode: Normal,
@@ -157,7 +163,9 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       user_clicked_graph(mouse_event),
     )
     UserScrolled(delta_y) -> #(
-      model |> update_zoom_level(delta_y) |> update_resolution_with_zoom_level,
+      model
+        |> update_zoom_level(delta_y)
+        |> update_active_resolution_with_zoom_level,
       effect.none(),
     )
     GraphClearSelection -> #(
@@ -178,7 +186,8 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       effect.none(),
     )
     GraphResizeViewBox(resolution) -> #(
-      Model(..model, resolution: resolution) |> update_resolution_with_zoom_level,
+      Model(..model, window_resolution: resolution)
+        |> update_active_resolution_with_zoom_level,
       effect.none(),
     )
   }
@@ -187,16 +196,21 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
 fn update_zoom_level(model: Model, delta_y: Float) -> Model {
   delta_y
   |> fn(d) { { d /. scroll_step } *. scroll_factor }
-  |> fn(d) { Model(..model, zoom_level: model.zoom_level +. d) }
+  |> float.add(model.zoom_level)
+  |> float.min(limit_zoom_out)
+  |> float.max(limit_zoom_in)
+  |> io.debug
+  |> fn(level) { Model(..model, zoom_level: level) }
 }
 
-fn update_resolution_with_zoom_level(model: Model) -> Model {
-  vector.scalar(model.resolution, model.zoom_level)
-  |> fn(vec) { Model(..model, resolution: vec) }
+fn update_active_resolution_with_zoom_level(model: Model) -> Model {
+  vector.scalar(model.window_resolution, model.zoom_level)
+  |> fn(vec) { Model(..model, active_resolution: vec) }
 }
 
 fn update_navigator_cursor_point(model: Model, point: Vector) -> Model {
   point
+  |> vector.scalar(model.zoom_level)
   |> fn(p) { Navigator(..model.navigator, cursor_point: p) }
   |> fn(nav) { Model(..model, navigator: nav) }
 }
@@ -208,12 +222,16 @@ fn set_navigator_mouse_down(model: Model) -> Model {
 
 fn update_last_clicked_point(model: Model, event: MouseEvent) -> Model {
   event.position
-  |> fn(p) { Model(..model, last_clicked_point: vector.add(model.offset, p)) }
+  |> vector.add(model.offset)
+  |> vector.scalar(model.zoom_level)
+  |> io.debug
+  |> fn(p) { Model(..model, last_clicked_point: p) }
 }
 
 fn update_all_node_offsets(model: Model, event: MouseEvent) -> Model {
   model.nodes
   |> map(nd.update_offset(_, event.position))
+  |> map(nd.scale_offset(_, model.zoom_level))
   |> fn(x) { Model(..model, nodes: x) }
 }
 
@@ -251,6 +269,7 @@ fn update_node_positions(model: Model) -> Model {
         )
     }
   })
+  |> map(nd.scale_position(_, model.zoom_level))
   |> fn(nodes) { [unselected, nodes] |> list.concat }
   |> fn(nodes) { Model(..model, nodes: nodes) }
 }
@@ -405,6 +424,64 @@ fn view_node(node: Node, selection: Set(NodeId)) -> element.Element(Msg) {
   )
 }
 
+fn view_grid_canvas(width: Int, height: Int) -> element.Element(Msg) {
+  let w = int.to_string(width) <> "%"
+  let h = int.to_string(height) <> "%"
+
+  let x = "-" <> int.to_string(width / 2) <> "%"
+  let y = "-" <> int.to_string(height / 2) <> "%"
+
+  svg.rect([
+    attr("x", x),
+    attr("y", y),
+    attr("width", w),
+    attr("height", h),
+    attr("fill", "url(#grid)"),
+  ])
+}
+
+fn view_grid() -> element.Element(Msg) {
+  svg.defs([], [
+    svg.pattern(
+      [
+        attribute.id("smallGrid"),
+        attr("width", "8"),
+        attr("height", "8"),
+        attr("patternUnits", "userSpaceOnUse"),
+      ],
+      [
+        svg.path([
+          attr("d", "M 8 0 L 0 0 0 8"),
+          attr("fill", "none"),
+          attr("stroke", "gray"),
+          attr("stroke-width", "0.5"),
+        ]),
+      ],
+    ),
+    svg.pattern(
+      [
+        attribute.id("grid"),
+        attr("width", "80"),
+        attr("height", "80"),
+        attr("patternUnits", "userSpaceOnUse"),
+      ],
+      [
+        svg.rect([
+          attr("width", "80"),
+          attr("height", "80"),
+          attr("fill", "url(#smallGrid)"),
+        ]),
+        svg.path([
+          attr("d", "M 80 0 L 0 0 0 80"),
+          attr("fill", "none"),
+          attr("stroke", "gray"),
+          attr("stroke-width", "1"),
+        ]),
+      ],
+    ),
+  ])
+}
+
 fn view(model: Model) -> element.Element(Msg) {
   let user_moved_mouse = fn(e) -> Result(Msg, List(DecodeError)) {
     result.try(event.mouse_position(e), fn(pos) {
@@ -421,8 +498,6 @@ fn view(model: Model) -> element.Element(Msg) {
   let wheel = fn(e) -> Result(Msg, List(DecodeError)) {
     use delta_y <- result.try(dynamic.field("deltaY", dynamic.float)(e))
 
-    io.debug(delta_y)
-
     Ok(UserScrolled(delta_y))
   }
 
@@ -436,7 +511,7 @@ fn view(model: Model) -> element.Element(Msg) {
     svg.svg(
       [
         attribute.id("graph"),
-        attr_viewbox(model.offset, model.resolution),
+        attr_viewbox(model.offset, model.active_resolution),
         attr("contentEditable", "true"),
         event.on("mousemove", user_moved_mouse),
         event.on("mousedown", mousedown),
@@ -444,52 +519,8 @@ fn view(model: Model) -> element.Element(Msg) {
         event.on("wheel", wheel),
       ],
       [
-        svg.defs([], [
-          svg.pattern(
-            [
-              attribute.id("smallGrid"),
-              attr("width", "8"),
-              attr("height", "8"),
-              attr("patternUnits", "userSpaceOnUse"),
-            ],
-            [
-              svg.path([
-                attr("d", "M 8 0 L 0 0 0 8"),
-                attr("fill", "none"),
-                attr("stroke", "gray"),
-                attr("stroke-width", "0.5"),
-              ]),
-            ],
-          ),
-          svg.pattern(
-            [
-              attribute.id("grid"),
-              attr("width", "80"),
-              attr("height", "80"),
-              attr("patternUnits", "userSpaceOnUse"),
-            ],
-            [
-              svg.rect([
-                attr("width", "80"),
-                attr("height", "80"),
-                attr("fill", "url(#smallGrid)"),
-              ]),
-              svg.path([
-                attr("d", "M 80 0 L 0 0 0 80"),
-                attr("fill", "none"),
-                attr("stroke", "gray"),
-                attr("stroke-width", "1"),
-              ]),
-            ],
-          ),
-        ]),
-        svg.rect([
-          attr("x", "-250%"),
-          attr("y", "-250%"),
-          attr("width", "500%"),
-          attr("height", "500%"),
-          attr("fill", "url(#grid)"),
-        ]),
+        view_grid(),
+        view_grid_canvas(500, 500),
         ..model.nodes
         |> list.map(fn(node: Node) { view_node(node, model.nodes_selected) })
       ],
