@@ -1,5 +1,3 @@
-import gleam/dict
-import gleam/int
 import graph/vector.{type Vector, Vector}
 
 pub type Navigator {

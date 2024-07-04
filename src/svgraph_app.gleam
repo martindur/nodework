@@ -151,7 +151,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     UserClickedNode(node_id, mouse_event) -> #(
       model
         |> set_navigator_mouse_down
-        |> update_all_node_offsets(mouse_event),
+        |> update_all_node_offsets,
       update_selected_nodes(mouse_event, node_id),
     )
     UserUnclickedNode(_node_id) -> #(
@@ -195,11 +195,15 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
 
 fn update_zoom_level(model: Model, delta_y: Float) -> Model {
   delta_y
-  |> fn(d) { { d /. scroll_step } *. scroll_factor }
+  |> fn(d) { 
+    case d >. 0.0 {
+      True -> 1.0 *. scroll_factor
+      False -> -1.0 *. scroll_factor
+    }
+  }
   |> float.add(model.zoom_level)
   |> float.min(limit_zoom_out)
   |> float.max(limit_zoom_in)
-  |> io.debug
   |> fn(level) { Model(..model, zoom_level: level) }
 }
 
@@ -222,16 +226,14 @@ fn set_navigator_mouse_down(model: Model) -> Model {
 
 fn update_last_clicked_point(model: Model, event: MouseEvent) -> Model {
   event.position
-  |> vector.add(model.offset)
   |> vector.scalar(model.zoom_level)
-  |> io.debug
+  |> vector.add(model.offset)
   |> fn(p) { Model(..model, last_clicked_point: p) }
 }
 
-fn update_all_node_offsets(model: Model, event: MouseEvent) -> Model {
+fn update_all_node_offsets(model: Model) -> Model {
   model.nodes
-  |> map(nd.update_offset(_, event.position))
-  |> map(nd.scale_offset(_, model.zoom_level))
+  |> map(nd.update_offset(_, model.navigator.cursor_point))
   |> fn(x) { Model(..model, nodes: x) }
 }
 
@@ -269,7 +271,7 @@ fn update_node_positions(model: Model) -> Model {
         )
     }
   })
-  |> map(nd.scale_position(_, model.zoom_level))
+  // |> map(nd.scale_position(_, model.zoom_level))
   |> fn(nodes) { [unselected, nodes] |> list.concat }
   |> fn(nodes) { Model(..model, nodes: nodes) }
 }
@@ -328,6 +330,45 @@ fn attr_viewbox(offset: Vector, resolution: Vector) -> Attribute(Msg) {
       Error(_) -> attr("viewBox", "0 0 100 100")
     }
   }
+}
+
+fn debug_draw_offset(nodes: List(Node)) -> element.Element(Msg) {
+  svg.g(
+    [],
+    nodes
+      |> map(fn(node) {
+        [
+          attr("x1", int.to_string(node.position.x)),
+          attr("y1", int.to_string(node.position.y)),
+          attr("x2", int.to_string(node.position.x + node.offset.x)),
+          attr("y2", int.to_string(node.position.y + node.offset.y)),
+          attr("stroke", "red"),
+        ]
+        |> svg.line()
+      }),
+  )
+}
+
+fn debug_draw_cursor_point(navigator: Navigator) -> element.Element(Msg) {
+  navigator.cursor_point
+  |> fn(p: Vector) {[
+    attr("r", "2"),
+    attr("color", "red"),
+    attr("cx", p.x |> int.to_string),
+    attr("cy", p.y |> int.to_string)
+  ]}
+  |> svg.circle()
+}
+
+fn debug_draw_last_clicked_point(model: Model) -> element.Element(Msg) {
+  model.last_clicked_point
+  |> fn(p: Vector) {[
+    attr("r", "2"),
+    attr("color", "red"),
+    attr("cx", p.x |> int.to_string),
+    attr("cy", p.y |> int.to_string)
+  ]}
+  |> svg.circle()
 }
 
 fn view_node_input(input: String, index: Int) -> element.Element(Msg) {
@@ -521,8 +562,14 @@ fn view(model: Model) -> element.Element(Msg) {
       [
         view_grid(),
         view_grid_canvas(500, 500),
-        ..model.nodes
-        |> list.map(fn(node: Node) { view_node(node, model.nodes_selected) })
+        svg.g(
+          [],
+          model.nodes
+            |> list.map(fn(node: Node) { view_node(node, model.nodes_selected) }),
+        ),
+        // debug_draw_offset(model.nodes),
+        // debug_draw_cursor_point(model.navigator),
+        // debug_draw_last_clicked_point(model)
       ],
     ),
   ])

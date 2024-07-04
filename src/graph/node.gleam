@@ -1,4 +1,4 @@
-import gleam/int
+import gleam/io
 import graph/vector.{type Vector}
 
 pub type NodeId =
@@ -30,7 +30,9 @@ pub type Node {
 
 /// Update a Node offset vector by subtracting its current position with a given point
 pub fn update_offset(node: Node, point: Vector) -> Node {
-  Node(..node, offset: vector.subtract(node.position, point))
+  node.position
+  |> vector.subtract(point)
+  |> fn(p) { Node(..node, offset: p) }
 }
 
 pub fn scale_offset(node: Node, scalar: Float) -> Node {
