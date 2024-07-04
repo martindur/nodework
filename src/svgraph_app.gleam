@@ -195,7 +195,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
 
 fn update_zoom_level(model: Model, delta_y: Float) -> Model {
   delta_y
-  |> fn(d) { 
+  |> fn(d) {
     case d >. 0.0 {
       True -> 1.0 *. scroll_factor
       False -> -1.0 *. scroll_factor
@@ -351,23 +351,27 @@ fn debug_draw_offset(nodes: List(Node)) -> element.Element(Msg) {
 
 fn debug_draw_cursor_point(navigator: Navigator) -> element.Element(Msg) {
   navigator.cursor_point
-  |> fn(p: Vector) {[
-    attr("r", "2"),
-    attr("color", "red"),
-    attr("cx", p.x |> int.to_string),
-    attr("cy", p.y |> int.to_string)
-  ]}
+  |> fn(p: Vector) {
+    [
+      attr("r", "2"),
+      attr("color", "red"),
+      attr("cx", p.x |> int.to_string),
+      attr("cy", p.y |> int.to_string),
+    ]
+  }
   |> svg.circle()
 }
 
 fn debug_draw_last_clicked_point(model: Model) -> element.Element(Msg) {
   model.last_clicked_point
-  |> fn(p: Vector) {[
-    attr("r", "2"),
-    attr("color", "red"),
-    attr("cx", p.x |> int.to_string),
-    attr("cy", p.y |> int.to_string)
-  ]}
+  |> fn(p: Vector) {
+    [
+      attr("r", "2"),
+      attr("color", "red"),
+      attr("cx", p.x |> int.to_string),
+      attr("cy", p.y |> int.to_string),
+    ]
+  }
   |> svg.circle()
 }
 
@@ -568,8 +572,8 @@ fn view(model: Model) -> element.Element(Msg) {
             |> list.map(fn(node: Node) { view_node(node, model.nodes_selected) }),
         ),
         // debug_draw_offset(model.nodes),
-        // debug_draw_cursor_point(model.navigator),
-        // debug_draw_last_clicked_point(model)
+      // debug_draw_cursor_point(model.navigator),
+      // debug_draw_last_clicked_point(model)
       ],
     ),
   ])
