@@ -26,14 +26,22 @@ type GraphMode {
 
 const graph_limit = 500
 
+const scroll_step = 120.0
+
+const scroll_factor = 0.1
+
+const limit_zoom_in = 0.5
+
+const limit_zoom_out = 3.0
+
 @external(javascript, "./resize.ffi.mjs", "windowSize")
 fn window_size() -> #(Int, Int)
 
-fn get_window_size() -> Resolution {
+fn get_window_size() -> Vector {
   window_size()
   |> fn(z) {
     let #(x, y) = z
-    Resolution(x: x, y: y)
+    Vector(x: x, y: y)
   }
 }
 
@@ -70,16 +78,14 @@ type Model {
   Model(
     nodes: List(Node),
     nodes_selected: Set(NodeId),
-    resolution: Resolution,
+    window_resolution: Vector,
+    active_resolution: Vector,
     offset: Vector,
     navigator: Navigator,
     mode: GraphMode,
     last_clicked_point: Vector,
+    zoom_level: Float,
   )
-}
-
-type Resolution {
-  Resolution(x: Int, y: Int)
 }
 
 fn init(_flags) -> #(Model, Effect(Msg)) {
@@ -102,11 +108,13 @@ fn init(_flags) -> #(Model, Effect(Msg)) {
         ),
       ],
       nodes_selected: set.new(),
-      resolution: get_window_size(),
+      window_resolution: get_window_size(),
+      active_resolution: get_window_size(),
       offset: Vector(0, 0),
       navigator: Navigator(Vector(0, 0), False),
       mode: Normal,
       last_clicked_point: Vector(0, 0),
+      zoom_level: 1.0,
     ),
     effect.none(),
   )
@@ -118,12 +126,13 @@ pub opaque type Msg {
   UserClickedNode(NodeId, MouseEvent)
   UserUnclickedNode(NodeId)
   UserClickedGraph(MouseEvent)
+  UserScrolled(Float)
   GraphClearSelection
   GraphSetDragMode
   GraphSetNormalMode
   GraphAddNodeToSelection(NodeId)
   GraphSetNodeAsSelection(NodeId)
-  GraphResizeViewBox(Resolution)
+  GraphResizeViewBox(Vector)
 }
 
 fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
@@ -142,7 +151,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     UserClickedNode(node_id, mouse_event) -> #(
       model
         |> set_navigator_mouse_down
-        |> update_all_node_offsets(mouse_event),
+        |> update_all_node_offsets,
       update_selected_nodes(mouse_event, node_id),
     )
     UserUnclickedNode(_node_id) -> #(
@@ -152,6 +161,12 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     UserClickedGraph(mouse_event) -> #(
       model |> update_last_clicked_point(mouse_event),
       user_clicked_graph(mouse_event),
+    )
+    UserScrolled(delta_y) -> #(
+      model
+        |> update_zoom_level(delta_y)
+        |> update_active_resolution_with_zoom_level,
+      effect.none(),
     )
     GraphClearSelection -> #(
       Model(..model, nodes_selected: set.new()),
@@ -171,14 +186,35 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       effect.none(),
     )
     GraphResizeViewBox(resolution) -> #(
-      Model(..model, resolution: resolution),
+      Model(..model, window_resolution: resolution)
+        |> update_active_resolution_with_zoom_level,
       effect.none(),
     )
   }
 }
 
+fn update_zoom_level(model: Model, delta_y: Float) -> Model {
+  delta_y
+  |> fn(d) {
+    case d >. 0.0 {
+      True -> 1.0 *. scroll_factor
+      False -> -1.0 *. scroll_factor
+    }
+  }
+  |> float.add(model.zoom_level)
+  |> float.min(limit_zoom_out)
+  |> float.max(limit_zoom_in)
+  |> fn(level) { Model(..model, zoom_level: level) }
+}
+
+fn update_active_resolution_with_zoom_level(model: Model) -> Model {
+  vector.scalar(model.window_resolution, model.zoom_level)
+  |> fn(vec) { Model(..model, active_resolution: vec) }
+}
+
 fn update_navigator_cursor_point(model: Model, point: Vector) -> Model {
   point
+  |> vector.scalar(model.zoom_level)
   |> fn(p) { Navigator(..model.navigator, cursor_point: p) }
   |> fn(nav) { Model(..model, navigator: nav) }
 }
@@ -190,12 +226,14 @@ fn set_navigator_mouse_down(model: Model) -> Model {
 
 fn update_last_clicked_point(model: Model, event: MouseEvent) -> Model {
   event.position
-  |> fn(p) { Model(..model, last_clicked_point: vector.add(model.offset, p)) }
+  |> vector.scalar(model.zoom_level)
+  |> vector.add(model.offset)
+  |> fn(p) { Model(..model, last_clicked_point: p) }
 }
 
-fn update_all_node_offsets(model: Model, event: MouseEvent) -> Model {
+fn update_all_node_offsets(model: Model) -> Model {
   model.nodes
-  |> map(nd.update_offset(_, event.position))
+  |> map(nd.update_offset(_, model.navigator.cursor_point))
   |> fn(x) { Model(..model, nodes: x) }
 }
 
@@ -233,6 +271,7 @@ fn update_node_positions(model: Model) -> Model {
         )
     }
   })
+  // |> map(nd.scale_position(_, model.zoom_level))
   |> fn(nodes) { [unselected, nodes] |> list.concat }
   |> fn(nodes) { Model(..model, nodes: nodes) }
 }
@@ -281,7 +320,7 @@ fn translate(x: Int, y: Int) -> String {
   "translate(" <> x_string <> "," <> y_string <> ")"
 }
 
-fn attr_viewbox(offset: Vector, resolution: Resolution) -> Attribute(Msg) {
+fn attr_viewbox(offset: Vector, resolution: Vector) -> Attribute(Msg) {
   [offset.x, offset.y, resolution.x, resolution.y]
   |> list.map(int.to_string)
   |> list.reduce(fn(a, b) { a <> " " <> b })
@@ -291,6 +330,49 @@ fn attr_viewbox(offset: Vector, resolution: Resolution) -> Attribute(Msg) {
       Error(_) -> attr("viewBox", "0 0 100 100")
     }
   }
+}
+
+fn debug_draw_offset(nodes: List(Node)) -> element.Element(Msg) {
+  svg.g(
+    [],
+    nodes
+      |> map(fn(node) {
+        [
+          attr("x1", int.to_string(node.position.x)),
+          attr("y1", int.to_string(node.position.y)),
+          attr("x2", int.to_string(node.position.x + node.offset.x)),
+          attr("y2", int.to_string(node.position.y + node.offset.y)),
+          attr("stroke", "red"),
+        ]
+        |> svg.line()
+      }),
+  )
+}
+
+fn debug_draw_cursor_point(navigator: Navigator) -> element.Element(Msg) {
+  navigator.cursor_point
+  |> fn(p: Vector) {
+    [
+      attr("r", "2"),
+      attr("color", "red"),
+      attr("cx", p.x |> int.to_string),
+      attr("cy", p.y |> int.to_string),
+    ]
+  }
+  |> svg.circle()
+}
+
+fn debug_draw_last_clicked_point(model: Model) -> element.Element(Msg) {
+  model.last_clicked_point
+  |> fn(p: Vector) {
+    [
+      attr("r", "2"),
+      attr("color", "red"),
+      attr("cx", p.x |> int.to_string),
+      attr("cy", p.y |> int.to_string),
+    ]
+  }
+  |> svg.circle()
 }
 
 fn view_node_input(input: String, index: Int) -> element.Element(Msg) {
@@ -387,6 +469,64 @@ fn view_node(node: Node, selection: Set(NodeId)) -> element.Element(Msg) {
   )
 }
 
+fn view_grid_canvas(width: Int, height: Int) -> element.Element(Msg) {
+  let w = int.to_string(width) <> "%"
+  let h = int.to_string(height) <> "%"
+
+  let x = "-" <> int.to_string(width / 2) <> "%"
+  let y = "-" <> int.to_string(height / 2) <> "%"
+
+  svg.rect([
+    attr("x", x),
+    attr("y", y),
+    attr("width", w),
+    attr("height", h),
+    attr("fill", "url(#grid)"),
+  ])
+}
+
+fn view_grid() -> element.Element(Msg) {
+  svg.defs([], [
+    svg.pattern(
+      [
+        attribute.id("smallGrid"),
+        attr("width", "8"),
+        attr("height", "8"),
+        attr("patternUnits", "userSpaceOnUse"),
+      ],
+      [
+        svg.path([
+          attr("d", "M 8 0 L 0 0 0 8"),
+          attr("fill", "none"),
+          attr("stroke", "gray"),
+          attr("stroke-width", "0.5"),
+        ]),
+      ],
+    ),
+    svg.pattern(
+      [
+        attribute.id("grid"),
+        attr("width", "80"),
+        attr("height", "80"),
+        attr("patternUnits", "userSpaceOnUse"),
+      ],
+      [
+        svg.rect([
+          attr("width", "80"),
+          attr("height", "80"),
+          attr("fill", "url(#smallGrid)"),
+        ]),
+        svg.path([
+          attr("d", "M 80 0 L 0 0 0 80"),
+          attr("fill", "none"),
+          attr("stroke", "gray"),
+          attr("stroke-width", "1"),
+        ]),
+      ],
+    ),
+  ])
+}
+
 fn view(model: Model) -> element.Element(Msg) {
   let user_moved_mouse = fn(e) -> Result(Msg, List(DecodeError)) {
     result.try(event.mouse_position(e), fn(pos) {
@@ -400,6 +540,12 @@ fn view(model: Model) -> element.Element(Msg) {
     Ok(UserClickedGraph(decoded_event))
   }
 
+  let wheel = fn(e) -> Result(Msg, List(DecodeError)) {
+    use delta_y <- result.try(dynamic.field("deltaY", dynamic.float)(e))
+
+    Ok(UserScrolled(delta_y))
+  }
+
   html.div([], [
     html.p([attribute.class("absolute right-2 top-2 select-none")], [
       case model.mode {
@@ -410,61 +556,24 @@ fn view(model: Model) -> element.Element(Msg) {
     svg.svg(
       [
         attribute.id("graph"),
-        attr_viewbox(model.offset, model.resolution),
+        attr_viewbox(model.offset, model.active_resolution),
         attr("contentEditable", "true"),
         event.on("mousemove", user_moved_mouse),
         event.on("mousedown", mousedown),
         event.on_mouse_up(GraphSetNormalMode),
+        event.on("wheel", wheel),
       ],
       [
-        svg.defs([], [
-          svg.pattern(
-            [
-              attribute.id("smallGrid"),
-              attr("width", "8"),
-              attr("height", "8"),
-              attr("patternUnits", "userSpaceOnUse"),
-            ],
-            [
-              svg.path([
-                attr("d", "M 8 0 L 0 0 0 8"),
-                attr("fill", "none"),
-                attr("stroke", "gray"),
-                attr("stroke-width", "0.5"),
-              ]),
-            ],
-          ),
-          svg.pattern(
-            [
-              attribute.id("grid"),
-              attr("width", "80"),
-              attr("height", "80"),
-              attr("patternUnits", "userSpaceOnUse"),
-            ],
-            [
-              svg.rect([
-                attr("width", "80"),
-                attr("height", "80"),
-                attr("fill", "url(#smallGrid)"),
-              ]),
-              svg.path([
-                attr("d", "M 80 0 L 0 0 0 80"),
-                attr("fill", "none"),
-                attr("stroke", "gray"),
-                attr("stroke-width", "1"),
-              ]),
-            ],
-          ),
-        ]),
-        svg.rect([
-          attr("x", "-250%"),
-          attr("y", "-250%"),
-          attr("width", "500%"),
-          attr("height", "500%"),
-          attr("fill", "url(#grid)"),
-        ]),
-        ..model.nodes
-        |> list.map(fn(node: Node) { view_node(node, model.nodes_selected) })
+        view_grid(),
+        view_grid_canvas(500, 500),
+        svg.g(
+          [],
+          model.nodes
+            |> list.map(fn(node: Node) { view_node(node, model.nodes_selected) }),
+        ),
+        // debug_draw_offset(model.nodes),
+      // debug_draw_cursor_point(model.navigator),
+      // debug_draw_last_clicked_point(model)
       ],
     ),
   ])
