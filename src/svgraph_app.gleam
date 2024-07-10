@@ -15,10 +15,12 @@ import lustre/event
 
 import graph/navigator.{type Navigator, Navigator}
 import graph/node.{type Node, type NodeId, Node} as nd
+import graph/conn.{type Conn, Conn}
 import graph/vector.{type Vector, Vector}
 import graph/viewbox.{type GraphMode, type ViewBox, Drag, Normal, ViewBox}
 
 pub type ResizeEvent
+pub type MouseUpEvent
 
 const graph_limit = 500
 
@@ -35,6 +37,9 @@ fn get_window_size() -> Vector {
 
 @external(javascript, "./resize.ffi.mjs", "documentResizeEventListener")
 fn document_resize_event_listener(listener: fn(ResizeEvent) -> Nil) -> Nil
+
+@external(javascript, "./mouse.ffi.mjs", "mouseUpEventListener")
+fn document_mouse_up_event_listener(listener: fn(MouseUpEvent) -> Nil) -> Nil
 
 pub fn main() {
   let app = lustre.application(init, update, view)
@@ -55,6 +60,12 @@ pub fn main() {
     |> send_to_runtime
   })
 
+  document_mouse_up_event_listener(fn(_) {
+    UserUnclicked
+    |> lustre.dispatch
+    |> send_to_runtime
+  })
+
   Nil
 }
 
@@ -65,6 +76,7 @@ type MouseEvent {
 type Model {
   Model(
     nodes: List(Node),
+    connections: List(Conn),
     nodes_selected: Set(NodeId),
     window_resolution: Vector,
     viewbox: ViewBox,
@@ -93,6 +105,8 @@ fn init(_flags) -> #(Model, Effect(Msg)) {
           name: "Circle",
         ),
       ],
+      connections: [
+      ],
       nodes_selected: set.new(),
       window_resolution: get_window_size(),
       viewbox: ViewBox(Vector(0, 0), get_window_size(), 1.0),
@@ -109,6 +123,8 @@ pub opaque type Msg {
   UserMovedMouse(Vector)
   UserClickedNode(NodeId, MouseEvent)
   UserUnclickedNode(NodeId)
+  UserClickedNodeOutput(NodeId, Vector)
+  UserUnclicked
   UserClickedGraph(MouseEvent)
   UserScrolled(Float)
   GraphClearSelection
@@ -126,6 +142,10 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     UserClickedNode(node_id, mouse_event) ->
       user_clicked_node(model, node_id, mouse_event)
     UserUnclickedNode(_node_id) -> user_unclicked_node(model)
+    UserClickedNodeOutput(node_id, offset) ->
+      user_clicked_node_output(model, node_id, offset)
+    UserUnclicked ->
+      user_unclicked(model)
     UserClickedGraph(mouse_event) -> user_clicked_graph(model, mouse_event)
     UserScrolled(delta_y) -> user_scrolled(model, delta_y)
     GraphClearSelection -> graph_clear_selection(model)
@@ -163,6 +183,7 @@ fn user_moved_mouse(model: Model, point: Vector) -> #(Model, Effect(Msg)) {
         nav.mouse_down,
         nav.cursor_point,
       ),
+      connections: conn.update_active_connection_ends(model.connections, nav.cursor_point),
       viewbox: viewbox.update_offset(
         model.viewbox,
         nav.cursor_point,
@@ -194,6 +215,23 @@ fn user_clicked_node(
 
 fn user_unclicked_node(model: Model) -> #(Model, Effect(Msg)) {
   Model(..model, navigator: Navigator(..model.navigator, mouse_down: False))
+  |> none_effect_wrapper
+}
+
+fn user_clicked_node_output(model: Model, node_id: NodeId, offset: Vector) -> #(Model, Effect(Msg)) {
+  let pos = nd.get_position(model.nodes, node_id) |> vector.add(offset)
+  let new_conn = Conn(pos, model.navigator.cursor_point, node_id, -1, True)
+
+  model.connections
+  |> list.prepend(new_conn)
+  |> fn(c) { Model(..model, connections: c) }
+  |> none_effect_wrapper
+}
+
+fn user_unclicked(model: Model) -> #(Model, Effect(Msg)) {
+  model.connections
+  |> filter(fn(c) { c.node_1_id != -1 && c.active != True})
+  |> fn(c) { Model(..model, connections: c) }
   |> none_effect_wrapper
 }
 
@@ -380,13 +418,17 @@ fn view_node_input(input: String, index: Int) -> element.Element(Msg) {
   )
 }
 
-fn view_node_output() -> element.Element(Msg) {
+fn view_node_output(id: NodeId) -> element.Element(Msg) {
+  let cx = 200
+  let cy = 50
+
   svg.circle([
-    attr("cx", "200"),
-    attr("cy", "50"),
+    attr("cx", int.to_string(cx)),
+    attr("cy", int.to_string(cy)),
     attr("r", "8"),
     attr("fill", "currentColor"),
     attribute.class("text-gray-500"),
+    event.on_mouse_down(UserClickedNodeOutput(id, Vector(cx, cy))),
   ])
 }
 
@@ -436,7 +478,7 @@ fn view_node(node: Node, selection: Set(NodeId)) -> element.Element(Msg) {
           ],
           node.name,
         ),
-        view_node_output(),
+        view_node_output(node.id),
       ],
       list.index_map(node.inputs, fn(input, i) { view_node_input(input, i) }),
     ]),
@@ -501,6 +543,10 @@ fn view_grid() -> element.Element(Msg) {
   ])
 }
 
+fn view_connection(c: Conn) -> element.Element(Msg) {
+  svg.line([attr("stroke", "blue"), attr("stroke-width", "5"), ..conn.to_attributes(c)])
+}
+
 fn view(model: Model) -> element.Element(Msg) {
   let user_moved_mouse = fn(e) -> Result(Msg, List(DecodeError)) {
     result.try(event.mouse_position(e), fn(pos) {
@@ -545,6 +591,11 @@ fn view(model: Model) -> element.Element(Msg) {
           model.nodes
             |> list.map(fn(node: Node) { view_node(node, model.nodes_selected) }),
         ),
+        svg.g(
+          [],
+          model.connections
+          |> list.map(view_connection)
+        )
         // debug_draw_offset(model.nodes),
       // debug_draw_cursor_point(model.navigator),
       // debug_draw_last_clicked_point(model)

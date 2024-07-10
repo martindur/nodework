@@ -1,7 +1,7 @@
 import gleam/io
-import gleam/list.{filter, map}
+import gleam/list.{filter, find, map}
 import gleam/set.{type Set}
-import graph/vector.{type Vector}
+import graph/vector.{type Vector, Vector}
 
 pub type NodeId =
   Int
@@ -28,6 +28,17 @@ pub type Node {
     inputs: List(String),
     name: String,
   )
+}
+
+pub fn get_position(nodes: List(Node), id: NodeId) -> Vector {
+  nodes
+  |> find(fn(n) { n.id == id }) 
+  |> fn(r: Result(Node, Nil)) {
+  case r {
+    Ok(n) -> n.position
+    Error(Nil) -> Vector(0, 0)
+  }
+  }
 }
 
 /// Update a Node offset vector by subtracting its current position with a given point
