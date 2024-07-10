@@ -16,6 +16,7 @@ import lustre/event
 import graph/navigator.{type Navigator, Navigator}
 import graph/node.{type Node, type NodeId, Node} as nd
 import graph/vector.{type Vector, Vector}
+import graph/viewbox
 
 pub type ResizeEvent
 
@@ -25,8 +26,6 @@ type GraphMode {
 }
 
 const graph_limit = 500
-
-const scroll_step = 120.0
 
 const scroll_factor = 0.1
 
@@ -162,12 +161,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       model |> update_last_clicked_point(mouse_event),
       user_clicked_graph(mouse_event),
     )
-    UserScrolled(delta_y) -> #(
-      model
-        |> update_zoom_level(delta_y)
-        |> update_active_resolution_with_zoom_level,
-      effect.none(),
-    )
+    UserScrolled(delta_y) -> user_scrolled(model, delta_y)
     GraphClearSelection -> #(
       Model(..model, nodes_selected: set.new()),
       effect.none(),
@@ -185,31 +179,34 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       Model(..model, nodes_selected: set.new() |> set.insert(node_id)),
       effect.none(),
     )
-    GraphResizeViewBox(resolution) -> #(
-      Model(..model, window_resolution: resolution)
-        |> update_active_resolution_with_zoom_level,
-      effect.none(),
-    )
+    GraphResizeViewBox(resolution) -> graph_resize_view_box(model, resolution)
   }
 }
 
-fn update_zoom_level(model: Model, delta_y: Float) -> Model {
-  delta_y
-  |> fn(d) {
-    case d >. 0.0 {
-      True -> 1.0 *. scroll_factor
-      False -> -1.0 *. scroll_factor
-    }
-  }
-  |> float.add(model.zoom_level)
-  |> float.min(limit_zoom_out)
-  |> float.max(limit_zoom_in)
-  |> fn(level) { Model(..model, zoom_level: level) }
+fn effect_none_wrap(model: Model) -> #(Model, Effect(Msg)) {
+  #(model, effect.none())
 }
 
-fn update_active_resolution_with_zoom_level(model: Model) -> Model {
-  vector.scalar(model.window_resolution, model.zoom_level)
-  |> fn(vec) { Model(..model, active_resolution: vec) }
+fn user_scrolled(model: Model, delta_y: Float) -> #(Model, Effect(Msg)) {
+  model.zoom_level
+  |> viewbox.update_zoom_level(delta_y, scroll_factor, limit_zoom_out, limit_zoom_in)
+  |> fn(zoom_level) {
+  Model(
+  ..model, 
+  zoom_level: zoom_level,
+  active_resolution: vector.scalar(model.window_resolution, zoom_level)
+  )
+  }
+  |> effect_none_wrap
+}
+
+fn graph_resize_view_box(model: Model, resolution: Vector) -> #(Model, Effect(Msg)) {
+  Model(
+    ..model,
+    window_resolution: resolution,
+    active_resolution: vector.scalar(resolution, model.zoom_level)
+  )
+  |> effect_none_wrap
 }
 
 fn update_navigator_cursor_point(model: Model, point: Vector) -> Model {
