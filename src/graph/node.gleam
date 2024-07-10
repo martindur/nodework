@@ -70,3 +70,8 @@ pub fn update_node_positions(nodes: List(Node), selected: Set(NodeId), mouse_dow
   })
   |> fn(nodes) { [unselected, nodes] |> list.concat }
 }
+
+pub fn update_all_node_offsets(nodes: List(Node), point: Vector) -> List(Node) {
+  nodes
+  |> map(update_offset(_, point))
+}

@@ -1,3 +1,6 @@
+//// The viewbox module contains functions for calculating a viewbox in an svg element. Such as offset and resolution.
+//// Furthermore it manages a zoom level for drawing elements at a scaled resolution
+
 import gleam/float
 import graph/vector.{type Vector}
 
@@ -14,6 +17,19 @@ pub type GraphMode {
 
 pub type ViewBox {
   ViewBox(offset: Vector, resolution: Vector, zoom_level: Float)
+}
+
+/// Scales a vector, with respect to the zoom level of a viewbox
+pub fn to_viewbox_scale(vb: ViewBox, p: Vector) -> Vector {
+  p
+  |> vector.scalar(vb.zoom_level)
+}
+
+/// Transforms a vector into the space of a viewbox
+pub fn to_viewbox_space(vb: ViewBox, p: Vector) -> Vector {
+  p
+  |> vector.scalar(vb.zoom_level)
+  |> vector.add(vb.offset)
 }
 
 pub fn update_offset(
