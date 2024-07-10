@@ -174,6 +174,11 @@ fn user_moved_mouse(model: Model, point: Vector) -> #(Model, Effect(Msg)) {
     model.viewbox |> viewbox.to_viewbox_scale(point),
   )
   |> fn(nav: Navigator) {
+
+    let vb =
+      model.viewbox
+      |> viewbox.update_offset(nav.cursor_point, model.last_clicked_point, model.mode, graph_limit)
+
     Model(
       ..model,
       navigator: nav,
@@ -183,14 +188,8 @@ fn user_moved_mouse(model: Model, point: Vector) -> #(Model, Effect(Msg)) {
         nav.mouse_down,
         nav.cursor_point,
       ),
-      connections: conn.update_active_connection_ends(model.connections, nav.cursor_point),
-      viewbox: viewbox.update_offset(
-        model.viewbox,
-        nav.cursor_point,
-        model.last_clicked_point,
-        model.mode,
-        graph_limit,
-      ),
+      connections: conn.update_active_connection_ends(model.connections, viewbox.to_viewbox_translate(vb, nav.cursor_point)),
+      viewbox: vb
     )
   }
   |> none_effect_wrapper
@@ -219,8 +218,9 @@ fn user_unclicked_node(model: Model) -> #(Model, Effect(Msg)) {
 }
 
 fn user_clicked_node_output(model: Model, node_id: NodeId, offset: Vector) -> #(Model, Effect(Msg)) {
-  let pos = nd.get_position(model.nodes, node_id) |> vector.add(offset)
-  let new_conn = Conn(pos, model.navigator.cursor_point, node_id, -1, True)
+  let p1 = nd.get_position(model.nodes, node_id) |> vector.add(offset)
+  let p2 = model.viewbox |> viewbox.to_viewbox_translate(model.navigator.cursor_point)
+  let new_conn = Conn(p1, p2, node_id, -1, True)
 
   model.connections
   |> list.prepend(new_conn)

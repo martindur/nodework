@@ -25,6 +25,11 @@ pub fn to_viewbox_scale(vb: ViewBox, p: Vector) -> Vector {
   |> vector.scalar(vb.zoom_level)
 }
 
+pub fn to_viewbox_translate(vb: ViewBox, p: Vector) -> Vector {
+  p
+  |> vector.add(vb.offset)
+}
+
 /// Transforms a vector into the space of a viewbox
 pub fn to_viewbox_space(vb: ViewBox, p: Vector) -> Vector {
   p
