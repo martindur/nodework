@@ -16,10 +16,9 @@ import lustre/event
 import graph/navigator.{type Navigator, Navigator}
 import graph/node.{type Node, type NodeId, Node} as nd
 import graph/vector.{type Vector, Vector}
-import graph/viewbox.{type ViewBox, ViewBox, type GraphMode, Normal, Drag}
+import graph/viewbox.{type GraphMode, type ViewBox, Drag, Normal, ViewBox}
 
 pub type ResizeEvent
-
 
 const graph_limit = 500
 
@@ -124,15 +123,18 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
   case msg {
     UserAddedNode(node) -> user_added_node(model, node)
     UserMovedMouse(point) -> user_moved_mouse(model, point)
-    UserClickedNode(node_id, mouse_event) -> user_clicked_node(model, node_id, mouse_event)
+    UserClickedNode(node_id, mouse_event) ->
+      user_clicked_node(model, node_id, mouse_event)
     UserUnclickedNode(_node_id) -> user_unclicked_node(model)
     UserClickedGraph(mouse_event) -> user_clicked_graph(model, mouse_event)
     UserScrolled(delta_y) -> user_scrolled(model, delta_y)
     GraphClearSelection -> graph_clear_selection(model)
     GraphSetDragMode -> Model(..model, mode: Drag) |> none_effect_wrapper
     GraphSetNormalMode -> Model(..model, mode: Normal) |> none_effect_wrapper
-    GraphAddNodeToSelection(node_id) -> graph_add_node_to_selection(model, node_id)
-    GraphSetNodeAsSelection(node_id) -> graph_set_node_as_selection(model, node_id)
+    GraphAddNodeToSelection(node_id) ->
+      graph_add_node_to_selection(model, node_id)
+    GraphSetNodeAsSelection(node_id) ->
+      graph_set_node_as_selection(model, node_id)
     GraphResizeViewBox(resolution) -> graph_resize_view_box(model, resolution)
   }
 }
@@ -148,26 +150,43 @@ fn user_added_node(model: Model, node: Node) -> #(Model, Effect(Msg)) {
 
 fn user_moved_mouse(model: Model, point: Vector) -> #(Model, Effect(Msg)) {
   model.navigator
-  |> navigator.update_cursor_point(model.viewbox |> viewbox.to_viewbox_scale(point))
+  |> navigator.update_cursor_point(
+    model.viewbox |> viewbox.to_viewbox_scale(point),
+  )
   |> fn(nav: Navigator) {
     Model(
       ..model,
       navigator: nav,
-      nodes: nd.update_node_positions(model.nodes, model.nodes_selected, nav.mouse_down, nav.cursor_point),
-      viewbox: viewbox.update_offset(model.viewbox, nav.cursor_point, model.last_clicked_point, model.mode, graph_limit)
+      nodes: nd.update_node_positions(
+        model.nodes,
+        model.nodes_selected,
+        nav.mouse_down,
+        nav.cursor_point,
+      ),
+      viewbox: viewbox.update_offset(
+        model.viewbox,
+        nav.cursor_point,
+        model.last_clicked_point,
+        model.mode,
+        graph_limit,
+      ),
     )
   }
   |> none_effect_wrapper
 }
 
-fn user_clicked_node(model: Model, node_id: NodeId, event: MouseEvent) -> #(Model, Effect(Msg)) {
+fn user_clicked_node(
+  model: Model,
+  node_id: NodeId,
+  event: MouseEvent,
+) -> #(Model, Effect(Msg)) {
   model.navigator
   |> navigator.set_navigator_mouse_down
   |> fn(nav) {
     Model(
       ..model,
       navigator: nav,
-      nodes: model.nodes |> nd.update_all_node_offsets(nav.cursor_point)
+      nodes: model.nodes |> nd.update_all_node_offsets(nav.cursor_point),
     )
   }
   |> fn(m) { #(m, update_selected_nodes(event, node_id)) }
@@ -184,12 +203,9 @@ fn user_clicked_graph(model: Model, event: MouseEvent) -> #(Model, Effect(Msg)) 
   |> fn(m) { #(m, shift_key_check(event)) }
 }
 
-
 fn user_scrolled(model: Model, delta_y: Float) -> #(Model, Effect(Msg)) {
   model.viewbox
-  |> viewbox.update_zoom_level(
-    delta_y,
-  )
+  |> viewbox.update_zoom_level(delta_y)
   |> viewbox.update_resolution(model.window_resolution)
   |> fn(vb) { Model(..model, viewbox: vb) }
   |> none_effect_wrapper
@@ -200,15 +216,18 @@ fn graph_clear_selection(model: Model) -> #(Model, Effect(Msg)) {
   |> none_effect_wrapper
 }
 
-fn graph_add_node_to_selection(model: Model, node_id: NodeId) -> #(Model, Effect(Msg)) {
-  Model(
-    ..model,
-    nodes_selected: model.nodes_selected |> set.insert(node_id)
-  )
+fn graph_add_node_to_selection(
+  model: Model,
+  node_id: NodeId,
+) -> #(Model, Effect(Msg)) {
+  Model(..model, nodes_selected: model.nodes_selected |> set.insert(node_id))
   |> none_effect_wrapper
 }
 
-fn graph_set_node_as_selection(model: Model, node_id: NodeId) -> #(Model, Effect(Msg)) {
+fn graph_set_node_as_selection(
+  model: Model,
+  node_id: NodeId,
+) -> #(Model, Effect(Msg)) {
   Model(..model, nodes_selected: set.new() |> set.insert(node_id))
   |> none_effect_wrapper
 }
@@ -220,19 +239,16 @@ fn graph_resize_view_box(
   Model(
     ..model,
     window_resolution: resolution,
-    viewbox: viewbox.update_resolution(model.viewbox, resolution)
+    viewbox: viewbox.update_resolution(model.viewbox, resolution),
   )
   |> none_effect_wrapper
 }
-
-
 
 fn update_last_clicked_point(model: Model, event: MouseEvent) -> Model {
   event.position
   |> viewbox.to_viewbox_space(model.viewbox, _)
   |> fn(p) { Model(..model, last_clicked_point: p) }
 }
-
 
 fn update_selected_nodes(event: MouseEvent, node_id: NodeId) -> Effect(Msg) {
   effect.from(fn(dispatch) {
