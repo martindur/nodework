@@ -1,4 +1,5 @@
 import gleam/float
+import graph/vector.{type Vector}
 
 pub fn update_zoom_level(
   zoom_level: Float,
@@ -17,4 +18,11 @@ pub fn update_zoom_level(
   |> float.add(zoom_level)
   |> float.min(limit_zoom_out)
   |> float.max(limit_zoom_in)
+}
+
+pub fn update_offset(point: Vector, offset: Vector, limit: Int) -> Vector {
+  point
+  |> vector.subtract(offset, _)
+  |> vector.inverse
+  |> vector.bounded_vector(limit)
 }

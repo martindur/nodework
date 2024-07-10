@@ -140,13 +140,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       Model(..model, nodes: list.append(model.nodes, [node])),
       effect.none(),
     )
-    UserMovedMouse(point) -> #(
-      model
-        |> update_navigator_cursor_point(point)
-        |> update_graph_offset
-        |> update_node_positions,
-      effect.none(),
-    )
+    UserMovedMouse(point) -> user_moved_mouse(model, point)
     UserClickedNode(node_id, mouse_event) -> #(
       model
         |> set_navigator_mouse_down
@@ -187,33 +181,50 @@ fn effect_none_wrap(model: Model) -> #(Model, Effect(Msg)) {
   #(model, effect.none())
 }
 
-fn user_scrolled(model: Model, delta_y: Float) -> #(Model, Effect(Msg)) {
-  model.zoom_level
-  |> viewbox.update_zoom_level(delta_y, scroll_factor, limit_zoom_out, limit_zoom_in)
-  |> fn(zoom_level) {
-  Model(
-  ..model, 
-  zoom_level: zoom_level,
-  active_resolution: vector.scalar(model.window_resolution, zoom_level)
-  )
+fn user_moved_mouse(model: Model, point: Vector) -> #(Model, Effect(Msg)) {
+  model.navigator
+  |> navigator.update_cursor_point(point, model.zoom_level)
+  |> fn(nav: Navigator) {
+    let offset = case model.mode {
+      Normal -> model.offset
+      Drag -> viewbox.update_offset(nav.cursor_point, model.last_clicked_point, graph_limit)
+    }
+
+    let nodes = nd.update_node_positions(model.nodes, model.nodes_selected, nav.mouse_down, nav.cursor_point)
+
+    Model(..model, navigator: nav, offset: offset, nodes: nodes)
   }
   |> effect_none_wrap
 }
 
-fn graph_resize_view_box(model: Model, resolution: Vector) -> #(Model, Effect(Msg)) {
-  Model(
-    ..model,
-    window_resolution: resolution,
-    active_resolution: vector.scalar(resolution, model.zoom_level)
+fn user_scrolled(model: Model, delta_y: Float) -> #(Model, Effect(Msg)) {
+  model.zoom_level
+  |> viewbox.update_zoom_level(
+    delta_y,
+    scroll_factor,
+    limit_zoom_out,
+    limit_zoom_in,
   )
+  |> fn(zoom_level) {
+    Model(
+      ..model,
+      zoom_level: zoom_level,
+      active_resolution: vector.scalar(model.window_resolution, zoom_level),
+    )
+  }
   |> effect_none_wrap
 }
 
-fn update_navigator_cursor_point(model: Model, point: Vector) -> Model {
-  point
-  |> vector.scalar(model.zoom_level)
-  |> fn(p) { Navigator(..model.navigator, cursor_point: p) }
-  |> fn(nav) { Model(..model, navigator: nav) }
+fn graph_resize_view_box(
+  model: Model,
+  resolution: Vector,
+) -> #(Model, Effect(Msg)) {
+  Model(
+    ..model,
+    window_resolution: resolution,
+    active_resolution: vector.scalar(resolution, model.zoom_level),
+  )
+  |> effect_none_wrap
 }
 
 fn set_navigator_mouse_down(model: Model) -> Model {
@@ -232,45 +243,6 @@ fn update_all_node_offsets(model: Model) -> Model {
   model.nodes
   |> map(nd.update_offset(_, model.navigator.cursor_point))
   |> fn(x) { Model(..model, nodes: x) }
-}
-
-fn update_graph_offset(model: Model) -> Model {
-  case model.mode {
-    Normal -> model
-    Drag ->
-      Model(
-        ..model,
-        offset: navigator.calc_position(
-            model.navigator,
-            model.last_clicked_point,
-          )
-          |> vector.inverse
-          |> vector.bounded_vector(graph_limit),
-      )
-  }
-}
-
-fn update_node_positions(model: Model) -> Model {
-  let is_selected = fn(node: Node) {
-    set.contains(model.nodes_selected, node.id)
-  }
-  let unselected = model.nodes |> filter(fn(x) { !is_selected(x) })
-
-  model.nodes
-  |> filter(is_selected)
-  |> map(fn(node) {
-    case model.navigator.mouse_down {
-      False -> node
-      True ->
-        Node(
-          ..node,
-          position: navigator.calc_position(model.navigator, node.offset),
-        )
-    }
-  })
-  // |> map(nd.scale_position(_, model.zoom_level))
-  |> fn(nodes) { [unselected, nodes] |> list.concat }
-  |> fn(nodes) { Model(..model, nodes: nodes) }
 }
 
 fn update_selected_nodes(event: MouseEvent, node_id: NodeId) -> Effect(Msg) {
