@@ -16,22 +16,12 @@ import lustre/event
 import graph/navigator.{type Navigator, Navigator}
 import graph/node.{type Node, type NodeId, Node} as nd
 import graph/vector.{type Vector, Vector}
-import graph/viewbox
+import graph/viewbox.{type ViewBox, ViewBox, type GraphMode, Normal, Drag}
 
 pub type ResizeEvent
 
-type GraphMode {
-  Normal
-  Drag
-}
 
 const graph_limit = 500
-
-const scroll_factor = 0.1
-
-const limit_zoom_in = 0.5
-
-const limit_zoom_out = 3.0
 
 @external(javascript, "./resize.ffi.mjs", "windowSize")
 fn window_size() -> #(Int, Int)
@@ -78,12 +68,10 @@ type Model {
     nodes: List(Node),
     nodes_selected: Set(NodeId),
     window_resolution: Vector,
-    active_resolution: Vector,
-    offset: Vector,
+    viewbox: ViewBox,
     navigator: Navigator,
     mode: GraphMode,
     last_clicked_point: Vector,
-    zoom_level: Float,
   )
 }
 
@@ -108,12 +96,10 @@ fn init(_flags) -> #(Model, Effect(Msg)) {
       ],
       nodes_selected: set.new(),
       window_resolution: get_window_size(),
-      active_resolution: get_window_size(),
-      offset: Vector(0, 0),
+      viewbox: ViewBox(Vector(0, 0), get_window_size(), 1.0),
       navigator: Navigator(Vector(0, 0), False),
       mode: Normal,
       last_clicked_point: Vector(0, 0),
-      zoom_level: 1.0,
     ),
     effect.none(),
   )
@@ -183,35 +169,22 @@ fn effect_none_wrap(model: Model) -> #(Model, Effect(Msg)) {
 
 fn user_moved_mouse(model: Model, point: Vector) -> #(Model, Effect(Msg)) {
   model.navigator
-  |> navigator.update_cursor_point(point, model.zoom_level)
+  |> navigator.update_cursor_point(point, model.viewbox.zoom_level)
   |> fn(nav: Navigator) {
-    let offset = case model.mode {
-      Normal -> model.offset
-      Drag -> viewbox.update_offset(nav.cursor_point, model.last_clicked_point, graph_limit)
-    }
-
     let nodes = nd.update_node_positions(model.nodes, model.nodes_selected, nav.mouse_down, nav.cursor_point)
 
-    Model(..model, navigator: nav, offset: offset, nodes: nodes)
+    Model(..model, navigator: nav, viewbox: viewbox.update_offset(model.viewbox, nav.cursor_point, model.last_clicked_point, model.mode, graph_limit), nodes: nodes)
   }
   |> effect_none_wrap
 }
 
 fn user_scrolled(model: Model, delta_y: Float) -> #(Model, Effect(Msg)) {
-  model.zoom_level
+  model.viewbox
   |> viewbox.update_zoom_level(
     delta_y,
-    scroll_factor,
-    limit_zoom_out,
-    limit_zoom_in,
   )
-  |> fn(zoom_level) {
-    Model(
-      ..model,
-      zoom_level: zoom_level,
-      active_resolution: vector.scalar(model.window_resolution, zoom_level),
-    )
-  }
+  |> viewbox.update_resolution(model.window_resolution)
+  |> fn(vb) { Model(..model, viewbox: vb) }
   |> effect_none_wrap
 }
 
@@ -222,7 +195,7 @@ fn graph_resize_view_box(
   Model(
     ..model,
     window_resolution: resolution,
-    active_resolution: vector.scalar(resolution, model.zoom_level),
+    viewbox: ViewBox(..model.viewbox, resolution: vector.scalar(resolution, model.viewbox.zoom_level)),
   )
   |> effect_none_wrap
 }
@@ -234,8 +207,8 @@ fn set_navigator_mouse_down(model: Model) -> Model {
 
 fn update_last_clicked_point(model: Model, event: MouseEvent) -> Model {
   event.position
-  |> vector.scalar(model.zoom_level)
-  |> vector.add(model.offset)
+  |> vector.scalar(model.viewbox.zoom_level)
+  |> vector.add(model.viewbox.offset)
   |> fn(p) { Model(..model, last_clicked_point: p) }
 }
 
@@ -525,7 +498,7 @@ fn view(model: Model) -> element.Element(Msg) {
     svg.svg(
       [
         attribute.id("graph"),
-        attr_viewbox(model.offset, model.active_resolution),
+        attr_viewbox(model.viewbox.offset, model.viewbox.resolution),
         attr("contentEditable", "true"),
         event.on("mousemove", user_moved_mouse),
         event.on("mousedown", mousedown),
