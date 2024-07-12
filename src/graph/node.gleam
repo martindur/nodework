@@ -1,4 +1,5 @@
 import gleam/io
+import gleam/int
 import gleam/list.{filter, find, map}
 import gleam/set.{type Set}
 import graph/vector.{type Vector, Vector}
@@ -6,10 +7,52 @@ import graph/vector.{type Vector, Vector}
 pub type NodeId =
   Int
 
-// pub type NodeInput {
-//   Shape
-//   String
-// }
+pub type NodeInputId =
+  String
+
+pub opaque type NodeInput {
+  NodeInput(id: NodeInputId, label: String, hovered: Bool)
+}
+
+pub fn new_input(id: NodeId, index: Int, label: String) -> NodeInput {
+  {int.to_string(id) <> "-" <> int.to_string(index)}
+  |> fn(input_id) { NodeInput(input_id, label, False) }
+}
+
+pub fn input_id(in: NodeInput) -> String {
+  in.id
+}
+
+pub fn input_label(in: NodeInput) -> String {
+  in.label
+}
+
+pub fn input_hovered(in: NodeInput) -> Bool {
+  in.hovered
+}
+
+pub fn set_input_hover(ins: List(Node), id: NodeInputId) -> List(Node) {
+  ins
+  |> map(fn(node) {
+    node.inputs
+    |> map(fn(input) {
+      {input.id == id}
+      |> fn(hovered) { NodeInput(..input, hovered: hovered) }
+    })
+    |> fn(inputs) { Node(..node, inputs: inputs) }
+  })
+}
+
+pub fn reset_input_hover(ins: List(Node)) -> List(Node) {
+  ins
+  |> map(fn(node) {
+    node.inputs
+    |> map(fn(input) {
+      NodeInput(..input, hovered: False)
+    })
+    |> fn(inputs) { Node(..node, inputs: inputs) }
+  })
+}
 
 // pub type NodeOutput {
 //   Shape
@@ -25,19 +68,19 @@ pub type Node {
     position: Vector,
     offset: Vector,
     id: NodeId,
-    inputs: List(String),
+    inputs: List(NodeInput),
     name: String,
   )
 }
 
 pub fn get_position(nodes: List(Node), id: NodeId) -> Vector {
   nodes
-  |> find(fn(n) { n.id == id }) 
+  |> find(fn(n) { n.id == id })
   |> fn(r: Result(Node, Nil)) {
-  case r {
-    Ok(n) -> n.position
-    Error(Nil) -> Vector(0, 0)
-  }
+    case r {
+      Ok(n) -> n.position
+      Error(Nil) -> Vector(0, 0)
+    }
   }
 }
 

@@ -13,13 +13,14 @@ import lustre/element/html
 import lustre/element/svg
 import lustre/event
 
-import graph/navigator.{type Navigator, Navigator}
-import graph/node.{type Node, type NodeId, Node} as nd
 import graph/conn.{type Conn, Conn}
+import graph/navigator.{type Navigator, Navigator}
+import graph/node.{type Node, type NodeId, type NodeInput, Node} as nd
 import graph/vector.{type Vector, Vector}
 import graph/viewbox.{type GraphMode, type ViewBox, Drag, Normal, ViewBox}
 
 pub type ResizeEvent
+
 pub type MouseUpEvent
 
 const graph_limit = 500
@@ -94,19 +95,18 @@ fn init(_flags) -> #(Model, Effect(Msg)) {
           position: Vector(0, 0),
           offset: Vector(0, 0),
           id: 0,
-          inputs: ["foo", "bar", "baz"],
+          inputs: [nd.new_input(0, 0, "foo"), nd.new_input(0, 1, "bar"), nd.new_input(0, 2, "baz")],
           name: "Rect",
         ),
         Node(
           position: Vector(300, 300),
           offset: Vector(0, 0),
           id: 1,
-          inputs: ["bob"],
+          inputs: [nd.new_input(1, 0, "bob")],
           name: "Circle",
-        ),
+       ),
       ],
-      connections: [
-      ],
+      connections: [],
       nodes_selected: set.new(),
       window_resolution: get_window_size(),
       viewbox: ViewBox(Vector(0, 0), get_window_size(), 1.0),
@@ -127,6 +127,8 @@ pub opaque type Msg {
   UserUnclicked
   UserClickedGraph(MouseEvent)
   UserScrolled(Float)
+  UserHoverNodeInput(String)
+  UserUnhoverNodeInput
   GraphClearSelection
   GraphSetDragMode
   GraphSetNormalMode
@@ -144,10 +146,11 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     UserUnclickedNode(_node_id) -> user_unclicked_node(model)
     UserClickedNodeOutput(node_id, offset) ->
       user_clicked_node_output(model, node_id, offset)
-    UserUnclicked ->
-      user_unclicked(model)
+    UserUnclicked -> user_unclicked(model)
     UserClickedGraph(mouse_event) -> user_clicked_graph(model, mouse_event)
     UserScrolled(delta_y) -> user_scrolled(model, delta_y)
+    UserHoverNodeInput(input_id) -> user_hover_node_input(model, input_id)
+    UserUnhoverNodeInput -> user_unhover_node_input(model)
     GraphClearSelection -> graph_clear_selection(model)
     GraphSetDragMode -> Model(..model, mode: Drag) |> none_effect_wrapper
     GraphSetNormalMode -> Model(..model, mode: Normal) |> none_effect_wrapper
@@ -174,10 +177,14 @@ fn user_moved_mouse(model: Model, point: Vector) -> #(Model, Effect(Msg)) {
     model.viewbox |> viewbox.to_viewbox_scale(point),
   )
   |> fn(nav: Navigator) {
-
     let vb =
       model.viewbox
-      |> viewbox.update_offset(nav.cursor_point, model.last_clicked_point, model.mode, graph_limit)
+      |> viewbox.update_offset(
+        nav.cursor_point,
+        model.last_clicked_point,
+        model.mode,
+        graph_limit,
+      )
 
     Model(
       ..model,
@@ -188,8 +195,11 @@ fn user_moved_mouse(model: Model, point: Vector) -> #(Model, Effect(Msg)) {
         nav.mouse_down,
         nav.cursor_point,
       ),
-      connections: conn.update_active_connection_ends(model.connections, viewbox.to_viewbox_translate(vb, nav.cursor_point)),
-      viewbox: vb
+      connections: conn.update_active_connection_ends(
+        model.connections,
+        viewbox.to_viewbox_translate(vb, nav.cursor_point),
+      ),
+      viewbox: vb,
     )
   }
   |> none_effect_wrapper
@@ -217,9 +227,14 @@ fn user_unclicked_node(model: Model) -> #(Model, Effect(Msg)) {
   |> none_effect_wrapper
 }
 
-fn user_clicked_node_output(model: Model, node_id: NodeId, offset: Vector) -> #(Model, Effect(Msg)) {
+fn user_clicked_node_output(
+  model: Model,
+  node_id: NodeId,
+  offset: Vector,
+) -> #(Model, Effect(Msg)) {
   let p1 = nd.get_position(model.nodes, node_id) |> vector.add(offset)
-  let p2 = model.viewbox |> viewbox.to_viewbox_translate(model.navigator.cursor_point)
+  let p2 =
+    model.viewbox |> viewbox.to_viewbox_translate(model.navigator.cursor_point)
   let new_conn = Conn(p1, p2, node_id, -1, True)
 
   model.connections
@@ -230,7 +245,7 @@ fn user_clicked_node_output(model: Model, node_id: NodeId, offset: Vector) -> #(
 
 fn user_unclicked(model: Model) -> #(Model, Effect(Msg)) {
   model.connections
-  |> filter(fn(c) { c.node_1_id != -1 && c.active != True})
+  |> filter(fn(c) { c.node_1_id != -1 && c.active != True })
   |> fn(c) { Model(..model, connections: c) }
   |> none_effect_wrapper
 }
@@ -246,6 +261,20 @@ fn user_scrolled(model: Model, delta_y: Float) -> #(Model, Effect(Msg)) {
   |> viewbox.update_zoom_level(delta_y)
   |> viewbox.update_resolution(model.window_resolution)
   |> fn(vb) { Model(..model, viewbox: vb) }
+  |> none_effect_wrapper
+}
+
+fn user_hover_node_input(model: Model, input_id: String) -> #(Model, Effect(Msg)) {
+  model.nodes
+  |> nd.set_input_hover(input_id)
+  |> fn(nodes) { Model(..model, nodes: nodes) }
+  |> none_effect_wrapper
+}
+
+fn user_unhover_node_input(model: Model) -> #(Model, Effect(Msg)) {
+  model.nodes
+  |> nd.reset_input_hover
+  |> fn(nodes) { Model(..model, nodes: nodes) }
   |> none_effect_wrapper
 }
 
@@ -387,7 +416,14 @@ fn debug_draw_last_clicked_point(model: Model) -> element.Element(Msg) {
   |> svg.circle()
 }
 
-fn view_node_input(input: String, index: Int) -> element.Element(Msg) {
+fn view_node_input(
+  input: NodeInput,
+  index: Int,
+) -> element.Element(Msg) {
+  let id = nd.input_id(input)
+  let label = nd.input_label(input)
+  let hovered = nd.input_hovered(input)
+
   svg.g(
     [
       attr(
@@ -399,9 +435,17 @@ fn view_node_input(input: String, index: Int) -> element.Element(Msg) {
       svg.circle([
         attr("cx", "0"),
         attr("cy", "0"),
-        attr("r", "8"),
+        attr("r", "10"),
         attr("fill", "currentColor"),
+        attr("stroke", "black"),
+        case hovered {
+          True -> attr("stroke-width", "3")
+          False -> attr("stroke-width", "0")
+        },
         attribute.class("text-gray-500"),
+        attribute.id(id),
+        event.on_mouse_enter(UserHoverNodeInput(id)),
+        event.on_mouse_leave(UserUnhoverNodeInput),
       ]),
       svg.text(
         [
@@ -412,7 +456,7 @@ fn view_node_input(input: String, index: Int) -> element.Element(Msg) {
           attr("fill", "currentColor"),
           attribute.class("text-gray-900"),
         ],
-        input,
+        label,
       ),
     ],
   )
@@ -425,7 +469,7 @@ fn view_node_output(id: NodeId) -> element.Element(Msg) {
   svg.circle([
     attr("cx", int.to_string(cx)),
     attr("cy", int.to_string(cy)),
-    attr("r", "8"),
+    attr("r", "10"),
     attr("fill", "currentColor"),
     attribute.class("text-gray-500"),
     event.on_mouse_down(UserClickedNodeOutput(id, Vector(cx, cy))),
@@ -480,7 +524,9 @@ fn view_node(node: Node, selection: Set(NodeId)) -> element.Element(Msg) {
         ),
         view_node_output(node.id),
       ],
-      list.index_map(node.inputs, fn(input, i) { view_node_input(input, i) }),
+      list.index_map(node.inputs, fn(input, i) {
+        view_node_input(input, i)
+      }),
     ]),
   )
 }
@@ -544,7 +590,11 @@ fn view_grid() -> element.Element(Msg) {
 }
 
 fn view_connection(c: Conn) -> element.Element(Msg) {
-  svg.line([attr("stroke", "blue"), attr("stroke-width", "5"), ..conn.to_attributes(c)])
+  svg.line([
+    attr("stroke", "blue"),
+    attr("stroke-width", "5"),
+    ..conn.to_attributes(c)
+  ])
 }
 
 fn view(model: Model) -> element.Element(Msg) {
@@ -588,14 +638,14 @@ fn view(model: Model) -> element.Element(Msg) {
         view_grid_canvas(500, 500),
         svg.g(
           [],
-          model.nodes
-            |> list.map(fn(node: Node) { view_node(node, model.nodes_selected) }),
+          model.connections
+            |> list.map(view_connection),
         ),
         svg.g(
           [],
-          model.connections
-          |> list.map(view_connection)
-        )
+          model.nodes
+            |> list.map(fn(node: Node) { view_node(node, model.nodes_selected) }),
+        ),
         // debug_draw_offset(model.nodes),
       // debug_draw_cursor_point(model.navigator),
       // debug_draw_last_clicked_point(model)

@@ -20,7 +20,7 @@ pub fn update_offset__from_negative__test() {
     Vector(-10, -10),
     Vector(9999, 9999),
     id: 1,
-    inputs: ["foo", "bar"],
+    inputs: [node.new_input(1, 0, "foo"), node.new_input(1, 1, "bar")],
     name: "baz",
   )
   |> node.update_offset(Vector(10, 10))
@@ -28,7 +28,7 @@ pub fn update_offset__from_negative__test() {
     Vector(-10, -10),
     Vector(20, 20),
     id: 1,
-    inputs: ["foo", "bar"],
+    inputs: [node.new_input(1, 0, "foo"), node.new_input(1, 1, "bar")],
     name: "baz",
   ))
 }
