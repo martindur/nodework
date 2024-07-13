@@ -1,5 +1,5 @@
-import gleam/io
 import gleam/int
+import gleam/io
 import gleam/list.{filter, find, map}
 import gleam/set.{type Set}
 import graph/vector.{type Vector, Vector}
@@ -14,8 +14,12 @@ pub opaque type NodeInput {
   NodeInput(id: NodeInputId, label: String, hovered: Bool)
 }
 
+pub type NodeError {
+  NotFound
+}
+
 pub fn new_input(id: NodeId, index: Int, label: String) -> NodeInput {
-  {int.to_string(id) <> "-" <> int.to_string(index)}
+  { int.to_string(id) <> "-" <> int.to_string(index) }
   |> fn(input_id) { NodeInput(input_id, label, False) }
 }
 
@@ -36,7 +40,7 @@ pub fn set_input_hover(ins: List(Node), id: NodeInputId) -> List(Node) {
   |> map(fn(node) {
     node.inputs
     |> map(fn(input) {
-      {input.id == id}
+      { input.id == id }
       |> fn(hovered) { NodeInput(..input, hovered: hovered) }
     })
     |> fn(inputs) { Node(..node, inputs: inputs) }
@@ -47,11 +51,26 @@ pub fn reset_input_hover(ins: List(Node)) -> List(Node) {
   ins
   |> map(fn(node) {
     node.inputs
-    |> map(fn(input) {
-      NodeInput(..input, hovered: False)
-    })
+    |> map(fn(input) { NodeInput(..input, hovered: False) })
     |> fn(inputs) { Node(..node, inputs: inputs) }
   })
+}
+
+pub fn get_node_from_input_hovered(ins: List(Node)) -> Result(Node, NodeError) {
+  ins
+  |> filter(fn(node) {
+    case node.inputs |> filter(fn(in) { in.hovered }) {
+      [] -> False
+      _ -> True
+    }
+  })
+  |> list.first
+  |> fn(res: Result(Node, Nil)) {
+    case res {
+      Ok(node) -> Ok(node)
+      Error(Nil) -> Error(NotFound)
+    }
+  }
 }
 
 // pub type NodeOutput {

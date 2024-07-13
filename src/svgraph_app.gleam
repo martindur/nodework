@@ -15,7 +15,7 @@ import lustre/event
 
 import graph/conn.{type Conn, Conn}
 import graph/navigator.{type Navigator, Navigator}
-import graph/node.{type Node, type NodeId, type NodeInput, Node} as nd
+import graph/node.{type Node, type NodeId, type NodeInput, Node, type NodeError, NotFound} as nd
 import graph/vector.{type Vector, Vector}
 import graph/viewbox.{type GraphMode, type ViewBox, Drag, Normal, ViewBox}
 
@@ -243,8 +243,29 @@ fn user_clicked_node_output(
   |> none_effect_wrapper
 }
 
+// TODO: Clear duplicates - when dragging a connection from a to b, when there already is one,
+// we should not add another connection. Either make a check, or a deduplicate function
+// deduplicate in Conn module is definitely more readable.
 fn user_unclicked(model: Model) -> #(Model, Effect(Msg)) {
   model.connections
+  |> map(fn(c) {
+    case c.active {
+      False -> c
+      True -> {
+        model.nodes
+        |> nd.get_node_from_input_hovered
+        |> fn(res: Result(Node, NodeError)) {
+          case res {
+            Error(NotFound) -> c
+            Ok(node) -> case c.node_0_id != node.id { // TODO: This case could really be a function to check for conflicts
+              False -> c
+              True -> Conn(..c, node_1_id: node.id, active: False)
+            }
+          }
+        }
+      }
+    }
+  })
   |> filter(fn(c) { c.node_1_id != -1 && c.active != True })
   |> fn(c) { Model(..model, connections: c) }
   |> none_effect_wrapper
