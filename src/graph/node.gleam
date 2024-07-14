@@ -1,7 +1,5 @@
 import gleam/int
-import gleam/io
 import gleam/list.{filter, find, map}
-import gleam/set.{type Set}
 import graph/vector.{type Vector, Vector}
 
 pub type NodeId =
@@ -120,26 +118,6 @@ pub fn scale_position(node: Node, scalar: Float) -> Node {
   node.position
   |> vector.scalar(scalar)
   |> fn(pos) { Node(..node, position: pos) }
-}
-
-pub fn update_node_positions(
-  nodes: List(Node),
-  selected: Set(NodeId),
-  mouse_down: Bool,
-  cursor_point: Vector,
-) -> List(Node) {
-  let is_selected = fn(node: Node) { set.contains(selected, node.id) }
-  let unselected = nodes |> filter(fn(x) { !is_selected(x) })
-
-  nodes
-  |> filter(is_selected)
-  |> map(fn(node) {
-    case mouse_down {
-      False -> node
-      True -> Node(..node, position: vector.subtract(node.offset, cursor_point))
-    }
-  })
-  |> fn(nodes) { [unselected, nodes] |> list.concat }
 }
 
 pub fn update_all_node_offsets(nodes: List(Node), point: Vector) -> List(Node) {

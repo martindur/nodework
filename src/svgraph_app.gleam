@@ -1,7 +1,6 @@
 import gleam/dynamic.{type DecodeError}
 import gleam/float
 import gleam/int
-import gleam/io
 import gleam/list.{filter, map}
 import gleam/result
 import gleam/set.{type Set}
@@ -13,11 +12,13 @@ import lustre/element/html
 import lustre/element/svg
 import lustre/event
 
+import graph/model.{type Model, Model}
+import graph/draw
 import graph/conn.{type Conn, Conn}
 import graph/navigator.{type Navigator, Navigator}
 import graph/node.{type Node, type NodeId, type NodeInput, Node, type NodeError, NotFound} as nd
 import graph/vector.{type Vector, Vector}
-import graph/viewbox.{type GraphMode, type ViewBox, Drag, Normal, ViewBox}
+import graph/viewbox.{type ViewBox, Drag, Normal, ViewBox}
 
 pub type ResizeEvent
 
@@ -74,18 +75,6 @@ type MouseEvent {
   MouseEvent(position: Vector, shift_key_active: Bool)
 }
 
-type Model {
-  Model(
-    nodes: List(Node),
-    connections: List(Conn),
-    nodes_selected: Set(NodeId),
-    window_resolution: Vector,
-    viewbox: ViewBox,
-    navigator: Navigator,
-    mode: GraphMode,
-    last_clicked_point: Vector,
-  )
-}
 
 fn init(_flags) -> #(Model, Effect(Msg)) {
   #(
@@ -171,39 +160,49 @@ fn user_added_node(model: Model, node: Node) -> #(Model, Effect(Msg)) {
   |> none_effect_wrapper
 }
 
-fn user_moved_mouse(model: Model, point: Vector) -> #(Model, Effect(Msg)) {
-  model.navigator
-  |> navigator.update_cursor_point(
-    model.viewbox |> viewbox.to_viewbox_scale(point),
-  )
-  |> fn(nav: Navigator) {
-    let vb =
-      model.viewbox
-      |> viewbox.update_offset(
-        nav.cursor_point,
-        model.last_clicked_point,
-        model.mode,
-        graph_limit,
-      )
 
-    Model(
-      ..model,
-      navigator: nav,
-      nodes: nd.update_node_positions(
-        model.nodes,
-        model.nodes_selected,
-        nav.mouse_down,
-        nav.cursor_point,
-      ),
-      connections: conn.update_active_connection_ends(
-        model.connections,
-        viewbox.to_viewbox_translate(vb, nav.cursor_point),
-      ),
-      viewbox: vb,
-    )
-  }
+fn user_moved_mouse(model: Model, point: Vector) -> #(Model, Effect(Msg)) {
+  model
+  |> draw.cursor_point(point)
+  |> draw.viewbox_offset(graph_limit)
+  |> draw.node_positions
+  |> draw.dragged_connection
   |> none_effect_wrapper
 }
+
+// fn user_moved_mouse(model: Model, point: Vector) -> #(Model, Effect(Msg)) {
+//   model.navigator
+//   |> navigator.update_cursor_point(
+//     model.viewbox |> viewbox.to_viewbox_scale(point),
+//   )
+//   |> fn(nav: Navigator) {
+//     let vb =
+//       model.viewbox
+//       |> viewbox.update_offset(
+//         nav.cursor_point,
+//         model.last_clicked_point,
+//         model.mode,
+//         graph_limit,
+//       )
+
+//     Model(
+//       ..model,
+//       navigator: nav,
+//       nodes: nd.update_node_positions(
+//         model.nodes,
+//         model.nodes_selected,
+//         nav.mouse_down,
+//         nav.cursor_point,
+//       ),
+//       connections: conn.update_active_connection_ends(
+//         model.connections,
+//         viewbox.to_viewbox_translate(vb, nav.cursor_point),
+//       ),
+//       viewbox: vb,
+//     )
+//   }
+//   |> none_effect_wrapper
+// }
 
 fn user_clicked_node(
   model: Model,
@@ -259,7 +258,7 @@ fn user_unclicked(model: Model) -> #(Model, Effect(Msg)) {
             Error(NotFound) -> c
             Ok(node) -> case c.node_0_id != node.id { // TODO: This case could really be a function to check for conflicts
               False -> c
-              True -> Conn(..c, node_1_id: node.id, active: False)
+              True -> Conn(..c, node_1_id: node.id, active: False) // TODO: Need to update second point to node input pos
             }
           }
         }
@@ -267,6 +266,7 @@ fn user_unclicked(model: Model) -> #(Model, Effect(Msg)) {
     }
   })
   |> filter(fn(c) { c.node_1_id != -1 && c.active != True })
+  |> conn.deduplicate
   |> fn(c) { Model(..model, connections: c) }
   |> none_effect_wrapper
 }
