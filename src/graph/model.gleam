@@ -1,4 +1,5 @@
 import gleam/set.{type Set}
+import gleam/dict.{type Dict}
 import graph/node.{type Node, type NodeId}
 import graph/conn.{type Conn}
 import graph/vector.{type Vector}
@@ -7,7 +8,7 @@ import graph/navigator.{type Navigator}
 
 pub type Model {
   Model(
-    nodes: List(Node),
+    nodes: Dict(NodeId, Node),
     connections: List(Conn),
     nodes_selected: Set(NodeId),
     window_resolution: Vector,

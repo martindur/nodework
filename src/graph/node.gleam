@@ -1,4 +1,6 @@
 import gleam/int
+import gleam/dict.{type Dict}
+import gleam/pair
 import gleam/list.{filter, find, map}
 import graph/vector.{type Vector, Vector}
 
@@ -33,9 +35,9 @@ pub fn input_hovered(in: NodeInput) -> Bool {
   in.hovered
 }
 
-pub fn set_input_hover(ins: List(Node), id: NodeInputId) -> List(Node) {
+pub fn set_input_hover(ins: Dict(NodeId, Node), id: NodeInputId) -> Dict(NodeId, Node) {
   ins
-  |> map(fn(node) {
+  |> dict.map_values(fn(_, node) {
     node.inputs
     |> map(fn(input) {
       { input.id == id }
@@ -45,30 +47,38 @@ pub fn set_input_hover(ins: List(Node), id: NodeInputId) -> List(Node) {
   })
 }
 
-pub fn reset_input_hover(ins: List(Node)) -> List(Node) {
+pub fn reset_input_hover(ins: Dict(NodeId, Node)) -> Dict(NodeId, Node) {
   ins
-  |> map(fn(node) {
+  |> dict.map_values(fn(_, node) {
     node.inputs
     |> map(fn(input) { NodeInput(..input, hovered: False) })
     |> fn(inputs) { Node(..node, inputs: inputs) }
   })
 }
 
-pub fn get_node_from_input_hovered(ins: List(Node)) -> Result(Node, NodeError) {
+pub fn get_node_from_input_hovered(ins: Dict(NodeId, Node)) -> Result(Node, NodeError) {
   ins
+  |> dict.to_list
+  |> map(pair.second)
   |> filter(fn(node) {
     case node.inputs |> filter(fn(in) { in.hovered }) {
       [] -> False
       _ -> True
     }
   })
-  |> list.first
-  |> fn(res: Result(Node, Nil)) {
-    case res {
-      Ok(node) -> Ok(node)
-      Error(Nil) -> Error(NotFound)
+  |> fn(nodes) {
+    case nodes {
+      [node] -> Ok(node)
+      [] -> Error(NotFound)
+      _ -> Error(NotFound)
     }
   }
+}
+
+pub fn positions_from_ids(nodes: List(Node), ids: List(NodeId)) {
+  nodes
+  |> filter(fn(node) { list.contains(ids, node.id) })
+  |> map(fn(node) { node.position })
 }
 
 // pub type NodeOutput {
@@ -90,9 +100,9 @@ pub type Node {
   )
 }
 
-pub fn get_position(nodes: List(Node), id: NodeId) -> Vector {
+pub fn get_position(nodes: Dict(NodeId, Node), id: NodeId) -> Vector {
   nodes
-  |> find(fn(n) { n.id == id })
+  |> dict.get(id)
   |> fn(r: Result(Node, Nil)) {
     case r {
       Ok(n) -> n.position
@@ -120,7 +130,7 @@ pub fn scale_position(node: Node, scalar: Float) -> Node {
   |> fn(pos) { Node(..node, position: pos) }
 }
 
-pub fn update_all_node_offsets(nodes: List(Node), point: Vector) -> List(Node) {
+pub fn update_all_node_offsets(nodes: Dict(NodeId, Node), point: Vector) -> Dict(NodeId, Node) {
   nodes
-  |> map(update_offset(_, point))
+  |> dict.map_values(fn(_, node) { update_offset(node, point) })
 }

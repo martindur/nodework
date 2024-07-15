@@ -1,5 +1,7 @@
 import gleam/dynamic.{type DecodeError}
 import gleam/float
+import gleam/dict
+import gleam/pair
 import gleam/int
 import gleam/list.{filter, map}
 import gleam/result
@@ -79,22 +81,22 @@ type MouseEvent {
 fn init(_flags) -> #(Model, Effect(Msg)) {
   #(
     Model(
-      nodes: [
-        Node(
+      nodes: dict.from_list([
+        #(0, Node(
           position: Vector(0, 0),
           offset: Vector(0, 0),
           id: 0,
           inputs: [nd.new_input(0, 0, "foo"), nd.new_input(0, 1, "bar"), nd.new_input(0, 2, "baz")],
           name: "Rect",
-        ),
-        Node(
+        )),
+        #(1, Node(
           position: Vector(300, 300),
           offset: Vector(0, 0),
           id: 1,
           inputs: [nd.new_input(1, 0, "bob")],
           name: "Circle",
-       ),
-      ],
+       )),
+      ]),
       connections: [],
       nodes_selected: set.new(),
       window_resolution: get_window_size(),
@@ -156,7 +158,7 @@ fn none_effect_wrapper(model: Model) -> #(Model, Effect(Msg)) {
 }
 
 fn user_added_node(model: Model, node: Node) -> #(Model, Effect(Msg)) {
-  Model(..model, nodes: list.append(model.nodes, [node]))
+  Model(..model, nodes: model.nodes |> dict.insert(node.id, node))
   |> none_effect_wrapper
 }
 
@@ -167,6 +169,7 @@ fn user_moved_mouse(model: Model, point: Vector) -> #(Model, Effect(Msg)) {
   |> draw.viewbox_offset(graph_limit)
   |> draw.node_positions
   |> draw.dragged_connection
+  |> draw.connections
   |> none_effect_wrapper
 }
 
@@ -665,7 +668,9 @@ fn view(model: Model) -> element.Element(Msg) {
         svg.g(
           [],
           model.nodes
-            |> list.map(fn(node: Node) { view_node(node, model.nodes_selected) }),
+            |> dict.to_list
+            |> map(pair.second)
+            |> map(fn(node: Node) { view_node(node, model.nodes_selected) }),
         ),
         // debug_draw_offset(model.nodes),
       // debug_draw_cursor_point(model.navigator),
