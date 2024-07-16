@@ -231,16 +231,16 @@ fn user_unclicked(model: Model) -> #(Model, Effect(Msg)) {
         |> fn(res: Result(#(Node, NodeInput), NodeError)) {
           case res {
             Error(NotFound) -> c
-            Ok(#(node, input)) -> case c.node_0_id != node.id { // TODO: This case could really be a function to check for conflicts
+            Ok(#(node, input)) -> case c.source_node_id != node.id { // TODO: This case could really be a function to check for conflicts
               False -> c
-              True -> Conn(..c, node_1_id: node.id, node_input_id: nd.input_id(input), active: False) // TODO: Need to update second point to node input pos
+              True -> Conn(..c, target_node_id: node.id, target_input_id: nd.input_id(input), active: False) // TODO: Need to update second point to node input pos
             }
           }
         }
       }
     }
   })
-  |> filter(fn(c) { c.node_1_id != -1 && c.active != True })
+  |> filter(fn(c) { c.target_node_id != -1 && c.active != True })
   |> conn.unique
   |> fn(c) { Model(..model, connections: c) }
   |> none_effect_wrapper

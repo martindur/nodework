@@ -5,7 +5,7 @@ import lustre/attribute.{type Attribute, attribute as attr}
 import graph/vector.{type Vector}
 
 pub type Conn {
-  Conn(p0: Vector, p1: Vector, node_0_id: Int, node_1_id: Int, node_input_id: String, active: Bool)
+  Conn(p0: Vector, p1: Vector, source_node_id: Int, target_node_id: Int, target_input_id: String, active: Bool)
 }
 
 pub fn to_attributes(conn: Conn) -> List(Attribute(a)) {
@@ -18,7 +18,7 @@ pub fn to_attributes(conn: Conn) -> List(Attribute(a)) {
 }
 
 fn conn_duplicate(a: Conn, b: Conn) -> Bool {
-  a.node_0_id == b.node_0_id && a.node_input_id == b.node_input_id
+  a.source_node_id == b.source_node_id && a.target_input_id == b.target_input_id
 }
 
 fn deduplicate_helper(remaining: List(Conn), seen: List(Conn)) -> List(Conn) {

@@ -64,7 +64,7 @@ fn order_connection_nodes(nodes: List(Node), c: Conn) -> List(Node) {
   case list.first(nodes) {
     Error(Nil) -> []
     Ok(node) ->
-      case node.id == c.node_0_id {
+      case node.id == c.source_node_id {
         True -> nodes
         False -> list.reverse(nodes)
       }
@@ -74,7 +74,7 @@ fn order_connection_nodes(nodes: List(Node), c: Conn) -> List(Node) {
 pub fn connections(m: Model) -> Model {
   m.connections
   |> map(fn(c) {
-    dict.take(m.nodes, [c.node_0_id, c.node_1_id])
+    dict.take(m.nodes, [c.source_node_id, c.target_node_id])
     |> dict.to_list
     |> map(pair.second)
     |> order_connection_nodes(c)
@@ -87,7 +87,7 @@ pub fn connections(m: Model) -> Model {
             ..c,
             p0: vector.add(a.position, node.output_position(a.output)),
             p1: b.inputs
-              |> filter(fn(in) { node.input_id(in) == c.node_input_id })
+              |> filter(fn(in) { node.input_id(in) == c.target_input_id })
               |> fn(nodes) {
                 let assert [x] = nodes
                 x
