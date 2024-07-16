@@ -85,6 +85,25 @@ pub fn reset_input_hover(ins: Dict(NodeId, Node)) -> Dict(NodeId, Node) {
   })
 }
 
+pub fn set_output_hover(ins: Dict(NodeId, Node), id: NodeOutputId) -> Dict(NodeId, Node) {
+  ins
+  |> dict.map_values(fn(_, node) {
+    case node.output.id == id {
+      True -> NodeOutput(..node.output, hovered: True)
+      False -> node.output
+    }
+    |> fn(output) { Node(..node, output: output) }
+  })
+}
+
+pub fn reset_output_hover(ins: Dict(NodeId, Node)) -> Dict(NodeId, Node) {
+  ins
+  |> dict.map_values(fn(_, node) {
+    NodeOutput(..node.output, hovered: False)
+    |> fn(output) { Node(..node, output: output) }
+  })
+}
+
 pub fn get_node_from_input_hovered(ins: Dict(NodeId, Node)) -> Result(#(Node, NodeInput), NodeError) {
   ins
   |> dict.to_list
@@ -115,6 +134,14 @@ pub fn new_output(id: NodeId) -> NodeOutput {
 
 pub fn output_position(out: NodeOutput) -> Vector {
   out.position
+}
+
+pub fn output_id(out: NodeOutput) -> NodeOutputId {
+  out.id
+}
+
+pub fn output_hovered(out: NodeOutput) -> Bool {
+  out.hovered
 }
 
 pub fn positions_from_ids(nodes: List(Node), ids: List(NodeId)) {

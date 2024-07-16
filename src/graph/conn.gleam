@@ -18,7 +18,7 @@ pub fn to_attributes(conn: Conn) -> List(Attribute(a)) {
 }
 
 fn conn_duplicate(a: Conn, b: Conn) -> Bool {
-  a.node_0_id == b.node_0_id && a.node_1_id == b.node_1_id
+  a.node_0_id == b.node_0_id && a.node_input_id == b.node_input_id
 }
 
 fn deduplicate_helper(remaining: List(Conn), seen: List(Conn)) -> List(Conn) {

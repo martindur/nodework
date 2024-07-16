@@ -95,7 +95,7 @@ fn init(_flags) -> #(Model, Effect(Msg)) {
           offset: Vector(0, 0),
           id: 1,
           inputs: [nd.new_input(1, 0, "bob")],
-          output: nd.new_output(0),
+          output: nd.new_output(1),
           name: "Circle",
        )),
       ]),
@@ -122,6 +122,8 @@ pub opaque type Msg {
   UserScrolled(Float)
   UserHoverNodeInput(String)
   UserUnhoverNodeInput
+  UserHoverNodeOutput(String)
+  UserUnhoverNodeOutput
   GraphClearSelection
   GraphSetDragMode
   GraphSetNormalMode
@@ -144,6 +146,8 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     UserScrolled(delta_y) -> user_scrolled(model, delta_y)
     UserHoverNodeInput(input_id) -> user_hover_node_input(model, input_id)
     UserUnhoverNodeInput -> user_unhover_node_input(model)
+    UserHoverNodeOutput(output_id) -> user_hover_node_output(model, output_id)
+    UserUnhoverNodeOutput -> user_unhover_node_output(model)
     GraphClearSelection -> graph_clear_selection(model)
     GraphSetDragMode -> Model(..model, mode: Drag) |> none_effect_wrapper
     GraphSetNormalMode -> Model(..model, mode: Normal) |> none_effect_wrapper
@@ -266,6 +270,20 @@ fn user_hover_node_input(model: Model, input_id: String) -> #(Model, Effect(Msg)
 fn user_unhover_node_input(model: Model) -> #(Model, Effect(Msg)) {
   model.nodes
   |> nd.reset_input_hover
+  |> fn(nodes) { Model(..model, nodes: nodes) }
+  |> none_effect_wrapper
+}
+
+fn user_hover_node_output(model: Model, output_id: String) -> #(Model, Effect(Msg)) {
+  model.nodes
+  |> nd.set_output_hover(output_id)
+  |> fn(nodes) { Model(..model, nodes: nodes) }
+  |> none_effect_wrapper
+}
+
+fn user_unhover_node_output(model: Model) -> #(Model, Effect(Msg)) {
+  model.nodes
+  |> nd.reset_output_hover
   |> fn(nodes) { Model(..model, nodes: nodes) }
   |> none_effect_wrapper
 }
@@ -455,6 +473,8 @@ fn view_node_input(
 
 fn view_node_output(node: Node) -> element.Element(Msg) {
   let pos = nd.output_position(node.output)
+  let id = nd.output_id(node.output)
+  let hovered = nd.output_hovered(node.output)
 
   svg.g([
     attr(
@@ -468,8 +488,15 @@ fn view_node_output(node: Node) -> element.Element(Msg) {
     attr("cy", "0"),
     attr("r", "10"),
     attr("fill", "currentColor"),
+    attr("stroke", "black"),
+    case hovered {
+      True -> attr("stroke-width", "3")
+      False -> attr("stroke-width", "0")
+    },
     attribute.class("text-gray-500"),
     event.on_mouse_down(UserClickedNodeOutput(node.id, pos)),
+    event.on_mouse_enter(UserHoverNodeOutput(id)),
+    event.on_mouse_leave(UserUnhoverNodeOutput),
   ])
   ])
 }
