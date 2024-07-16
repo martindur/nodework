@@ -87,6 +87,7 @@ fn init(_flags) -> #(Model, Effect(Msg)) {
           offset: Vector(0, 0),
           id: 0,
           inputs: [nd.new_input(0, 0, "foo"), nd.new_input(0, 1, "bar"), nd.new_input(0, 2, "baz")],
+          output: nd.new_output(0),
           name: "Rect",
         )),
         #(1, Node(
@@ -94,6 +95,7 @@ fn init(_flags) -> #(Model, Effect(Msg)) {
           offset: Vector(0, 0),
           id: 1,
           inputs: [nd.new_input(1, 0, "bob")],
+          output: nd.new_output(0),
           name: "Circle",
        )),
       ]),
@@ -173,40 +175,6 @@ fn user_moved_mouse(model: Model, point: Vector) -> #(Model, Effect(Msg)) {
   |> none_effect_wrapper
 }
 
-// fn user_moved_mouse(model: Model, point: Vector) -> #(Model, Effect(Msg)) {
-//   model.navigator
-//   |> navigator.update_cursor_point(
-//     model.viewbox |> viewbox.to_viewbox_scale(point),
-//   )
-//   |> fn(nav: Navigator) {
-//     let vb =
-//       model.viewbox
-//       |> viewbox.update_offset(
-//         nav.cursor_point,
-//         model.last_clicked_point,
-//         model.mode,
-//         graph_limit,
-//       )
-
-//     Model(
-//       ..model,
-//       navigator: nav,
-//       nodes: nd.update_node_positions(
-//         model.nodes,
-//         model.nodes_selected,
-//         nav.mouse_down,
-//         nav.cursor_point,
-//       ),
-//       connections: conn.update_active_connection_ends(
-//         model.connections,
-//         viewbox.to_viewbox_translate(vb, nav.cursor_point),
-//       ),
-//       viewbox: vb,
-//     )
-//   }
-//   |> none_effect_wrapper
-// }
-
 fn user_clicked_node(
   model: Model,
   node_id: NodeId,
@@ -237,7 +205,7 @@ fn user_clicked_node_output(
   let p1 = nd.get_position(model.nodes, node_id) |> vector.add(offset)
   let p2 =
     model.viewbox |> viewbox.to_viewbox_translate(model.navigator.cursor_point)
-  let new_conn = Conn(p1, p2, node_id, -1, True)
+  let new_conn = Conn(p1, p2, node_id, -1, "", True)
 
   model.connections
   |> list.prepend(new_conn)
@@ -256,12 +224,12 @@ fn user_unclicked(model: Model) -> #(Model, Effect(Msg)) {
       True -> {
         model.nodes
         |> nd.get_node_from_input_hovered
-        |> fn(res: Result(Node, NodeError)) {
+        |> fn(res: Result(#(Node, NodeInput), NodeError)) {
           case res {
             Error(NotFound) -> c
-            Ok(node) -> case c.node_0_id != node.id { // TODO: This case could really be a function to check for conflicts
+            Ok(#(node, input)) -> case c.node_0_id != node.id { // TODO: This case could really be a function to check for conflicts
               False -> c
-              True -> Conn(..c, node_1_id: node.id, active: False) // TODO: Need to update second point to node input pos
+              True -> Conn(..c, node_1_id: node.id, node_input_id: nd.input_id(input), active: False) // TODO: Need to update second point to node input pos
             }
           }
         }
@@ -269,7 +237,7 @@ fn user_unclicked(model: Model) -> #(Model, Effect(Msg)) {
     }
   })
   |> filter(fn(c) { c.node_1_id != -1 && c.active != True })
-  |> conn.deduplicate
+  |> conn.unique
   |> fn(c) { Model(..model, connections: c) }
   |> none_effect_wrapper
 }
@@ -442,7 +410,6 @@ fn debug_draw_last_clicked_point(model: Model) -> element.Element(Msg) {
 
 fn view_node_input(
   input: NodeInput,
-  index: Int,
 ) -> element.Element(Msg) {
   let id = nd.input_id(input)
   let label = nd.input_label(input)
@@ -452,7 +419,7 @@ fn view_node_input(
     [
       attr(
         "transform",
-        "translate(0, " <> { 50 + index * 30 } |> int.to_string() <> ")",
+        nd.input_position(input) |> vector.to_html(vector.Translate)
       ),
     ],
     [
@@ -486,17 +453,24 @@ fn view_node_input(
   )
 }
 
-fn view_node_output(id: NodeId) -> element.Element(Msg) {
-  let cx = 200
-  let cy = 50
+fn view_node_output(node: Node) -> element.Element(Msg) {
+  let pos = nd.output_position(node.output)
 
+  svg.g([
+    attr(
+      "transform",
+      pos |> vector.to_html(vector.Translate)
+    )
+  ],
+  [
   svg.circle([
-    attr("cx", int.to_string(cx)),
-    attr("cy", int.to_string(cy)),
+    attr("cx", "0"),
+    attr("cy", "0"),
     attr("r", "10"),
     attr("fill", "currentColor"),
     attribute.class("text-gray-500"),
-    event.on_mouse_down(UserClickedNodeOutput(id, Vector(cx, cy))),
+    event.on_mouse_down(UserClickedNodeOutput(node.id, pos)),
+  ])
   ])
 }
 
@@ -546,10 +520,10 @@ fn view_node(node: Node, selection: Set(NodeId)) -> element.Element(Msg) {
           ],
           node.name,
         ),
-        view_node_output(node.id),
+        view_node_output(node),
       ],
-      list.index_map(node.inputs, fn(input, i) {
-        view_node_input(input, i)
+      list.map(node.inputs, fn(input) {
+        view_node_input(input)
       }),
     ]),
   )

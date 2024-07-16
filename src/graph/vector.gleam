@@ -6,6 +6,12 @@ pub type Vector {
   Vector(x: Int, y: Int)
 }
 
+pub type Transform {
+  Translate
+  Scale
+  Rotate
+}
+
 pub fn subtract(a: Vector, b: Vector) -> Vector {
   Vector(x: b.x - a.x, y: b.y - a.y)
 }
@@ -62,4 +68,13 @@ pub fn get_path(start_point: Vector, end_point: Vector) -> String {
     " ",
     to_string(end_point.y),
   ])
+}
+
+pub fn to_html(vec: Vector, t: Transform) -> String {
+  case t {
+    Translate -> "translate("
+    Scale -> "scale("
+    Rotate -> "rotate("
+  }
+  |> fn(t) { t <> int.to_string(vec.x) <> "," <> int.to_string(vec.y) <> ")" }
 }

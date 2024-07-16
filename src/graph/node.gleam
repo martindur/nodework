@@ -1,26 +1,51 @@
 import gleam/int
 import gleam/dict.{type Dict}
 import gleam/pair
-import gleam/list.{filter, find, map}
+import gleam/list.{filter, filter_map, map}
 import graph/vector.{type Vector, Vector}
+
+
+pub type Node {
+  Node(
+    position: Vector,
+    offset: Vector,
+    id: NodeId,
+    inputs: List(NodeInput),
+    output: NodeOutput,
+    name: String,
+  )
+}
 
 pub type NodeId =
   Int
-
-pub type NodeInputId =
-  String
-
-pub opaque type NodeInput {
-  NodeInput(id: NodeInputId, label: String, hovered: Bool)
-}
 
 pub type NodeError {
   NotFound
 }
 
+pub type NodeInputId =
+  String
+
+pub type NodeOutputId =
+  String
+
+pub opaque type NodeInput {
+  NodeInput(id: NodeInputId, position: Vector, label: String, hovered: Bool)
+}
+
+pub opaque type NodeOutput {
+  NodeOutput(id: NodeOutputId, position: Vector, hovered: Bool)
+}
+
+fn input_position_from_index(index: Int) -> Vector {
+  Vector(0, 50 + index * 30)
+}
+
 pub fn new_input(id: NodeId, index: Int, label: String) -> NodeInput {
   { int.to_string(id) <> "-" <> int.to_string(index) }
-  |> fn(input_id) { NodeInput(input_id, label, False) }
+  |> fn(input_id) { 
+    NodeInput(input_id, input_position_from_index(index), label, False)
+  }
 }
 
 pub fn input_id(in: NodeInput) -> String {
@@ -33,6 +58,10 @@ pub fn input_label(in: NodeInput) -> String {
 
 pub fn input_hovered(in: NodeInput) -> Bool {
   in.hovered
+}
+
+pub fn input_position(in: NodeInput) -> Vector {
+  in.position
 }
 
 pub fn set_input_hover(ins: Dict(NodeId, Node), id: NodeInputId) -> Dict(NodeId, Node) {
@@ -56,48 +85,42 @@ pub fn reset_input_hover(ins: Dict(NodeId, Node)) -> Dict(NodeId, Node) {
   })
 }
 
-pub fn get_node_from_input_hovered(ins: Dict(NodeId, Node)) -> Result(Node, NodeError) {
+pub fn get_node_from_input_hovered(ins: Dict(NodeId, Node)) -> Result(#(Node, NodeInput), NodeError) {
   ins
   |> dict.to_list
   |> map(pair.second)
-  |> filter(fn(node) {
+  |> filter_map(fn(node) {
     case node.inputs |> filter(fn(in) { in.hovered }) {
-      [] -> False
-      _ -> True
+      [] -> Error(Nil)
+      [input] -> Ok(#(node, input))
+      _ -> Error(Nil)
     }
   })
   |> fn(nodes) {
     case nodes {
-      [node] -> Ok(node)
+      [node_and_input] -> Ok(node_and_input)
       [] -> Error(NotFound)
       _ -> Error(NotFound)
     }
   }
 }
 
+pub fn new_output(id: NodeId) -> NodeOutput {
+  NodeOutput(
+    "out-" <> int.to_string(id),
+    Vector(200, 50), // NOTE: For now we just have a single output, which sits the same place. We might want to change it if node needs to be wider
+    False
+  )
+}
+
+pub fn output_position(out: NodeOutput) -> Vector {
+  out.position
+}
+
 pub fn positions_from_ids(nodes: List(Node), ids: List(NodeId)) {
   nodes
   |> filter(fn(node) { list.contains(ids, node.id) })
   |> map(fn(node) { node.position })
-}
-
-// pub type NodeOutput {
-//   Shape
-//   String
-// }
-
-// pub type NodeUI {
-//   NodeUI(title: String, inputs: List(NodeInput), output: NodeOutput)
-// }
-
-pub type Node {
-  Node(
-    position: Vector,
-    offset: Vector,
-    id: NodeId,
-    inputs: List(NodeInput),
-    name: String,
-  )
 }
 
 pub fn get_position(nodes: Dict(NodeId, Node), id: NodeId) -> Vector {

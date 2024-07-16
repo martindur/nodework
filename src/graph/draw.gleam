@@ -1,13 +1,13 @@
-import gleam/list.{filter, map, concat}
 import gleam/dict
-import gleam/set
+import gleam/list.{concat, filter, map}
 import gleam/pair
-import graph/model.{type Model, Model}
-import graph/node.{type Node, Node}
-import graph/navigator.{type Navigator, Navigator}
-import graph/vector.{type Vector, Vector}
-import graph/viewbox.{ViewBox, Normal, Drag}
+import gleam/set
 import graph/conn.{type Conn, Conn}
+import graph/model.{type Model, Model}
+import graph/navigator.{type Navigator, Navigator}
+import graph/node.{type Node, type NodeInput, Node}
+import graph/vector.{type Vector, Vector}
+import graph/viewbox.{Drag, Normal, ViewBox}
 
 pub fn cursor_point(m: Model, p: Vector) -> Model {
   p
@@ -36,25 +36,15 @@ pub fn node_positions(m: Model) -> Model {
   |> dict.map_values(fn(_key, node) {
     case m.navigator.mouse_down {
       False -> node
-      True -> Node(..node, position: vector.subtract(node.offset, m.navigator.cursor_point))
+      True ->
+        Node(
+          ..node,
+          position: vector.subtract(node.offset, m.navigator.cursor_point),
+        )
     }
   })
   |> dict.merge(m.nodes, _)
   |> fn(nodes) { Model(..m, nodes: nodes) }
-
-  // let is_selected = fn(node: Node) { set.contains(m.nodes_selected, node.id) }
-  // let unselected = m.nodes |> dict.filter(fn(_, x) { !is_selected(x) })
-
-  // m.nodes
-  // |> dict.filter(is_selected)
-  // |> map(fn(node) {
-  //   case m.navigator.mouse_down {
-  //     False -> node
-  //     True -> Node(..node, position: vector.subtract(node.offset, m.navigator.cursor_point))
-  //   }
-  // })
-  // |> fn(nodes) { [unselected, nodes] |> concat }
-  // |> fn(nodes) { Model(..m, nodes: nodes) }
 }
 
 pub fn dragged_connection(m: Model) -> Model {
@@ -82,9 +72,6 @@ fn order_connection_nodes(nodes: List(Node), c: Conn) -> List(Node) {
 }
 
 pub fn connections(m: Model) -> Model {
-  let offset = Vector(200, 50) // TODO: Add actual positions to inputs/output
-  let input_offset = Vector(0, 50)
-
   m.connections
   |> map(fn(c) {
     dict.take(m.nodes, [c.node_0_id, c.node_1_id])
@@ -95,11 +82,22 @@ pub fn connections(m: Model) -> Model {
       case nodes {
         [] -> c
         [_] -> c
-        [a, b] -> Conn(..c, p0: vector.add(a.position, offset), p1: vector.add(b.position, input_offset))
+        [a, b] ->
+          Conn(
+            ..c,
+            p0: vector.add(a.position, node.output_position(a.output)),
+            p1: b.inputs
+              |> filter(fn(in) { node.input_id(in) == c.node_input_id })
+              |> fn(nodes) {
+                let assert [x] = nodes
+                x
+              }
+              |> fn(x: NodeInput) { node.input_position(x) }
+              |> vector.add(b.position, _),
+          )
         _ -> c
       }
     }
   })
-  |> fn (conns) { Model(..m, connections: conns) }
+  |> fn(conns) { Model(..m, connections: conns) }
 }
-
