@@ -1,9 +1,8 @@
-import gleam/int
 import gleam/dict.{type Dict}
-import gleam/pair
+import gleam/int
 import gleam/list.{filter, filter_map, map}
+import gleam/pair
 import graph/vector.{type Vector, Vector}
-
 
 pub type Node {
   Node(
@@ -43,7 +42,7 @@ fn input_position_from_index(index: Int) -> Vector {
 
 pub fn new_input(id: NodeId, index: Int, label: String) -> NodeInput {
   { int.to_string(id) <> "-" <> int.to_string(index) }
-  |> fn(input_id) { 
+  |> fn(input_id) {
     NodeInput(input_id, input_position_from_index(index), label, False)
   }
 }
@@ -64,7 +63,10 @@ pub fn input_position(in: NodeInput) -> Vector {
   in.position
 }
 
-pub fn set_input_hover(ins: Dict(NodeId, Node), id: NodeInputId) -> Dict(NodeId, Node) {
+pub fn set_input_hover(
+  ins: Dict(NodeId, Node),
+  id: NodeInputId,
+) -> Dict(NodeId, Node) {
   ins
   |> dict.map_values(fn(_, node) {
     node.inputs
@@ -85,7 +87,10 @@ pub fn reset_input_hover(ins: Dict(NodeId, Node)) -> Dict(NodeId, Node) {
   })
 }
 
-pub fn set_output_hover(ins: Dict(NodeId, Node), id: NodeOutputId) -> Dict(NodeId, Node) {
+pub fn set_output_hover(
+  ins: Dict(NodeId, Node),
+  id: NodeOutputId,
+) -> Dict(NodeId, Node) {
   ins
   |> dict.map_values(fn(_, node) {
     case node.output.id == id {
@@ -104,7 +109,9 @@ pub fn reset_output_hover(ins: Dict(NodeId, Node)) -> Dict(NodeId, Node) {
   })
 }
 
-pub fn get_node_from_input_hovered(ins: Dict(NodeId, Node)) -> Result(#(Node, NodeInput), NodeError) {
+pub fn get_node_from_input_hovered(
+  ins: Dict(NodeId, Node),
+) -> Result(#(Node, NodeInput), NodeError) {
   ins
   |> dict.to_list
   |> map(pair.second)
@@ -127,8 +134,9 @@ pub fn get_node_from_input_hovered(ins: Dict(NodeId, Node)) -> Result(#(Node, No
 pub fn new_output(id: NodeId) -> NodeOutput {
   NodeOutput(
     "out-" <> int.to_string(id),
-    Vector(200, 50), // NOTE: For now we just have a single output, which sits the same place. We might want to change it if node needs to be wider
-    False
+    Vector(200, 50),
+    // NOTE: For now we just have a single output, which sits the same place. We might want to change it if node needs to be wider
+    False,
   )
 }
 
@@ -180,7 +188,10 @@ pub fn scale_position(node: Node, scalar: Float) -> Node {
   |> fn(pos) { Node(..node, position: pos) }
 }
 
-pub fn update_all_node_offsets(nodes: Dict(NodeId, Node), point: Vector) -> Dict(NodeId, Node) {
+pub fn update_all_node_offsets(
+  nodes: Dict(NodeId, Node),
+  point: Vector,
+) -> Dict(NodeId, Node) {
   nodes
   |> dict.map_values(fn(_, node) { update_offset(node, point) })
 }

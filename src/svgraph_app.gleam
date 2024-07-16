@@ -1,9 +1,9 @@
+import gleam/dict
 import gleam/dynamic.{type DecodeError}
 import gleam/float
-import gleam/dict
-import gleam/pair
 import gleam/int
 import gleam/list.{filter, map}
+import gleam/pair
 import gleam/result
 import gleam/set.{type Set}
 import lustre
@@ -14,11 +14,13 @@ import lustre/element/html
 import lustre/element/svg
 import lustre/event
 
-import graph/model.{type Model, Model}
-import graph/draw
 import graph/conn.{type Conn, Conn}
+import graph/draw
+import graph/model.{type Model, Model}
 import graph/navigator.{type Navigator, Navigator}
-import graph/node.{type Node, type NodeId, type NodeInput, Node, type NodeError, NotFound} as nd
+import graph/node.{
+  type Node, type NodeError, type NodeId, type NodeInput, Node, NotFound,
+} as nd
 import graph/vector.{type Vector, Vector}
 import graph/viewbox.{type ViewBox, Drag, Normal, ViewBox}
 
@@ -77,27 +79,36 @@ type MouseEvent {
   MouseEvent(position: Vector, shift_key_active: Bool)
 }
 
-
 fn init(_flags) -> #(Model, Effect(Msg)) {
   #(
     Model(
       nodes: dict.from_list([
-        #(0, Node(
-          position: Vector(0, 0),
-          offset: Vector(0, 0),
-          id: 0,
-          inputs: [nd.new_input(0, 0, "foo"), nd.new_input(0, 1, "bar"), nd.new_input(0, 2, "baz")],
-          output: nd.new_output(0),
-          name: "Rect",
-        )),
-        #(1, Node(
-          position: Vector(300, 300),
-          offset: Vector(0, 0),
-          id: 1,
-          inputs: [nd.new_input(1, 0, "bob")],
-          output: nd.new_output(1),
-          name: "Circle",
-       )),
+        #(
+          0,
+          Node(
+            position: Vector(0, 0),
+            offset: Vector(0, 0),
+            id: 0,
+            inputs: [
+              nd.new_input(0, 0, "foo"),
+              nd.new_input(0, 1, "bar"),
+              nd.new_input(0, 2, "baz"),
+            ],
+            output: nd.new_output(0),
+            name: "Rect",
+          ),
+        ),
+        #(
+          1,
+          Node(
+            position: Vector(300, 300),
+            offset: Vector(0, 0),
+            id: 1,
+            inputs: [nd.new_input(1, 0, "bob")],
+            output: nd.new_output(1),
+            name: "Circle",
+          ),
+        ),
       ]),
       connections: [],
       nodes_selected: set.new(),
@@ -168,7 +179,6 @@ fn user_added_node(model: Model, node: Node) -> #(Model, Effect(Msg)) {
   |> none_effect_wrapper
 }
 
-
 fn user_moved_mouse(model: Model, point: Vector) -> #(Model, Effect(Msg)) {
   model
   |> draw.cursor_point(point)
@@ -231,10 +241,19 @@ fn user_unclicked(model: Model) -> #(Model, Effect(Msg)) {
         |> fn(res: Result(#(Node, NodeInput), NodeError)) {
           case res {
             Error(NotFound) -> c
-            Ok(#(node, input)) -> case c.source_node_id != node.id { // TODO: This case could really be a function to check for conflicts
-              False -> c
-              True -> Conn(..c, target_node_id: node.id, target_input_id: nd.input_id(input), active: False) // TODO: Need to update second point to node input pos
-            }
+            Ok(#(node, input)) ->
+              case c.source_node_id != node.id {
+                // TODO: This case could really be a function to check for conflicts
+                False -> c
+                True ->
+                  Conn(
+                    ..c,
+                    target_node_id: node.id,
+                    target_input_id: nd.input_id(input),
+                    active: False,
+                  )
+                // TODO: Need to update second point to node input pos
+              }
           }
         }
       }
@@ -260,7 +279,10 @@ fn user_scrolled(model: Model, delta_y: Float) -> #(Model, Effect(Msg)) {
   |> none_effect_wrapper
 }
 
-fn user_hover_node_input(model: Model, input_id: String) -> #(Model, Effect(Msg)) {
+fn user_hover_node_input(
+  model: Model,
+  input_id: String,
+) -> #(Model, Effect(Msg)) {
   model.nodes
   |> nd.set_input_hover(input_id)
   |> fn(nodes) { Model(..model, nodes: nodes) }
@@ -274,7 +296,10 @@ fn user_unhover_node_input(model: Model) -> #(Model, Effect(Msg)) {
   |> none_effect_wrapper
 }
 
-fn user_hover_node_output(model: Model, output_id: String) -> #(Model, Effect(Msg)) {
+fn user_hover_node_output(
+  model: Model,
+  output_id: String,
+) -> #(Model, Effect(Msg)) {
   model.nodes
   |> nd.set_output_hover(output_id)
   |> fn(nodes) { Model(..model, nodes: nodes) }
@@ -426,9 +451,7 @@ fn debug_draw_last_clicked_point(model: Model) -> element.Element(Msg) {
   |> svg.circle()
 }
 
-fn view_node_input(
-  input: NodeInput,
-) -> element.Element(Msg) {
+fn view_node_input(input: NodeInput) -> element.Element(Msg) {
   let id = nd.input_id(input)
   let label = nd.input_label(input)
   let hovered = nd.input_hovered(input)
@@ -437,7 +460,7 @@ fn view_node_input(
     [
       attr(
         "transform",
-        nd.input_position(input) |> vector.to_html(vector.Translate)
+        nd.input_position(input) |> vector.to_html(vector.Translate),
       ),
     ],
     [
@@ -476,28 +499,22 @@ fn view_node_output(node: Node) -> element.Element(Msg) {
   let id = nd.output_id(node.output)
   let hovered = nd.output_hovered(node.output)
 
-  svg.g([
-    attr(
-      "transform",
-      pos |> vector.to_html(vector.Translate)
-    )
-  ],
-  [
-  svg.circle([
-    attr("cx", "0"),
-    attr("cy", "0"),
-    attr("r", "10"),
-    attr("fill", "currentColor"),
-    attr("stroke", "black"),
-    case hovered {
-      True -> attr("stroke-width", "3")
-      False -> attr("stroke-width", "0")
-    },
-    attribute.class("text-gray-500"),
-    event.on_mouse_down(UserClickedNodeOutput(node.id, pos)),
-    event.on_mouse_enter(UserHoverNodeOutput(id)),
-    event.on_mouse_leave(UserUnhoverNodeOutput),
-  ])
+  svg.g([attr("transform", pos |> vector.to_html(vector.Translate))], [
+    svg.circle([
+      attr("cx", "0"),
+      attr("cy", "0"),
+      attr("r", "10"),
+      attr("fill", "currentColor"),
+      attr("stroke", "black"),
+      case hovered {
+        True -> attr("stroke-width", "3")
+        False -> attr("stroke-width", "0")
+      },
+      attribute.class("text-gray-500"),
+      event.on_mouse_down(UserClickedNodeOutput(node.id, pos)),
+      event.on_mouse_enter(UserHoverNodeOutput(id)),
+      event.on_mouse_leave(UserUnhoverNodeOutput),
+    ]),
   ])
 }
 
@@ -549,9 +566,7 @@ fn view_node(node: Node, selection: Set(NodeId)) -> element.Element(Msg) {
         ),
         view_node_output(node),
       ],
-      list.map(node.inputs, fn(input) {
-        view_node_input(input)
-      }),
+      list.map(node.inputs, fn(input) { view_node_input(input) }),
     ]),
   )
 }

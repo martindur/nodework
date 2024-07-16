@@ -5,7 +5,14 @@ import lustre/attribute.{type Attribute, attribute as attr}
 import graph/vector.{type Vector}
 
 pub type Conn {
-  Conn(p0: Vector, p1: Vector, source_node_id: Int, target_node_id: Int, target_input_id: String, active: Bool)
+  Conn(
+    p0: Vector,
+    p1: Vector,
+    source_node_id: Int,
+    target_node_id: Int,
+    target_input_id: String,
+    active: Bool,
+  )
 }
 
 pub fn to_attributes(conn: Conn) -> List(Attribute(a)) {

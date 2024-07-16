@@ -1,10 +1,10 @@
-import gleam/set.{type Set}
 import gleam/dict.{type Dict}
-import graph/node.{type Node, type NodeId}
+import gleam/set.{type Set}
 import graph/conn.{type Conn}
-import graph/vector.{type Vector}
-import graph/viewbox.{type ViewBox, type GraphMode}
 import graph/navigator.{type Navigator}
+import graph/node.{type Node, type NodeId}
+import graph/vector.{type Vector}
+import graph/viewbox.{type GraphMode, type ViewBox}
 
 pub type Model {
   Model(

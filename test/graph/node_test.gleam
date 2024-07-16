@@ -4,7 +4,14 @@ import graph/node.{Node}
 import graph/vector.{Vector}
 
 pub fn update_offset__from_origin__test() {
-  Node(Vector(0, 0), Vector(10, 10), id: 0, inputs: [], output: node.new_output(0),  name: "foo")
+  Node(
+    Vector(0, 0),
+    Vector(10, 10),
+    id: 0,
+    inputs: [],
+    output: node.new_output(0),
+    name: "foo",
+  )
   |> node.update_offset(Vector(5, 5))
   |> should.equal(Node(
     Vector(0, 0),
