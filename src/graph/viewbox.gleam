@@ -25,29 +25,16 @@ pub fn to_viewbox_scale(vb: ViewBox, p: Vector) -> Vector {
   |> vector.scalar(vb.zoom_level)
 }
 
+pub fn to_viewbox_translate(vb: ViewBox, p: Vector) -> Vector {
+  p
+  |> vector.add(vb.offset)
+}
+
 /// Transforms a vector into the space of a viewbox
 pub fn to_viewbox_space(vb: ViewBox, p: Vector) -> Vector {
   p
   |> vector.scalar(vb.zoom_level)
   |> vector.add(vb.offset)
-}
-
-pub fn update_offset(
-  vb: ViewBox,
-  point: Vector,
-  offset: Vector,
-  mode: GraphMode,
-  limit: Int,
-) -> ViewBox {
-  case mode {
-    Normal -> vb.offset
-    Drag ->
-      point
-      |> vector.subtract(offset, _)
-      |> vector.inverse
-      |> vector.bounded_vector(limit)
-  }
-  |> fn(offset) { ViewBox(..vb, offset: offset) }
 }
 
 pub fn update_resolution(vb: ViewBox, resolution: Vector) -> ViewBox {

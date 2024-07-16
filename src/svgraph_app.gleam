@@ -1,8 +1,9 @@
+import gleam/dict
 import gleam/dynamic.{type DecodeError}
 import gleam/float
 import gleam/int
-import gleam/io
 import gleam/list.{filter, map}
+import gleam/pair
 import gleam/result
 import gleam/set.{type Set}
 import lustre
@@ -13,12 +14,19 @@ import lustre/element/html
 import lustre/element/svg
 import lustre/event
 
+import graph/conn.{type Conn, Conn}
+import graph/draw
+import graph/model.{type Model, Model}
 import graph/navigator.{type Navigator, Navigator}
-import graph/node.{type Node, type NodeId, Node} as nd
+import graph/node.{
+  type Node, type NodeError, type NodeId, type NodeInput, Node, NotFound,
+} as nd
 import graph/vector.{type Vector, Vector}
-import graph/viewbox.{type GraphMode, type ViewBox, Drag, Normal, ViewBox}
+import graph/viewbox.{type ViewBox, Drag, Normal, ViewBox}
 
 pub type ResizeEvent
+
+pub type MouseUpEvent
 
 const graph_limit = 500
 
@@ -35,6 +43,9 @@ fn get_window_size() -> Vector {
 
 @external(javascript, "./resize.ffi.mjs", "documentResizeEventListener")
 fn document_resize_event_listener(listener: fn(ResizeEvent) -> Nil) -> Nil
+
+@external(javascript, "./mouse.ffi.mjs", "mouseUpEventListener")
+fn document_mouse_up_event_listener(listener: fn(MouseUpEvent) -> Nil) -> Nil
 
 pub fn main() {
   let app = lustre.application(init, update, view)
@@ -55,6 +66,12 @@ pub fn main() {
     |> send_to_runtime
   })
 
+  document_mouse_up_event_listener(fn(_) {
+    UserUnclicked
+    |> lustre.dispatch
+    |> send_to_runtime
+  })
+
   Nil
 }
 
@@ -62,37 +79,38 @@ type MouseEvent {
   MouseEvent(position: Vector, shift_key_active: Bool)
 }
 
-type Model {
-  Model(
-    nodes: List(Node),
-    nodes_selected: Set(NodeId),
-    window_resolution: Vector,
-    viewbox: ViewBox,
-    navigator: Navigator,
-    mode: GraphMode,
-    last_clicked_point: Vector,
-  )
-}
-
 fn init(_flags) -> #(Model, Effect(Msg)) {
   #(
     Model(
-      nodes: [
-        Node(
-          position: Vector(0, 0),
-          offset: Vector(0, 0),
-          id: 0,
-          inputs: ["foo", "bar", "baz"],
-          name: "Rect",
+      nodes: dict.from_list([
+        #(
+          0,
+          Node(
+            position: Vector(0, 0),
+            offset: Vector(0, 0),
+            id: 0,
+            inputs: [
+              nd.new_input(0, 0, "foo"),
+              nd.new_input(0, 1, "bar"),
+              nd.new_input(0, 2, "baz"),
+            ],
+            output: nd.new_output(0),
+            name: "Rect",
+          ),
         ),
-        Node(
-          position: Vector(300, 300),
-          offset: Vector(0, 0),
-          id: 1,
-          inputs: ["bob"],
-          name: "Circle",
+        #(
+          1,
+          Node(
+            position: Vector(300, 300),
+            offset: Vector(0, 0),
+            id: 1,
+            inputs: [nd.new_input(1, 0, "bob")],
+            output: nd.new_output(1),
+            name: "Circle",
+          ),
         ),
-      ],
+      ]),
+      connections: [],
       nodes_selected: set.new(),
       window_resolution: get_window_size(),
       viewbox: ViewBox(Vector(0, 0), get_window_size(), 1.0),
@@ -109,8 +127,14 @@ pub opaque type Msg {
   UserMovedMouse(Vector)
   UserClickedNode(NodeId, MouseEvent)
   UserUnclickedNode(NodeId)
+  UserClickedNodeOutput(NodeId, Vector)
+  UserUnclicked
   UserClickedGraph(MouseEvent)
   UserScrolled(Float)
+  UserHoverNodeInput(String)
+  UserUnhoverNodeInput
+  UserHoverNodeOutput(String)
+  UserUnhoverNodeOutput
   GraphClearSelection
   GraphSetDragMode
   GraphSetNormalMode
@@ -126,8 +150,15 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     UserClickedNode(node_id, mouse_event) ->
       user_clicked_node(model, node_id, mouse_event)
     UserUnclickedNode(_node_id) -> user_unclicked_node(model)
+    UserClickedNodeOutput(node_id, offset) ->
+      user_clicked_node_output(model, node_id, offset)
+    UserUnclicked -> user_unclicked(model)
     UserClickedGraph(mouse_event) -> user_clicked_graph(model, mouse_event)
     UserScrolled(delta_y) -> user_scrolled(model, delta_y)
+    UserHoverNodeInput(input_id) -> user_hover_node_input(model, input_id)
+    UserUnhoverNodeInput -> user_unhover_node_input(model)
+    UserHoverNodeOutput(output_id) -> user_hover_node_output(model, output_id)
+    UserUnhoverNodeOutput -> user_unhover_node_output(model)
     GraphClearSelection -> graph_clear_selection(model)
     GraphSetDragMode -> Model(..model, mode: Drag) |> none_effect_wrapper
     GraphSetNormalMode -> Model(..model, mode: Normal) |> none_effect_wrapper
@@ -144,34 +175,17 @@ fn none_effect_wrapper(model: Model) -> #(Model, Effect(Msg)) {
 }
 
 fn user_added_node(model: Model, node: Node) -> #(Model, Effect(Msg)) {
-  Model(..model, nodes: list.append(model.nodes, [node]))
+  Model(..model, nodes: model.nodes |> dict.insert(node.id, node))
   |> none_effect_wrapper
 }
 
 fn user_moved_mouse(model: Model, point: Vector) -> #(Model, Effect(Msg)) {
-  model.navigator
-  |> navigator.update_cursor_point(
-    model.viewbox |> viewbox.to_viewbox_scale(point),
-  )
-  |> fn(nav: Navigator) {
-    Model(
-      ..model,
-      navigator: nav,
-      nodes: nd.update_node_positions(
-        model.nodes,
-        model.nodes_selected,
-        nav.mouse_down,
-        nav.cursor_point,
-      ),
-      viewbox: viewbox.update_offset(
-        model.viewbox,
-        nav.cursor_point,
-        model.last_clicked_point,
-        model.mode,
-        graph_limit,
-      ),
-    )
-  }
+  model
+  |> draw.cursor_point(point)
+  |> draw.viewbox_offset(graph_limit)
+  |> draw.node_positions
+  |> draw.dragged_connection
+  |> draw.connections
   |> none_effect_wrapper
 }
 
@@ -197,6 +211,60 @@ fn user_unclicked_node(model: Model) -> #(Model, Effect(Msg)) {
   |> none_effect_wrapper
 }
 
+fn user_clicked_node_output(
+  model: Model,
+  node_id: NodeId,
+  offset: Vector,
+) -> #(Model, Effect(Msg)) {
+  let p1 = nd.get_position(model.nodes, node_id) |> vector.add(offset)
+  let p2 =
+    model.viewbox |> viewbox.to_viewbox_translate(model.navigator.cursor_point)
+  let new_conn = Conn(p1, p2, node_id, -1, "", True)
+
+  model.connections
+  |> list.prepend(new_conn)
+  |> fn(c) { Model(..model, connections: c) }
+  |> none_effect_wrapper
+}
+
+// TODO: Clear duplicates - when dragging a connection from a to b, when there already is one,
+// we should not add another connection. Either make a check, or a deduplicate function
+// deduplicate in Conn module is definitely more readable.
+fn user_unclicked(model: Model) -> #(Model, Effect(Msg)) {
+  model.connections
+  |> map(fn(c) {
+    case c.active {
+      False -> c
+      True -> {
+        model.nodes
+        |> nd.get_node_from_input_hovered
+        |> fn(res: Result(#(Node, NodeInput), NodeError)) {
+          case res {
+            Error(NotFound) -> c
+            Ok(#(node, input)) ->
+              case c.source_node_id != node.id {
+                // TODO: This case could really be a function to check for conflicts
+                False -> c
+                True ->
+                  Conn(
+                    ..c,
+                    target_node_id: node.id,
+                    target_input_id: nd.input_id(input),
+                    active: False,
+                  )
+                // TODO: Need to update second point to node input pos
+              }
+          }
+        }
+      }
+    }
+  })
+  |> filter(fn(c) { c.target_node_id != -1 && c.active != True })
+  |> conn.unique
+  |> fn(c) { Model(..model, connections: c) }
+  |> none_effect_wrapper
+}
+
 fn user_clicked_graph(model: Model, event: MouseEvent) -> #(Model, Effect(Msg)) {
   model
   |> update_last_clicked_point(event)
@@ -208,6 +276,40 @@ fn user_scrolled(model: Model, delta_y: Float) -> #(Model, Effect(Msg)) {
   |> viewbox.update_zoom_level(delta_y)
   |> viewbox.update_resolution(model.window_resolution)
   |> fn(vb) { Model(..model, viewbox: vb) }
+  |> none_effect_wrapper
+}
+
+fn user_hover_node_input(
+  model: Model,
+  input_id: String,
+) -> #(Model, Effect(Msg)) {
+  model.nodes
+  |> nd.set_input_hover(input_id)
+  |> fn(nodes) { Model(..model, nodes: nodes) }
+  |> none_effect_wrapper
+}
+
+fn user_unhover_node_input(model: Model) -> #(Model, Effect(Msg)) {
+  model.nodes
+  |> nd.reset_input_hover
+  |> fn(nodes) { Model(..model, nodes: nodes) }
+  |> none_effect_wrapper
+}
+
+fn user_hover_node_output(
+  model: Model,
+  output_id: String,
+) -> #(Model, Effect(Msg)) {
+  model.nodes
+  |> nd.set_output_hover(output_id)
+  |> fn(nodes) { Model(..model, nodes: nodes) }
+  |> none_effect_wrapper
+}
+
+fn user_unhover_node_output(model: Model) -> #(Model, Effect(Msg)) {
+  model.nodes
+  |> nd.reset_output_hover
+  |> fn(nodes) { Model(..model, nodes: nodes) }
   |> none_effect_wrapper
 }
 
@@ -349,21 +451,33 @@ fn debug_draw_last_clicked_point(model: Model) -> element.Element(Msg) {
   |> svg.circle()
 }
 
-fn view_node_input(input: String, index: Int) -> element.Element(Msg) {
+fn view_node_input(input: NodeInput) -> element.Element(Msg) {
+  let id = nd.input_id(input)
+  let label = nd.input_label(input)
+  let hovered = nd.input_hovered(input)
+
   svg.g(
     [
       attr(
         "transform",
-        "translate(0, " <> { 50 + index * 30 } |> int.to_string() <> ")",
+        nd.input_position(input) |> vector.to_html(vector.Translate),
       ),
     ],
     [
       svg.circle([
         attr("cx", "0"),
         attr("cy", "0"),
-        attr("r", "8"),
+        attr("r", "10"),
         attr("fill", "currentColor"),
+        attr("stroke", "black"),
+        case hovered {
+          True -> attr("stroke-width", "3")
+          False -> attr("stroke-width", "0")
+        },
         attribute.class("text-gray-500"),
+        attribute.id(id),
+        event.on_mouse_enter(UserHoverNodeInput(id)),
+        event.on_mouse_leave(UserUnhoverNodeInput),
       ]),
       svg.text(
         [
@@ -374,19 +488,33 @@ fn view_node_input(input: String, index: Int) -> element.Element(Msg) {
           attr("fill", "currentColor"),
           attribute.class("text-gray-900"),
         ],
-        input,
+        label,
       ),
     ],
   )
 }
 
-fn view_node_output() -> element.Element(Msg) {
-  svg.circle([
-    attr("cx", "200"),
-    attr("cy", "50"),
-    attr("r", "8"),
-    attr("fill", "currentColor"),
-    attribute.class("text-gray-500"),
+fn view_node_output(node: Node) -> element.Element(Msg) {
+  let pos = nd.output_position(node.output)
+  let id = nd.output_id(node.output)
+  let hovered = nd.output_hovered(node.output)
+
+  svg.g([attr("transform", pos |> vector.to_html(vector.Translate))], [
+    svg.circle([
+      attr("cx", "0"),
+      attr("cy", "0"),
+      attr("r", "10"),
+      attr("fill", "currentColor"),
+      attr("stroke", "black"),
+      case hovered {
+        True -> attr("stroke-width", "3")
+        False -> attr("stroke-width", "0")
+      },
+      attribute.class("text-gray-500"),
+      event.on_mouse_down(UserClickedNodeOutput(node.id, pos)),
+      event.on_mouse_enter(UserHoverNodeOutput(id)),
+      event.on_mouse_leave(UserUnhoverNodeOutput),
+    ]),
   ])
 }
 
@@ -436,9 +564,9 @@ fn view_node(node: Node, selection: Set(NodeId)) -> element.Element(Msg) {
           ],
           node.name,
         ),
-        view_node_output(),
+        view_node_output(node),
       ],
-      list.index_map(node.inputs, fn(input, i) { view_node_input(input, i) }),
+      list.map(node.inputs, fn(input) { view_node_input(input) }),
     ]),
   )
 }
@@ -501,6 +629,14 @@ fn view_grid() -> element.Element(Msg) {
   ])
 }
 
+fn view_connection(c: Conn) -> element.Element(Msg) {
+  svg.line([
+    attr("stroke", "blue"),
+    attr("stroke-width", "5"),
+    ..conn.to_attributes(c)
+  ])
+}
+
 fn view(model: Model) -> element.Element(Msg) {
   let user_moved_mouse = fn(e) -> Result(Msg, List(DecodeError)) {
     result.try(event.mouse_position(e), fn(pos) {
@@ -542,8 +678,15 @@ fn view(model: Model) -> element.Element(Msg) {
         view_grid_canvas(500, 500),
         svg.g(
           [],
+          model.connections
+            |> list.map(view_connection),
+        ),
+        svg.g(
+          [],
           model.nodes
-            |> list.map(fn(node: Node) { view_node(node, model.nodes_selected) }),
+            |> dict.to_list
+            |> map(pair.second)
+            |> map(fn(node: Node) { view_node(node, model.nodes_selected) }),
         ),
         // debug_draw_offset(model.nodes),
       // debug_draw_cursor_point(model.navigator),
