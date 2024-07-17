@@ -1,20 +1,20 @@
-# svgraph_app
+# nodework
 
-[![Package Version](https://img.shields.io/hexpm/v/svgraph_app)](https://hex.pm/packages/svgraph_app)
-[![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/svgraph_app/)
+[![Package Version](https://img.shields.io/hexpm/v/nodework)](https://hex.pm/packages/nodework)
+[![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/nodework/)
 
 ```sh
-gleam add svgraph_app
+gleam add nodework
 ```
 ```gleam
-import svgraph_app
+import nodework
 
 pub fn main() {
   // TODO: An example of the project in use
 }
 ```
 
-Further documentation can be found at <https://hexdocs.pm/svgraph_app>.
+Further documentation can be found at <https://hexdocs.pm/nodework>.
 
 ## Development
 
