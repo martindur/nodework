@@ -2,12 +2,12 @@ import gleam/dict
 import gleam/list.{concat, filter, map}
 import gleam/pair
 import gleam/set
-import graph/conn.{type Conn, Conn}
-import graph/model.{type Model, Model}
-import graph/navigator.{type Navigator, Navigator}
-import graph/node.{type Node, type NodeInput, Node}
-import graph/vector.{type Vector, Vector}
-import graph/viewbox.{Drag, Normal, ViewBox}
+import nodework/conn.{type Conn, Conn}
+import nodework/model.{type Model, Model}
+import nodework/navigator.{type Navigator, Navigator}
+import nodework/node.{type Node, type NodeInput, Node}
+import nodework/vector.{type Vector, Vector}
+import nodework/viewbox.{Drag, Normal, ViewBox}
 
 pub fn cursor_point(m: Model, p: Vector) -> Model {
   p

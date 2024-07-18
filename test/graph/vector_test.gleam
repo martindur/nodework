@@ -1,5 +1,5 @@
 import gleeunit/should
-import graph/vector.{Vector}
+import nodework/vector.{Vector}
 
 pub fn subtract__test() {
   Vector(0, 0)

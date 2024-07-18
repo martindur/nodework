@@ -1,7 +1,7 @@
 import gleeunit/should
 
-import graph/node.{Node}
-import graph/vector.{Vector}
+import nodework/node.{Node}
+import nodework/vector.{Vector}
 
 pub fn update_offset__from_origin__test() {
   Node(

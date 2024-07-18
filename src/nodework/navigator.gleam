@@ -1,4 +1,4 @@
-import graph/vector.{type Vector, Vector}
+import nodework/vector.{type Vector, Vector}
 
 pub type Navigator {
   Navigator(cursor_point: Vector, mouse_down: Bool)

@@ -2,7 +2,7 @@ import gleam/dict.{type Dict}
 import gleam/int
 import gleam/list.{filter, filter_map, map}
 import gleam/pair
-import graph/vector.{type Vector, Vector}
+import nodework/vector.{type Vector, Vector}
 
 pub type Node {
   Node(

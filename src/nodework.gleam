@@ -14,15 +14,15 @@ import lustre/element/html
 import lustre/element/svg
 import lustre/event
 
-import graph/conn.{type Conn, Conn}
-import graph/draw
-import graph/model.{type Model, Model}
-import graph/navigator.{type Navigator, Navigator}
-import graph/node.{
+import nodework/conn.{type Conn, Conn}
+import nodework/draw
+import nodework/model.{type Model, Model}
+import nodework/navigator.{type Navigator, Navigator}
+import nodework/node.{
   type Node, type NodeError, type NodeId, type NodeInput, Node, NotFound,
 } as nd
-import graph/vector.{type Vector, Vector}
-import graph/viewbox.{type ViewBox, Drag, Normal, ViewBox}
+import nodework/vector.{type Vector, Vector}
+import nodework/viewbox.{type ViewBox, Drag, Normal, ViewBox}
 
 pub type ResizeEvent
 
@@ -46,6 +46,25 @@ fn document_resize_event_listener(listener: fn(ResizeEvent) -> Nil) -> Nil
 
 @external(javascript, "./mouse.ffi.mjs", "mouseUpEventListener")
 fn document_mouse_up_event_listener(listener: fn(MouseUpEvent) -> Nil) -> Nil
+
+pub fn app() {
+  lustre.application(init, update, view)
+}
+
+pub fn setup(runtime_call) {
+  document_resize_event_listener(fn(_) {
+    get_window_size()
+    |> GraphResizeViewBox
+    |> lustre.dispatch
+    |> runtime_call
+  })
+
+  document_mouse_up_event_listener(fn(_) {
+    UserUnclicked
+    |> lustre.dispatch
+    |> runtime_call
+  })
+}
 
 pub fn main() {
   let app = lustre.application(init, update, view)

@@ -2,7 +2,7 @@
 //// Furthermore it manages a zoom level for drawing elements at a scaled resolution
 
 import gleam/float
-import graph/vector.{type Vector}
+import nodework/vector.{type Vector}
 
 const scroll_factor = 0.1
 

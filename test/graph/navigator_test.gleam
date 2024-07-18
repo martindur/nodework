@@ -1,6 +1,6 @@
 import gleeunit/should
-import graph/navigator.{Navigator}
-import graph/vector.{Vector}
+import nodework/navigator.{Navigator}
+import nodework/vector.{Vector}
 
 pub fn calc_position__test() {
   let current_cursor_position = Vector(50, 50)

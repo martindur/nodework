@@ -2,7 +2,7 @@ import gleam/int.{to_string}
 import gleam/list.{any}
 import lustre/attribute.{type Attribute, attribute as attr}
 
-import graph/vector.{type Vector}
+import nodework/vector.{type Vector}
 
 pub type Conn {
   Conn(
