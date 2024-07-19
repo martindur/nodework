@@ -18,7 +18,7 @@ import lustre/event
 
 import nodework/conn.{type Conn, Conn}
 import nodework/draw
-import nodework/model.{type Model, Model, Menu}
+import nodework/model.{type Model, Model, type Menu, Menu}
 import nodework/navigator.{type Navigator, Navigator}
 import nodework/node.{
   type Node, type NodeError, type NodeId, type NodeInput, Node, NotFound,
@@ -371,6 +371,7 @@ fn graph_resize_view_box(
 
 fn graph_open_menu(model: Model) -> #(Model, Effect(Msg)) {
   model.navigator.cursor_point
+  |> viewbox.from_viewbox_scale(model.viewbox, _) // we don't zoom the menu, so we don't want a scaled cursor
   |> fn(cursor) { Menu(pos: cursor, active: True) }
   |> fn(menu) { Model(..model, menu: menu) }
   |> none_effect_wrapper
@@ -663,6 +664,24 @@ fn view_connection(c: Conn) -> element.Element(Msg) {
   ])
 }
 
+fn view_menu(menu: Menu) -> element.Element(Msg) {
+  // let pos = "top-[" <> int.to_string(menu.pos.x) <> "px] left-[" <> int.to_string(menu.pos.y) <> "px]"
+  // let pos = "top-[230px] left-[467px]"
+  let pos = "translate(" <> int.to_string(menu.pos.x) <> "px, " <> int.to_string(menu.pos.y) <> "px)"
+
+  html.div(
+    case menu.active {
+      True -> [
+        attribute.class("absolute top-0 left-0 w-[100px] h-[300px] bg-gray-200"),
+        attribute.style([#("transform", pos)])
+      ]
+      False -> [
+        attribute.class("hidden"),
+      ]
+    }
+  , [])
+}
+
 fn mouse_event_decoder(e) -> Result(MouseEvent, List(DecodeError)) {
   event.stop_propagation(e)
 
@@ -744,11 +763,6 @@ fn view(model: Model) -> element.Element(Msg) {
       // debug_draw_last_clicked_point(model)
       ],
     ),
-    html.div([
-      case model.menu.active {
-        True -> attribute.class("absolute top-0 right-0 w-32 h-32 bg-gray-200")
-        False -> attribute.class("hidden")
-      }
-      ], [])
+    view_menu(model.menu)
   ])
 }

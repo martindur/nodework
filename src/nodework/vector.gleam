@@ -30,6 +30,16 @@ pub fn scalar(vec: Vector, b: Float) -> Vector {
   })
 }
 
+pub fn divide(vec: Vector, b: Float) -> Vector {
+  vec
+  |> map_vector(fn(val) {
+    val
+    |> to_float
+    |> fn(x) { x /. b }
+    |> round()
+  })
+}
+
 pub fn add(a: Vector, b: Vector) -> Vector {
   Vector(x: a.x + b.x, y: a.y + b.y)
 }

@@ -1,6 +1,7 @@
 //// The viewbox module contains functions for calculating a viewbox in an svg element. Such as offset and resolution.
 //// Furthermore it manages a zoom level for drawing elements at a scaled resolution
 
+import gleam/io
 import gleam/float
 import nodework/vector.{type Vector}
 
@@ -35,6 +36,11 @@ pub fn to_viewbox_space(vb: ViewBox, p: Vector) -> Vector {
   p
   |> vector.scalar(vb.zoom_level)
   |> vector.add(vb.offset)
+}
+
+pub fn from_viewbox_scale(vb: ViewBox, p: Vector) -> Vector {
+  p
+  |> vector.divide(vb.zoom_level)
 }
 
 pub fn update_resolution(vb: ViewBox, resolution: Vector) -> ViewBox {
