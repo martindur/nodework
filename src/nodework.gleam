@@ -1,3 +1,4 @@
+import gleam/io
 import gleam/dict
 import gleam/dynamic.{type DecodeError}
 import gleam/float
@@ -6,6 +7,7 @@ import gleam/list.{filter, map}
 import gleam/pair
 import gleam/result
 import gleam/set.{type Set}
+import gleam/string
 import lustre
 import lustre/attribute.{type Attribute, attribute as attr}
 import lustre/effect.{type Effect}
@@ -16,7 +18,7 @@ import lustre/event
 
 import nodework/conn.{type Conn, Conn}
 import nodework/draw
-import nodework/model.{type Model, Model}
+import nodework/model.{type Model, Model, Menu}
 import nodework/navigator.{type Navigator, Navigator}
 import nodework/node.{
   type Node, type NodeError, type NodeId, type NodeInput, Node, NotFound,
@@ -27,6 +29,9 @@ import nodework/viewbox.{type ViewBox, Drag, Normal, ViewBox}
 pub type ResizeEvent
 
 pub type MouseUpEvent
+
+pub type Key =
+  String
 
 const graph_limit = 500
 
@@ -41,10 +46,10 @@ fn get_window_size() -> Vector {
   }
 }
 
-@external(javascript, "./resize.ffi.mjs", "documentResizeEventListener")
+@external(javascript, "./nodework.ffi.mjs", "documentResizeEventListener")
 fn document_resize_event_listener(listener: fn(ResizeEvent) -> Nil) -> Nil
 
-@external(javascript, "./mouse.ffi.mjs", "mouseUpEventListener")
+@external(javascript, "./nodework.ffi.mjs", "mouseUpEventListener")
 fn document_mouse_up_event_listener(listener: fn(MouseUpEvent) -> Nil) -> Nil
 
 pub fn app() {
@@ -52,6 +57,14 @@ pub fn app() {
 }
 
 pub fn setup(runtime_call) {
+  // A few notes might be helpful here.
+  // This is how we can communicate with document/window
+  // In this case, we parse window size as a Resolution,
+  // which is piped to a GraphResize Msg.
+
+  // We then use the dispatch to handle it as a msg to update
+  // and finally send it to the runtime, which returns Nil.
+  // And that's our handler hooked on the listener
   document_resize_event_listener(fn(_) {
     get_window_size()
     |> GraphResizeViewBox
@@ -70,26 +83,7 @@ pub fn main() {
   let app = lustre.application(init, update, view)
   let assert Ok(send_to_runtime) = lustre.start(app, "#app", Nil)
 
-  // A few notes might be helpful here.
-  // This is how we can communicate with document/window
-  // In this case, we parse window size as a Resolution,
-  // which is piped to a GraphResize Msg.
-
-  // We then use the dispatch to handle it as a msg to update
-  // and finally send it to the runtime, which returns Nil.
-  // And that's our handler hooked on the listener
-  document_resize_event_listener(fn(_) {
-    get_window_size()
-    |> GraphResizeViewBox
-    |> lustre.dispatch
-    |> send_to_runtime
-  })
-
-  document_mouse_up_event_listener(fn(_) {
-    UserUnclicked
-    |> lustre.dispatch
-    |> send_to_runtime
-  })
+  setup(send_to_runtime)
 
   Nil
 }
@@ -136,6 +130,7 @@ fn init(_flags) -> #(Model, Effect(Msg)) {
       navigator: Navigator(Vector(0, 0), False),
       mode: Normal,
       last_clicked_point: Vector(0, 0),
+      menu: Menu(Vector(0, 0), False)
     ),
     effect.none(),
   )
@@ -154,12 +149,14 @@ pub opaque type Msg {
   UserUnhoverNodeInput
   UserHoverNodeOutput(String)
   UserUnhoverNodeOutput
+  UserPressedKey(Key)
   GraphClearSelection
   GraphSetDragMode
   GraphSetNormalMode
   GraphAddNodeToSelection(NodeId)
   GraphSetNodeAsSelection(NodeId)
   GraphResizeViewBox(Vector)
+  GraphOpenMenu
 }
 
 fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
@@ -178,6 +175,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     UserUnhoverNodeInput -> user_unhover_node_input(model)
     UserHoverNodeOutput(output_id) -> user_hover_node_output(model, output_id)
     UserUnhoverNodeOutput -> user_unhover_node_output(model)
+    UserPressedKey(key) -> user_pressed_key(model, key)
     GraphClearSelection -> graph_clear_selection(model)
     GraphSetDragMode -> Model(..model, mode: Drag) |> none_effect_wrapper
     GraphSetNormalMode -> Model(..model, mode: Normal) |> none_effect_wrapper
@@ -186,6 +184,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     GraphSetNodeAsSelection(node_id) ->
       graph_set_node_as_selection(model, node_id)
     GraphResizeViewBox(resolution) -> graph_resize_view_box(model, resolution)
+    GraphOpenMenu -> graph_open_menu(model)
   }
 }
 
@@ -332,6 +331,11 @@ fn user_unhover_node_output(model: Model) -> #(Model, Effect(Msg)) {
   |> none_effect_wrapper
 }
 
+fn user_pressed_key(model: Model, key: Key) -> #(Model, Effect(Msg)) {
+  model
+  |> fn(m) { #(m, key_pressed(key)) }
+}
+
 fn graph_clear_selection(model: Model) -> #(Model, Effect(Msg)) {
   Model(..model, nodes_selected: set.new())
   |> none_effect_wrapper
@@ -365,6 +369,13 @@ fn graph_resize_view_box(
   |> none_effect_wrapper
 }
 
+fn graph_open_menu(model: Model) -> #(Model, Effect(Msg)) {
+  model.navigator.cursor_point
+  |> fn(cursor) { Menu(pos: cursor, active: True) }
+  |> fn(menu) { Model(..model, menu: menu) }
+  |> none_effect_wrapper
+}
+
 fn update_last_clicked_point(model: Model, event: MouseEvent) -> Model {
   event.position
   |> viewbox.to_viewbox_space(model.viewbox, _)
@@ -391,16 +402,12 @@ fn shift_key_check(event: MouseEvent) -> Effect(Msg) {
   })
 }
 
-fn mouse_event_decoder(e) -> Result(MouseEvent, List(DecodeError)) {
-  event.stop_propagation(e)
-
-  use shift_key <- result.try(dynamic.field("shiftKey", dynamic.bool)(e))
-  use position <- result.try(event.mouse_position(e))
-
-  Ok(MouseEvent(
-    position: Vector(float.round(position.0), float.round(position.1)),
-    shift_key_active: shift_key,
-  ))
+fn key_pressed(key: Key) -> Effect(Msg) {
+  case string.lowercase(key) {
+    "a" -> effect.from(fn(dispatch) { GraphOpenMenu |> dispatch })
+    // Menu key
+    _ -> effect.none()
+  }
 }
 
 pub fn on_mouse_move(msg: msg) -> Attribute(msg) {
@@ -656,6 +663,24 @@ fn view_connection(c: Conn) -> element.Element(Msg) {
   ])
 }
 
+fn mouse_event_decoder(e) -> Result(MouseEvent, List(DecodeError)) {
+  event.stop_propagation(e)
+
+  use shift_key <- result.try(dynamic.field("shiftKey", dynamic.bool)(e))
+  use position <- result.try(event.mouse_position(e))
+
+  Ok(MouseEvent(
+    position: Vector(float.round(position.0), float.round(position.1)),
+    shift_key_active: shift_key,
+  ))
+}
+
+fn keydown_event_decoder(e) -> Result(Key, List(DecodeError)) {
+  use key <- result.try(dynamic.field("key", dynamic.string)(e))
+
+  Ok(key)
+}
+
 fn view(model: Model) -> element.Element(Msg) {
   let user_moved_mouse = fn(e) -> Result(Msg, List(DecodeError)) {
     result.try(event.mouse_position(e), fn(pos) {
@@ -669,13 +694,20 @@ fn view(model: Model) -> element.Element(Msg) {
     Ok(UserClickedGraph(decoded_event))
   }
 
+  let keydown = fn(e) -> Result(Msg, List(DecodeError)) {
+    io.debug("keydown")
+    use key <- result.try(keydown_event_decoder(e))
+
+    Ok(UserPressedKey(key))
+  }
+
   let wheel = fn(e) -> Result(Msg, List(DecodeError)) {
     use delta_y <- result.try(dynamic.field("deltaY", dynamic.float)(e))
 
     Ok(UserScrolled(delta_y))
   }
 
-  html.div([], [
+  html.div([attr("tabindex", "0"), event.on("keydown", keydown)], [
     html.p([attribute.class("absolute right-2 top-2 select-none")], [
       case model.mode {
         Normal -> element.text("NORMAL")
@@ -712,5 +744,11 @@ fn view(model: Model) -> element.Element(Msg) {
       // debug_draw_last_clicked_point(model)
       ],
     ),
+    html.div([
+      case model.menu.active {
+        True -> attribute.class("absolute top-0 right-0 w-32 h-32 bg-gray-200")
+        False -> attribute.class("hidden")
+      }
+      ], [])
   ])
 }

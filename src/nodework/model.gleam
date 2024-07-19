@@ -6,6 +6,10 @@ import nodework/node.{type Node, type NodeId}
 import nodework/vector.{type Vector}
 import nodework/viewbox.{type GraphMode, type ViewBox}
 
+pub type Menu {
+  Menu(pos: Vector, active: Bool)
+}
+
 pub type Model {
   Model(
     nodes: Dict(NodeId, Node),
@@ -16,5 +20,6 @@ pub type Model {
     navigator: Navigator,
     mode: GraphMode,
     last_clicked_point: Vector,
+    menu: Menu
   )
 }
