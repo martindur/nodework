@@ -1,8 +1,8 @@
-import gleam/io
 import gleam/dict
 import gleam/dynamic.{type DecodeError}
 import gleam/float
 import gleam/int
+import gleam/io
 import gleam/list.{filter, map}
 import gleam/pair
 import gleam/result
@@ -18,13 +18,14 @@ import lustre/event
 
 import nodework/conn.{type Conn, Conn}
 import nodework/draw
-import nodework/model.{type Model, Model, type Menu, Menu}
+import nodework/model.{type Model, Model}
 import nodework/navigator.{type Navigator, Navigator}
 import nodework/node.{
   type Node, type NodeError, type NodeId, type NodeInput, Node, NotFound,
 } as nd
 import nodework/vector.{type Vector, Vector}
 import nodework/viewbox.{type ViewBox, Drag, Normal, ViewBox}
+import nodework/menu.{type Menu, Menu}
 
 pub type ResizeEvent
 
@@ -130,7 +131,7 @@ fn init(_flags) -> #(Model, Effect(Msg)) {
       navigator: Navigator(Vector(0, 0), False),
       mode: Normal,
       last_clicked_point: Vector(0, 0),
-      menu: Menu(Vector(0, 0), False)
+      menu: Menu(Vector(0, 0), False, [#("Rect", "rect"), #("Circle", "circle")]),
     ),
     effect.none(),
   )
@@ -157,6 +158,8 @@ pub opaque type Msg {
   GraphSetNodeAsSelection(NodeId)
   GraphResizeViewBox(Vector)
   GraphOpenMenu
+  GraphCloseMenu
+  GraphSpawnNode(String)
 }
 
 fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
@@ -185,11 +188,20 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       graph_set_node_as_selection(model, node_id)
     GraphResizeViewBox(resolution) -> graph_resize_view_box(model, resolution)
     GraphOpenMenu -> graph_open_menu(model)
+    GraphCloseMenu -> graph_close_menu(model)
+    GraphSpawnNode(identifier) -> graph_spawn_node(model, identifier)
   }
 }
 
 fn none_effect_wrapper(model: Model) -> #(Model, Effect(Msg)) {
   #(model, effect.none())
+}
+
+fn simple_effect(msg: Msg) -> Effect(Msg) {
+  effect.from(fn(dispatch) {
+    msg
+    |> dispatch
+  })
 }
 
 fn user_added_node(model: Model, node: Node) -> #(Model, Effect(Msg)) {
@@ -221,7 +233,15 @@ fn user_clicked_node(
       nodes: model.nodes |> nd.update_all_node_offsets(nav.cursor_point),
     )
   }
-  |> fn(m) { #(m, update_selected_nodes(event, node_id)) }
+  |> fn(m) {
+    #(
+      m,
+      effect.batch([
+        update_selected_nodes(event, node_id),
+        simple_effect(GraphCloseMenu),
+      ]),
+    )
+  }
 }
 
 fn user_unclicked_node(model: Model) -> #(Model, Effect(Msg)) {
@@ -286,7 +306,9 @@ fn user_unclicked(model: Model) -> #(Model, Effect(Msg)) {
 fn user_clicked_graph(model: Model, event: MouseEvent) -> #(Model, Effect(Msg)) {
   model
   |> update_last_clicked_point(event)
-  |> fn(m) { #(m, shift_key_check(event)) }
+  |> fn(m) {
+    #(m, effect.batch([shift_key_check(event), simple_effect(GraphCloseMenu)]))
+  }
 }
 
 fn user_scrolled(model: Model, delta_y: Float) -> #(Model, Effect(Msg)) {
@@ -371,10 +393,31 @@ fn graph_resize_view_box(
 
 fn graph_open_menu(model: Model) -> #(Model, Effect(Msg)) {
   model.navigator.cursor_point
-  |> viewbox.from_viewbox_scale(model.viewbox, _) // we don't zoom the menu, so we don't want a scaled cursor
-  |> fn(cursor) { Menu(pos: cursor, active: True) }
+  |> viewbox.from_viewbox_scale(model.viewbox, _)
+  // we don't zoom the menu, so we don't want a scaled cursor
+  |> fn(cursor) { Menu(..model.menu, pos: cursor, active: True) }
   |> fn(menu) { Model(..model, menu: menu) }
   |> none_effect_wrapper
+}
+
+fn graph_close_menu(model: Model) -> #(Model, Effect(Msg)) {
+  Menu(..model.menu, active: False)
+  |> fn(menu) { Model(..model, menu: menu) }
+  |> none_effect_wrapper
+}
+
+fn graph_spawn_node(model: Model, identifier: String) -> #(Model, Effect(Msg)) {
+  model.nodes
+  |> dict.to_list
+  |> list.length
+  |> nd.make_node(identifier, _)
+  |> fn(res: Result(Node, Nil)) {
+    case res {
+      Ok(node) -> Model(..model, nodes: dict.insert(model.nodes, node.id, node))
+      Error(Nil) -> model
+    }
+  }
+  |> fn(m) { #(m, simple_effect(GraphCloseMenu)) }
 }
 
 fn update_last_clicked_point(model: Model, event: MouseEvent) -> Model {
@@ -433,49 +476,6 @@ fn attr_viewbox(offset: Vector, resolution: Vector) -> Attribute(Msg) {
       Error(_) -> attr("viewBox", "0 0 100 100")
     }
   }
-}
-
-fn debug_draw_offset(nodes: List(Node)) -> element.Element(Msg) {
-  svg.g(
-    [],
-    nodes
-      |> map(fn(node) {
-        [
-          attr("x1", int.to_string(node.position.x)),
-          attr("y1", int.to_string(node.position.y)),
-          attr("x2", int.to_string(node.position.x + node.offset.x)),
-          attr("y2", int.to_string(node.position.y + node.offset.y)),
-          attr("stroke", "red"),
-        ]
-        |> svg.line()
-      }),
-  )
-}
-
-fn debug_draw_cursor_point(navigator: Navigator) -> element.Element(Msg) {
-  navigator.cursor_point
-  |> fn(p: Vector) {
-    [
-      attr("r", "2"),
-      attr("color", "red"),
-      attr("cx", p.x |> int.to_string),
-      attr("cy", p.y |> int.to_string),
-    ]
-  }
-  |> svg.circle()
-}
-
-fn debug_draw_last_clicked_point(model: Model) -> element.Element(Msg) {
-  model.last_clicked_point
-  |> fn(p: Vector) {
-    [
-      attr("r", "2"),
-      attr("color", "red"),
-      attr("cx", p.x |> int.to_string),
-      attr("cy", p.y |> int.to_string),
-    ]
-  }
-  |> svg.circle()
 }
 
 fn view_node_input(input: NodeInput) -> element.Element(Msg) {
@@ -664,24 +664,6 @@ fn view_connection(c: Conn) -> element.Element(Msg) {
   ])
 }
 
-fn view_menu(menu: Menu) -> element.Element(Msg) {
-  // let pos = "top-[" <> int.to_string(menu.pos.x) <> "px] left-[" <> int.to_string(menu.pos.y) <> "px]"
-  // let pos = "top-[230px] left-[467px]"
-  let pos = "translate(" <> int.to_string(menu.pos.x) <> "px, " <> int.to_string(menu.pos.y) <> "px)"
-
-  html.div(
-    case menu.active {
-      True -> [
-        attribute.class("absolute top-0 left-0 w-[100px] h-[300px] bg-gray-200"),
-        attribute.style([#("transform", pos)])
-      ]
-      False -> [
-        attribute.class("hidden"),
-      ]
-    }
-  , [])
-}
-
 fn mouse_event_decoder(e) -> Result(MouseEvent, List(DecodeError)) {
   event.stop_propagation(e)
 
@@ -726,6 +708,13 @@ fn view(model: Model) -> element.Element(Msg) {
     Ok(UserScrolled(delta_y))
   }
 
+  let spawn = fn(e) -> Result(Msg, List(DecodeError)) {
+    use target <- result.try(dynamic.field("target", dynamic.dynamic)(e))
+    use identifier <- result.try(dynamic.field("id", dynamic.string)(target))
+
+    Ok(GraphSpawnNode(identifier))
+  }
+
   html.div([attr("tabindex", "0"), event.on("keydown", keydown)], [
     html.p([attribute.class("absolute right-2 top-2 select-none")], [
       case model.mode {
@@ -763,6 +752,6 @@ fn view(model: Model) -> element.Element(Msg) {
       // debug_draw_last_clicked_point(model)
       ],
     ),
-    view_menu(model.menu)
+    menu.view_menu(model.menu, spawn),
   ])
 }
