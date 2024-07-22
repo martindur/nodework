@@ -2600,7 +2600,7 @@ function to_attributes(conn) {
   ]);
 }
 function conn_duplicate(a, b) {
-  return a.source_node_id === b.source_node_id && a.target_input_id === b.target_input_id;
+  return a.target_input_id === b.target_input_id;
 }
 function deduplicate_helper(loop$remaining, loop$seen) {
   while (true) {
@@ -2626,6 +2626,20 @@ function deduplicate_helper(loop$remaining, loop$seen) {
 }
 function unique(conns) {
   return deduplicate_helper(conns, toList([]));
+}
+function map_active(conns, f) {
+  let _pipe = conns;
+  return map(
+    _pipe,
+    (c) => {
+      let $ = c.active;
+      if (!$) {
+        return c;
+      } else {
+        return f(c);
+      }
+    }
+  );
 }
 
 // build/dev/javascript/nodework/nodework/menu.mjs
@@ -3421,50 +3435,44 @@ function user_clicked_node_output(model, node_id, offset) {
   return none_effect_wrapper(_pipe$2);
 }
 function user_unclicked(model) {
-  let _pipe = model.connections;
-  let _pipe$1 = map(
-    _pipe,
-    (c) => {
-      let $ = c.active;
-      if (!$) {
-        return c;
-      } else {
-        let _pipe$12 = model.nodes;
-        let _pipe$22 = get_node_from_input_hovered(_pipe$12);
-        return ((res) => {
-          if (!res.isOk() && res[0] instanceof NotFound) {
+  let _pipe = (() => {
+    let $ = get_node_from_input_hovered(model.nodes);
+    if (!$.isOk() && $[0] instanceof NotFound) {
+      return model.connections;
+    } else {
+      let node = $[0][0];
+      let input = $[0][1];
+      let _pipe2 = model.connections;
+      return map_active(
+        _pipe2,
+        (c) => {
+          let $1 = c.source_node_id !== node.id;
+          if (!$1) {
             return c;
           } else {
-            let node = res[0][0];
-            let input = res[0][1];
-            let $1 = c.source_node_id !== node.id;
-            if (!$1) {
-              return c;
-            } else {
-              return c.withFields({
-                target_node_id: node.id,
-                target_input_id: input_id(input),
-                active: false
-              });
-            }
+            return c.withFields({
+              target_node_id: node.id,
+              target_input_id: input_id(input),
+              active: false
+            });
           }
-        })(_pipe$22);
-      }
+        }
+      );
     }
-  );
-  let _pipe$2 = filter(
-    _pipe$1,
+  })();
+  let _pipe$1 = filter(
+    _pipe,
     (c) => {
       return c.target_node_id !== -1 && c.active !== true;
     }
   );
-  let _pipe$3 = unique(_pipe$2);
-  let _pipe$4 = ((c) => {
+  let _pipe$2 = unique(_pipe$1);
+  let _pipe$3 = ((c) => {
     return model.withFields({ connections: c });
   })(
-    _pipe$3
+    _pipe$2
   );
-  return none_effect_wrapper(_pipe$4);
+  return none_effect_wrapper(_pipe$3);
 }
 function user_scrolled(model, delta_y) {
   let _pipe = model.viewbox;
