@@ -195,3 +195,35 @@ pub fn update_all_node_offsets(
   nodes
   |> dict.map_values(fn(_, node) { update_offset(node, point) })
 }
+
+pub fn make_node(
+  identifier: String,
+  id: NodeId,
+  position: Vector,
+) -> Result(Node, Nil) {
+  case identifier {
+    "rect" ->
+      Ok(Node(
+        position: position,
+        offset: Vector(0, 0),
+        id: id,
+        inputs: [
+          new_input(id, 0, "foo"),
+          new_input(id, 1, "bar"),
+          new_input(id, 2, "baz"),
+        ],
+        output: new_output(id),
+        name: "Rect",
+      ))
+    "circle" ->
+      Ok(Node(
+        position: position,
+        offset: Vector(0, 0),
+        id: id,
+        inputs: [new_input(id, 0, "bob")],
+        output: new_output(id),
+        name: "Circle",
+      ))
+    _ -> Error(Nil)
+  }
+}

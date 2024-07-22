@@ -2,6 +2,7 @@
 //// Furthermore it manages a zoom level for drawing elements at a scaled resolution
 
 import gleam/float
+import gleam/io
 import nodework/vector.{type Vector}
 
 const scroll_factor = 0.1
@@ -35,6 +36,11 @@ pub fn to_viewbox_space(vb: ViewBox, p: Vector) -> Vector {
   p
   |> vector.scalar(vb.zoom_level)
   |> vector.add(vb.offset)
+}
+
+pub fn from_viewbox_scale(vb: ViewBox, p: Vector) -> Vector {
+  p
+  |> vector.divide(vb.zoom_level)
 }
 
 pub fn update_resolution(vb: ViewBox, resolution: Vector) -> ViewBox {
