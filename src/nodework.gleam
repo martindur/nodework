@@ -16,6 +16,7 @@ import lustre/element/html
 import lustre/element/svg
 import lustre/event
 
+import util/random
 import nodework/conn.{type Conn, Conn}
 import nodework/draw
 import nodework/menu.{type Menu, Menu}
@@ -144,6 +145,7 @@ pub opaque type Msg {
   UserUnclickedNode(NodeId)
   UserClickedNodeOutput(NodeId, Vector)
   UserUnclicked
+  UserClickedConn(String, MouseEvent)
   UserClickedGraph(MouseEvent)
   UserScrolled(Float)
   UserHoverNodeInput(String)
@@ -172,6 +174,8 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     UserClickedNodeOutput(node_id, offset) ->
       user_clicked_node_output(model, node_id, offset)
     UserUnclicked -> user_unclicked(model)
+    UserClickedConn(conn_id, mouse_event) ->
+      user_clicked_conn(model, conn_id, mouse_event)
     UserClickedGraph(mouse_event) -> user_clicked_graph(model, mouse_event)
     UserScrolled(delta_y) -> user_scrolled(model, delta_y)
     UserHoverNodeInput(input_id) -> user_hover_node_input(model, input_id)
@@ -257,7 +261,8 @@ fn user_clicked_node_output(
   let p1 = nd.get_position(model.nodes, node_id) |> vector.add(offset)
   let p2 =
     model.viewbox |> viewbox.to_viewbox_translate(model.navigator.cursor_point)
-  let new_conn = Conn(p1, p2, node_id, -1, "", True)
+  let id = random.generate_random_id("conn")
+  let new_conn = Conn(id, p1, p2, node_id, -1, "", True)
 
   model.connections
   |> list.prepend(new_conn)
@@ -287,6 +292,22 @@ fn user_unclicked(model: Model) -> #(Model, Effect(Msg)) {
   |> filter(fn(c) { c.target_node_id != -1 && c.active != True })
   |> conn.unique
   |> fn(c) { Model(..model, connections: c) }
+  |> none_effect_wrapper
+}
+
+fn user_clicked_conn(
+  model: Model,
+  conn_id: String,
+  event: MouseEvent,
+) -> #(Model, Effect(Msg)) {
+  model.connections
+  |> map(fn(c) {
+    case c.id == conn_id {
+      False -> c
+      True -> Conn(..c, p1: event.position, target_node_id: -1, target_input_id: "", active: True)
+    }
+  })
+  |> fn(conns) { Model(..model, connections: conns) }
   |> none_effect_wrapper
 }
 
@@ -648,9 +669,22 @@ fn view_grid() -> element.Element(Msg) {
 }
 
 fn view_connection(c: Conn) -> element.Element(Msg) {
+  let mousedown = fn(e) -> Result(Msg, List(DecodeError)) {
+    use decoded_event <- result.try(mouse_event_decoder(e))
+
+    Ok(UserClickedConn(c.id, decoded_event))
+  }
+
   svg.line([
-    attr("stroke", "blue"),
-    attr("stroke-width", "5"),
+    case c.active {
+      True -> attribute.class("text-gray-500")
+      False -> attribute.class("text-gray-500 hover:text-indigo-500")
+    },
+    attr("stroke", "currentColor"),
+    attr("stroke-width", "10"),
+    attr("stroke-linecap", "round"),
+    attr("stroke-dasharray", "12,12"),
+    event.on("mousedown", mousedown),
     ..conn.to_attributes(c)
   ])
 }
@@ -687,7 +721,6 @@ fn view(model: Model) -> element.Element(Msg) {
   }
 
   let keydown = fn(e) -> Result(Msg, List(DecodeError)) {
-    io.debug("keydown")
     use key <- result.try(keydown_event_decoder(e))
 
     Ok(UserPressedKey(key))
