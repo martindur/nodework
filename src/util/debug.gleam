@@ -1,13 +1,12 @@
 import gleam/int
 import gleam/list.{map}
-import lustre/element
 import lustre/attribute.{attribute as attr}
+import lustre/element
 import lustre/element/svg
+import nodework/model.{type Model}
+import nodework/navigator.{type Navigator}
 import nodework/node.{type Node}
 import nodework/vector.{type Vector}
-import nodework/navigator.{type Navigator}
-import nodework/model.{type Model}
-
 
 pub fn debug_draw_offset(nodes: List(Node)) -> element.Element(msg) {
   svg.g(

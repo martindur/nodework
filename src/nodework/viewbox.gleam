@@ -1,8 +1,8 @@
 //// The viewbox module contains functions for calculating a viewbox in an svg element. Such as offset and resolution.
 //// Furthermore it manages a zoom level for drawing elements at a scaled resolution
 
-import gleam/io
 import gleam/float
+import gleam/io
 import nodework/vector.{type Vector}
 
 const scroll_factor = 0.1
