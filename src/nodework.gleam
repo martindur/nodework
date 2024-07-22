@@ -36,7 +36,7 @@ pub type Key =
 
 const graph_limit = 500
 
-@external(javascript, "./resize.ffi.mjs", "windowSize")
+@external(javascript, "./nodework.ffi.mjs", "windowSize")
 fn window_size() -> #(Int, Int)
 
 fn get_window_size() -> Vector {
