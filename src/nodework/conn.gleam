@@ -6,6 +6,7 @@ import nodework/vector.{type Vector}
 
 pub type Conn {
   Conn(
+    id: String,
     p0: Vector,
     p1: Vector,
     source_node_id: Int,

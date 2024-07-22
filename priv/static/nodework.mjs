@@ -108,11 +108,6 @@ var BitArray = class _BitArray {
     return new _BitArray(this.buffer.slice(index2));
   }
 };
-var UtfCodepoint = class {
-  constructor(value) {
-    this.value = value;
-  }
-};
 function byteArrayToInt(byteArray) {
   byteArray = byteArray.reverse();
   let value = 0;
@@ -255,7 +250,28 @@ function to_result(option, e) {
   }
 }
 
+// build/dev/javascript/gleam_stdlib/gleam/order.mjs
+var Lt = class extends CustomType {
+};
+var Eq = class extends CustomType {
+};
+var Gt = class extends CustomType {
+};
+
 // build/dev/javascript/gleam_stdlib/gleam/float.mjs
+function compare(a, b) {
+  let $ = a === b;
+  if ($) {
+    return new Eq();
+  } else {
+    let $1 = a < b;
+    if ($1) {
+      return new Lt();
+    } else {
+      return new Gt();
+    }
+  }
+}
 function min(a, b) {
   let $ = a < b;
   if ($) {
@@ -321,6 +337,10 @@ function second(pair) {
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/list.mjs
+var Ascending = class extends CustomType {
+};
+var Descending = class extends CustomType {
+};
 function count_length(loop$list, loop$count) {
   while (true) {
     let list = loop$list;
@@ -436,6 +456,30 @@ function do_map(loop$list, loop$fun, loop$acc) {
 function map(list, fun) {
   return do_map(list, fun, toList([]));
 }
+function do_take(loop$list, loop$n, loop$acc) {
+  while (true) {
+    let list = loop$list;
+    let n = loop$n;
+    let acc = loop$acc;
+    let $ = n <= 0;
+    if ($) {
+      return reverse(acc);
+    } else {
+      if (list.hasLength(0)) {
+        return reverse(acc);
+      } else {
+        let x = list.head;
+        let xs = list.tail;
+        loop$list = xs;
+        loop$n = n - 1;
+        loop$acc = prepend(x, acc);
+      }
+    }
+  }
+}
+function take(list, n) {
+  return do_take(list, n, toList([]));
+}
 function do_append(loop$first, loop$second) {
   while (true) {
     let first3 = loop$first;
@@ -522,6 +566,329 @@ function any(loop$list, loop$predicate) {
     }
   }
 }
+function sequences(loop$list, loop$compare, loop$growing, loop$direction, loop$prev, loop$acc) {
+  while (true) {
+    let list = loop$list;
+    let compare3 = loop$compare;
+    let growing = loop$growing;
+    let direction = loop$direction;
+    let prev = loop$prev;
+    let acc = loop$acc;
+    let growing$1 = prepend(prev, growing);
+    if (list.hasLength(0)) {
+      if (direction instanceof Ascending) {
+        return prepend(do_reverse(growing$1, toList([])), acc);
+      } else {
+        return prepend(growing$1, acc);
+      }
+    } else {
+      let new$1 = list.head;
+      let rest$1 = list.tail;
+      let $ = compare3(prev, new$1);
+      if ($ instanceof Gt && direction instanceof Descending) {
+        loop$list = rest$1;
+        loop$compare = compare3;
+        loop$growing = growing$1;
+        loop$direction = direction;
+        loop$prev = new$1;
+        loop$acc = acc;
+      } else if ($ instanceof Lt && direction instanceof Ascending) {
+        loop$list = rest$1;
+        loop$compare = compare3;
+        loop$growing = growing$1;
+        loop$direction = direction;
+        loop$prev = new$1;
+        loop$acc = acc;
+      } else if ($ instanceof Eq && direction instanceof Ascending) {
+        loop$list = rest$1;
+        loop$compare = compare3;
+        loop$growing = growing$1;
+        loop$direction = direction;
+        loop$prev = new$1;
+        loop$acc = acc;
+      } else if ($ instanceof Gt && direction instanceof Ascending) {
+        let acc$1 = (() => {
+          if (direction instanceof Ascending) {
+            return prepend(do_reverse(growing$1, toList([])), acc);
+          } else {
+            return prepend(growing$1, acc);
+          }
+        })();
+        if (rest$1.hasLength(0)) {
+          return prepend(toList([new$1]), acc$1);
+        } else {
+          let next = rest$1.head;
+          let rest$2 = rest$1.tail;
+          let direction$1 = (() => {
+            let $1 = compare3(new$1, next);
+            if ($1 instanceof Lt) {
+              return new Ascending();
+            } else if ($1 instanceof Eq) {
+              return new Ascending();
+            } else {
+              return new Descending();
+            }
+          })();
+          loop$list = rest$2;
+          loop$compare = compare3;
+          loop$growing = toList([new$1]);
+          loop$direction = direction$1;
+          loop$prev = next;
+          loop$acc = acc$1;
+        }
+      } else if ($ instanceof Lt && direction instanceof Descending) {
+        let acc$1 = (() => {
+          if (direction instanceof Ascending) {
+            return prepend(do_reverse(growing$1, toList([])), acc);
+          } else {
+            return prepend(growing$1, acc);
+          }
+        })();
+        if (rest$1.hasLength(0)) {
+          return prepend(toList([new$1]), acc$1);
+        } else {
+          let next = rest$1.head;
+          let rest$2 = rest$1.tail;
+          let direction$1 = (() => {
+            let $1 = compare3(new$1, next);
+            if ($1 instanceof Lt) {
+              return new Ascending();
+            } else if ($1 instanceof Eq) {
+              return new Ascending();
+            } else {
+              return new Descending();
+            }
+          })();
+          loop$list = rest$2;
+          loop$compare = compare3;
+          loop$growing = toList([new$1]);
+          loop$direction = direction$1;
+          loop$prev = next;
+          loop$acc = acc$1;
+        }
+      } else {
+        let acc$1 = (() => {
+          if (direction instanceof Ascending) {
+            return prepend(do_reverse(growing$1, toList([])), acc);
+          } else {
+            return prepend(growing$1, acc);
+          }
+        })();
+        if (rest$1.hasLength(0)) {
+          return prepend(toList([new$1]), acc$1);
+        } else {
+          let next = rest$1.head;
+          let rest$2 = rest$1.tail;
+          let direction$1 = (() => {
+            let $1 = compare3(new$1, next);
+            if ($1 instanceof Lt) {
+              return new Ascending();
+            } else if ($1 instanceof Eq) {
+              return new Ascending();
+            } else {
+              return new Descending();
+            }
+          })();
+          loop$list = rest$2;
+          loop$compare = compare3;
+          loop$growing = toList([new$1]);
+          loop$direction = direction$1;
+          loop$prev = next;
+          loop$acc = acc$1;
+        }
+      }
+    }
+  }
+}
+function merge_ascendings(loop$list1, loop$list2, loop$compare, loop$acc) {
+  while (true) {
+    let list1 = loop$list1;
+    let list2 = loop$list2;
+    let compare3 = loop$compare;
+    let acc = loop$acc;
+    if (list1.hasLength(0)) {
+      let list = list2;
+      return do_reverse(list, acc);
+    } else if (list2.hasLength(0)) {
+      let list = list1;
+      return do_reverse(list, acc);
+    } else {
+      let first1 = list1.head;
+      let rest1 = list1.tail;
+      let first22 = list2.head;
+      let rest2 = list2.tail;
+      let $ = compare3(first1, first22);
+      if ($ instanceof Lt) {
+        loop$list1 = rest1;
+        loop$list2 = list2;
+        loop$compare = compare3;
+        loop$acc = prepend(first1, acc);
+      } else if ($ instanceof Gt) {
+        loop$list1 = list1;
+        loop$list2 = rest2;
+        loop$compare = compare3;
+        loop$acc = prepend(first22, acc);
+      } else {
+        loop$list1 = list1;
+        loop$list2 = rest2;
+        loop$compare = compare3;
+        loop$acc = prepend(first22, acc);
+      }
+    }
+  }
+}
+function merge_ascending_pairs(loop$sequences, loop$compare, loop$acc) {
+  while (true) {
+    let sequences2 = loop$sequences;
+    let compare3 = loop$compare;
+    let acc = loop$acc;
+    if (sequences2.hasLength(0)) {
+      return do_reverse(acc, toList([]));
+    } else if (sequences2.hasLength(1)) {
+      let sequence = sequences2.head;
+      return do_reverse(
+        prepend(do_reverse(sequence, toList([])), acc),
+        toList([])
+      );
+    } else {
+      let ascending1 = sequences2.head;
+      let ascending2 = sequences2.tail.head;
+      let rest$1 = sequences2.tail.tail;
+      let descending = merge_ascendings(
+        ascending1,
+        ascending2,
+        compare3,
+        toList([])
+      );
+      loop$sequences = rest$1;
+      loop$compare = compare3;
+      loop$acc = prepend(descending, acc);
+    }
+  }
+}
+function merge_descendings(loop$list1, loop$list2, loop$compare, loop$acc) {
+  while (true) {
+    let list1 = loop$list1;
+    let list2 = loop$list2;
+    let compare3 = loop$compare;
+    let acc = loop$acc;
+    if (list1.hasLength(0)) {
+      let list = list2;
+      return do_reverse(list, acc);
+    } else if (list2.hasLength(0)) {
+      let list = list1;
+      return do_reverse(list, acc);
+    } else {
+      let first1 = list1.head;
+      let rest1 = list1.tail;
+      let first22 = list2.head;
+      let rest2 = list2.tail;
+      let $ = compare3(first1, first22);
+      if ($ instanceof Lt) {
+        loop$list1 = list1;
+        loop$list2 = rest2;
+        loop$compare = compare3;
+        loop$acc = prepend(first22, acc);
+      } else if ($ instanceof Gt) {
+        loop$list1 = rest1;
+        loop$list2 = list2;
+        loop$compare = compare3;
+        loop$acc = prepend(first1, acc);
+      } else {
+        loop$list1 = rest1;
+        loop$list2 = list2;
+        loop$compare = compare3;
+        loop$acc = prepend(first1, acc);
+      }
+    }
+  }
+}
+function merge_descending_pairs(loop$sequences, loop$compare, loop$acc) {
+  while (true) {
+    let sequences2 = loop$sequences;
+    let compare3 = loop$compare;
+    let acc = loop$acc;
+    if (sequences2.hasLength(0)) {
+      return do_reverse(acc, toList([]));
+    } else if (sequences2.hasLength(1)) {
+      let sequence = sequences2.head;
+      return do_reverse(
+        prepend(do_reverse(sequence, toList([])), acc),
+        toList([])
+      );
+    } else {
+      let descending1 = sequences2.head;
+      let descending2 = sequences2.tail.head;
+      let rest$1 = sequences2.tail.tail;
+      let ascending = merge_descendings(
+        descending1,
+        descending2,
+        compare3,
+        toList([])
+      );
+      loop$sequences = rest$1;
+      loop$compare = compare3;
+      loop$acc = prepend(ascending, acc);
+    }
+  }
+}
+function merge_all(loop$sequences, loop$direction, loop$compare) {
+  while (true) {
+    let sequences2 = loop$sequences;
+    let direction = loop$direction;
+    let compare3 = loop$compare;
+    if (sequences2.hasLength(0)) {
+      return toList([]);
+    } else if (sequences2.hasLength(1) && direction instanceof Ascending) {
+      let sequence = sequences2.head;
+      return sequence;
+    } else if (sequences2.hasLength(1) && direction instanceof Descending) {
+      let sequence = sequences2.head;
+      return do_reverse(sequence, toList([]));
+    } else if (direction instanceof Ascending) {
+      let sequences$1 = merge_ascending_pairs(sequences2, compare3, toList([]));
+      loop$sequences = sequences$1;
+      loop$direction = new Descending();
+      loop$compare = compare3;
+    } else {
+      let sequences$1 = merge_descending_pairs(sequences2, compare3, toList([]));
+      loop$sequences = sequences$1;
+      loop$direction = new Ascending();
+      loop$compare = compare3;
+    }
+  }
+}
+function sort(list, compare3) {
+  if (list.hasLength(0)) {
+    return toList([]);
+  } else if (list.hasLength(1)) {
+    let x = list.head;
+    return toList([x]);
+  } else {
+    let x = list.head;
+    let y = list.tail.head;
+    let rest$1 = list.tail.tail;
+    let direction = (() => {
+      let $ = compare3(x, y);
+      if ($ instanceof Lt) {
+        return new Ascending();
+      } else if ($ instanceof Eq) {
+        return new Ascending();
+      } else {
+        return new Descending();
+      }
+    })();
+    let sequences$1 = sequences(
+      rest$1,
+      compare3,
+      toList([x]),
+      direction,
+      y,
+      toList([])
+    );
+    return merge_all(sequences$1, new Ascending(), compare3);
+  }
+}
 function reduce(list, fun) {
   if (list.hasLength(0)) {
     return new Error(void 0);
@@ -530,6 +897,40 @@ function reduce(list, fun) {
     let rest$1 = list.tail;
     return new Ok(fold(rest$1, first$1, fun));
   }
+}
+function do_shuffle_pair_unwrap(loop$list, loop$acc) {
+  while (true) {
+    let list = loop$list;
+    let acc = loop$acc;
+    if (list.hasLength(0)) {
+      return acc;
+    } else {
+      let elem_pair = list.head;
+      let enumerable = list.tail;
+      loop$list = enumerable;
+      loop$acc = prepend(elem_pair[1], acc);
+    }
+  }
+}
+function do_shuffle_by_pair_indexes(list_of_pairs) {
+  return sort(
+    list_of_pairs,
+    (a_pair, b_pair) => {
+      return compare(a_pair[0], b_pair[0]);
+    }
+  );
+}
+function shuffle(list) {
+  let _pipe = list;
+  let _pipe$1 = fold(
+    _pipe,
+    toList([]),
+    (acc, a) => {
+      return prepend([random_uniform(), a], acc);
+    }
+  );
+  let _pipe$2 = do_shuffle_by_pair_indexes(_pipe$1);
+  return do_shuffle_pair_unwrap(_pipe$2, toList([]));
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/result.mjs
@@ -583,9 +984,8 @@ function to_string3(builder) {
 function lowercase2(string3) {
   return lowercase(string3);
 }
-function inspect2(term) {
-  let _pipe = inspect(term);
-  return to_string3(_pipe);
+function join2(strings, separator) {
+  return join(strings, separator);
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/dynamic.mjs
@@ -1394,6 +1794,16 @@ function to_string(term) {
 function lowercase(string3) {
   return string3.toLowerCase();
 }
+function join(xs, separator) {
+  const iterator = xs[Symbol.iterator]();
+  let result = iterator.next().value || "";
+  let current = iterator.next();
+  while (!current.done) {
+    result = result + separator + current.value;
+    current = iterator.next();
+  }
+  return result;
+}
 function concat2(xs) {
   let result = "";
   for (const x of xs) {
@@ -1423,17 +1833,15 @@ var unicode_whitespaces = [
 ].join();
 var left_trim_regex = new RegExp(`^([${unicode_whitespaces}]*)`, "g");
 var right_trim_regex = new RegExp(`([${unicode_whitespaces}]*)$`, "g");
-function print_debug(string3) {
-  if (typeof process === "object" && process.stderr?.write) {
-    process.stderr.write(string3 + "\n");
-  } else if (typeof Deno === "object") {
-    Deno.stderr.writeSync(new TextEncoder().encode(string3 + "\n"));
-  } else {
-    console.log(string3);
-  }
-}
 function round(float3) {
   return Math.round(float3);
+}
+function random_uniform() {
+  const random_uniform_result = Math.random();
+  if (random_uniform_result === 1) {
+    return random_uniform();
+  }
+  return random_uniform_result;
 }
 function new_map() {
   return Dict.new();
@@ -1518,117 +1926,6 @@ function try_get_field(value, field2, or_else) {
   } catch {
     return or_else();
   }
-}
-function inspect(v) {
-  const t = typeof v;
-  if (v === true)
-    return "True";
-  if (v === false)
-    return "False";
-  if (v === null)
-    return "//js(null)";
-  if (v === void 0)
-    return "Nil";
-  if (t === "string")
-    return inspectString(v);
-  if (t === "bigint" || t === "number")
-    return v.toString();
-  if (Array.isArray(v))
-    return `#(${v.map(inspect).join(", ")})`;
-  if (v instanceof List)
-    return inspectList(v);
-  if (v instanceof UtfCodepoint)
-    return inspectUtfCodepoint(v);
-  if (v instanceof BitArray)
-    return inspectBitArray(v);
-  if (v instanceof CustomType)
-    return inspectCustomType(v);
-  if (v instanceof Dict)
-    return inspectDict(v);
-  if (v instanceof Set)
-    return `//js(Set(${[...v].map(inspect).join(", ")}))`;
-  if (v instanceof RegExp)
-    return `//js(${v})`;
-  if (v instanceof Date)
-    return `//js(Date("${v.toISOString()}"))`;
-  if (v instanceof Function) {
-    const args = [];
-    for (const i of Array(v.length).keys())
-      args.push(String.fromCharCode(i + 97));
-    return `//fn(${args.join(", ")}) { ... }`;
-  }
-  return inspectObject(v);
-}
-function inspectString(str) {
-  let new_str = '"';
-  for (let i = 0; i < str.length; i++) {
-    let char = str[i];
-    switch (char) {
-      case "\n":
-        new_str += "\\n";
-        break;
-      case "\r":
-        new_str += "\\r";
-        break;
-      case "	":
-        new_str += "\\t";
-        break;
-      case "\f":
-        new_str += "\\f";
-        break;
-      case "\\":
-        new_str += "\\\\";
-        break;
-      case '"':
-        new_str += '\\"';
-        break;
-      default:
-        if (char < " " || char > "~" && char < "\xA0") {
-          new_str += "\\u{" + char.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0") + "}";
-        } else {
-          new_str += char;
-        }
-    }
-  }
-  new_str += '"';
-  return new_str;
-}
-function inspectDict(map4) {
-  let body = "dict.from_list([";
-  let first3 = true;
-  map4.forEach((value, key) => {
-    if (!first3)
-      body = body + ", ";
-    body = body + "#(" + inspect(key) + ", " + inspect(value) + ")";
-    first3 = false;
-  });
-  return body + "])";
-}
-function inspectObject(v) {
-  const name = Object.getPrototypeOf(v)?.constructor?.name || "Object";
-  const props = [];
-  for (const k of Object.keys(v)) {
-    props.push(`${inspect(k)}: ${inspect(v[k])}`);
-  }
-  const body = props.length ? " " + props.join(", ") + " " : "";
-  const head = name === "Object" ? "" : name + " ";
-  return `//js(${head}{${body}})`;
-}
-function inspectCustomType(record) {
-  const props = Object.keys(record).map((label) => {
-    const value = inspect(record[label]);
-    return isNaN(parseInt(label)) ? `${label}: ${value}` : value;
-  }).join(", ");
-  return props ? `${record.constructor.name}(${props})` : record.constructor.name;
-}
-function inspectList(list) {
-  return `[${list.toArray().map(inspect).join(", ")}]`;
-}
-function inspectBitArray(bits) {
-  return `<<${Array.from(bits.buffer).join(", ")}>>`;
-}
-function inspectUtfCodepoint(codepoint2) {
-  return `//utfcodepoint(${String.fromCodePoint(codepoint2.value)})`;
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/dict.mjs
@@ -1718,11 +2015,11 @@ function insert_taken(loop$dict, loop$desired_keys, loop$acc) {
     }
   }
 }
-function do_take(desired_keys, dict) {
+function do_take2(desired_keys, dict) {
   return insert_taken(dict, desired_keys, new$());
 }
 function take3(dict, desired_keys) {
-  return do_take(desired_keys, dict);
+  return do_take2(desired_keys, dict);
 }
 function insert_pair(dict, pair) {
   return insert(dict, pair[0], pair[1]);
@@ -1780,14 +2077,6 @@ function do_map_values(f, dict) {
 }
 function map_values(dict, fun) {
   return do_map_values(fun, dict);
-}
-
-// build/dev/javascript/gleam_stdlib/gleam/io.mjs
-function debug(term) {
-  let _pipe = term;
-  let _pipe$1 = inspect2(_pipe);
-  print_debug(_pipe$1);
-  return term;
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/set.mjs
@@ -2501,6 +2790,9 @@ function documentResizeEventListener(listener) {
 function mouseUpEventListener(listener) {
   return window.addEventListener("mouseup", listener);
 }
+function windowSize() {
+  return [window.innerWidth, window.innerHeight];
+}
 
 // build/dev/javascript/nodework/nodework/vector.mjs
 var Vector = class extends CustomType {
@@ -2581,8 +2873,9 @@ function to_html(vec, t) {
 
 // build/dev/javascript/nodework/nodework/conn.mjs
 var Conn = class extends CustomType {
-  constructor(p0, p1, source_node_id, target_node_id, target_input_id, active) {
+  constructor(id2, p0, p1, source_node_id, target_node_id, target_input_id, active) {
     super();
+    this.id = id2;
     this.p0 = p0;
     this.p1 = p1;
     this.source_node_id = source_node_id;
@@ -3200,9 +3493,53 @@ function connections(m) {
   })(_pipe$1);
 }
 
-// build/dev/javascript/nodework/resize.ffi.mjs
-function windowSize() {
-  return [window.innerWidth, window.innerHeight];
+// build/dev/javascript/nodework/util/random.mjs
+var lib = /* @__PURE__ */ toList([
+  "a",
+  "b",
+  "c",
+  "d",
+  "e",
+  "f",
+  "g",
+  "h",
+  "i",
+  "j",
+  "k",
+  "l",
+  "m",
+  "n",
+  "o",
+  "p",
+  "q",
+  "r",
+  "s",
+  "t",
+  "u",
+  "v",
+  "w",
+  "x",
+  "y",
+  "z",
+  "0",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9"
+]);
+function generate_random_id(prefix) {
+  let _pipe = lib;
+  let _pipe$1 = shuffle(_pipe);
+  let _pipe$2 = take(_pipe$1, 12);
+  let _pipe$3 = join2(_pipe$2, "");
+  return ((id2) => {
+    return prefix + "." + id2;
+  })(_pipe$3);
 }
 
 // build/dev/javascript/nodework/nodework.mjs
@@ -3246,6 +3583,13 @@ var UserClickedNodeOutput = class extends CustomType {
   }
 };
 var UserUnclicked = class extends CustomType {
+};
+var UserClickedConn = class extends CustomType {
+  constructor(x0, x1) {
+    super();
+    this[0] = x0;
+    this[1] = x1;
+  }
 };
 var UserClickedGraph = class extends CustomType {
   constructor(x0) {
@@ -3424,7 +3768,8 @@ function user_clicked_node_output(model, node_id, offset) {
     let _pipe2 = model.viewbox;
     return to_viewbox_translate(_pipe2, model.navigator.cursor_point);
   })();
-  let new_conn = new Conn(p1, p2, node_id, -1, "", true);
+  let id2 = generate_random_id("conn");
+  let new_conn = new Conn(id2, p1, p2, node_id, -1, "", true);
   let _pipe = model.connections;
   let _pipe$1 = prepend2(_pipe, new_conn);
   let _pipe$2 = ((c) => {
@@ -3473,6 +3818,31 @@ function user_unclicked(model) {
     _pipe$2
   );
   return none_effect_wrapper(_pipe$3);
+}
+function user_clicked_conn(model, conn_id, event2) {
+  let _pipe = model.connections;
+  let _pipe$1 = map(
+    _pipe,
+    (c) => {
+      let $ = c.id === conn_id;
+      if (!$) {
+        return c;
+      } else {
+        return c.withFields({
+          p1: event2.position,
+          target_node_id: -1,
+          target_input_id: "",
+          active: true
+        });
+      }
+    }
+  );
+  let _pipe$2 = ((conns) => {
+    return model.withFields({ connections: conns });
+  })(
+    _pipe$1
+  );
+  return none_effect_wrapper(_pipe$2);
 }
 function user_scrolled(model, delta_y) {
   let _pipe = model.viewbox;
@@ -3865,14 +4235,6 @@ function view_grid() {
     ])
   );
 }
-function view_connection(c) {
-  return line(
-    prepend(
-      attribute("stroke", "blue"),
-      prepend(attribute("stroke-width", "5"), to_attributes(c))
-    )
-  );
-}
 function mouse_event_decoder(e) {
   stop_propagation(e);
   return try$(
@@ -3952,6 +4314,44 @@ function view_node(node, selection) {
     )
   );
 }
+function view_connection(c) {
+  let mousedown = (e) => {
+    return try$(
+      mouse_event_decoder(e),
+      (decoded_event) => {
+        return new Ok(new UserClickedConn(c.id, decoded_event));
+      }
+    );
+  };
+  return line(
+    prepend(
+      (() => {
+        let $ = c.active;
+        if ($) {
+          return class$("text-gray-500");
+        } else {
+          return class$("text-gray-500 hover:text-indigo-500");
+        }
+      })(),
+      prepend(
+        attribute("stroke", "currentColor"),
+        prepend(
+          attribute("stroke-width", "10"),
+          prepend(
+            attribute("stroke-linecap", "round"),
+            prepend(
+              attribute("stroke-dasharray", "12,12"),
+              prepend(
+                on2("mousedown", mousedown),
+                to_attributes(c)
+              )
+            )
+          )
+        )
+      )
+    )
+  );
+}
 function keydown_event_decoder(e) {
   return try$(
     field("key", string)(e),
@@ -3982,7 +4382,6 @@ function view(model) {
     );
   };
   let keydown = (e) => {
-    debug("keydown");
     return try$(
       keydown_event_decoder(e),
       (key) => {
@@ -4096,6 +4495,10 @@ function update(model, msg) {
     return user_clicked_node_output(model, node_id, offset);
   } else if (msg instanceof UserUnclicked) {
     return user_unclicked(model);
+  } else if (msg instanceof UserClickedConn) {
+    let conn_id = msg[0];
+    let mouse_event = msg[1];
+    return user_clicked_conn(model, conn_id, mouse_event);
   } else if (msg instanceof UserClickedGraph) {
     let mouse_event = msg[0];
     return user_clicked_graph(model, mouse_event);
@@ -4148,7 +4551,7 @@ function main() {
     throw makeError(
       "assignment_no_match",
       "nodework",
-      85,
+      86,
       "main",
       "Assignment pattern did not match",
       { value: $ }
