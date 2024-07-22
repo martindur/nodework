@@ -16,7 +16,6 @@ import lustre/element/html
 import lustre/element/svg
 import lustre/event
 
-import util/random
 import nodework/conn.{type Conn, Conn}
 import nodework/draw
 import nodework/menu.{type Menu, Menu}
@@ -27,6 +26,7 @@ import nodework/node.{
 } as nd
 import nodework/vector.{type Vector, Vector}
 import nodework/viewbox.{type ViewBox, Drag, Normal, ViewBox}
+import util/random
 
 pub type ResizeEvent
 
@@ -304,7 +304,14 @@ fn user_clicked_conn(
   |> map(fn(c) {
     case c.id == conn_id {
       False -> c
-      True -> Conn(..c, p1: event.position, target_node_id: -1, target_input_id: "", active: True)
+      True ->
+        Conn(
+          ..c,
+          p1: event.position,
+          target_node_id: -1,
+          target_input_id: "",
+          active: True,
+        )
     }
   })
   |> fn(conns) { Model(..model, connections: conns) }
