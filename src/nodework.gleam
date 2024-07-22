@@ -265,38 +265,25 @@ fn user_clicked_node_output(
   |> none_effect_wrapper
 }
 
-// TODO: Clear duplicates - when dragging a connection from a to b, when there already is one,
-// we should not add another connection. Either make a check, or a deduplicate function
-// deduplicate in Conn module is definitely more readable.
 fn user_unclicked(model: Model) -> #(Model, Effect(Msg)) {
-  model.connections
-  |> map(fn(c) {
-    case c.active {
-      False -> c
-      True -> {
-        model.nodes
-        |> nd.get_node_from_input_hovered
-        |> fn(res: Result(#(Node, NodeInput), NodeError)) {
-          case res {
-            Error(NotFound) -> c
-            Ok(#(node, input)) ->
-              case c.source_node_id != node.id {
-                // TODO: This case could really be a function to check for conflicts
-                False -> c
-                True ->
-                  Conn(
-                    ..c,
-                    target_node_id: node.id,
-                    target_input_id: nd.input_id(input),
-                    active: False,
-                  )
-                // TODO: Need to update second point to node input pos
-              }
-          }
+  case nd.get_node_from_input_hovered(model.nodes) {
+    Error(NotFound) -> model.connections
+    Ok(#(node, input)) -> {
+      model.connections
+      |> conn.map_active(fn(c) {
+        case c.source_node_id != node.id {
+          False -> c
+          True ->
+            Conn(
+              ..c,
+              target_node_id: node.id,
+              target_input_id: nd.input_id(input),
+              active: False,
+            )
         }
-      }
+      })
     }
-  })
+  }
   |> filter(fn(c) { c.target_node_id != -1 && c.active != True })
   |> conn.unique
   |> fn(c) { Model(..model, connections: c) }

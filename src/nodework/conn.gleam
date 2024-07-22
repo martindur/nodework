@@ -25,7 +25,8 @@ pub fn to_attributes(conn: Conn) -> List(Attribute(a)) {
 }
 
 fn conn_duplicate(a: Conn, b: Conn) -> Bool {
-  a.source_node_id == b.source_node_id && a.target_input_id == b.target_input_id
+  // an input can only hold a single connection
+  a.target_input_id == b.target_input_id
 }
 
 fn deduplicate_helper(remaining: List(Conn), seen: List(Conn)) -> List(Conn) {
@@ -42,4 +43,14 @@ fn deduplicate_helper(remaining: List(Conn), seen: List(Conn)) -> List(Conn) {
 
 pub fn unique(conns: List(Conn)) -> List(Conn) {
   deduplicate_helper(conns, [])
+}
+
+pub fn map_active(conns: List(Conn), f: fn(Conn) -> Conn) {
+  conns
+  |> list.map(fn(c) {
+    case c.active {
+      False -> c
+      True -> f(c)
+    }
+  })
 }
