@@ -18,6 +18,7 @@ import lustre/event
 
 import nodework/conn.{type Conn, Conn}
 import nodework/draw
+import nodework/menu.{type Menu, Menu}
 import nodework/model.{type Model, Model}
 import nodework/navigator.{type Navigator, Navigator}
 import nodework/node.{
@@ -25,7 +26,6 @@ import nodework/node.{
 } as nd
 import nodework/vector.{type Vector, Vector}
 import nodework/viewbox.{type ViewBox, Drag, Normal, ViewBox}
-import nodework/menu.{type Menu, Menu}
 
 pub type ResizeEvent
 
@@ -410,7 +410,11 @@ fn graph_spawn_node(model: Model, identifier: String) -> #(Model, Effect(Msg)) {
   model.nodes
   |> dict.to_list
   |> list.length
-  |> nd.make_node(identifier, _)
+  |> nd.make_node(
+    identifier,
+    _,
+    viewbox.to_viewbox_space(model.viewbox, model.menu.pos),
+  )
   |> fn(res: Result(Node, Nil)) {
     case res {
       Ok(node) -> Model(..model, nodes: dict.insert(model.nodes, node.id, node))

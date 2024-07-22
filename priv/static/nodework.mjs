@@ -40,10 +40,10 @@ var List = class {
     return desired === 0;
   }
   countLength() {
-    let length2 = 0;
+    let length3 = 0;
     for (let _ of this)
-      length2++;
-    return length2;
+      length3++;
+    return length3;
   }
 };
 function prepend(element2, tail) {
@@ -106,6 +106,11 @@ var BitArray = class _BitArray {
   // @internal
   sliceAfter(index2) {
     return new _BitArray(this.buffer.slice(index2));
+  }
+};
+var UtfCodepoint = class {
+  constructor(value) {
+    this.value = value;
   }
 };
 function byteArrayToInt(byteArray) {
@@ -316,6 +321,22 @@ function second(pair) {
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/list.mjs
+function count_length(loop$list, loop$count) {
+  while (true) {
+    let list = loop$list;
+    let count = loop$count;
+    if (list.atLeastLength(1)) {
+      let list$1 = list.tail;
+      loop$list = list$1;
+      loop$count = count + 1;
+    } else {
+      return count;
+    }
+  }
+}
+function length(list) {
+  return count_length(list, 0);
+}
 function do_reverse(loop$remaining, loop$accumulator) {
   while (true) {
     let remaining = loop$remaining;
@@ -414,6 +435,23 @@ function do_map(loop$list, loop$fun, loop$acc) {
 }
 function map(list, fun) {
   return do_map(list, fun, toList([]));
+}
+function do_append(loop$first, loop$second) {
+  while (true) {
+    let first3 = loop$first;
+    let second2 = loop$second;
+    if (first3.hasLength(0)) {
+      return second2;
+    } else {
+      let item = first3.head;
+      let rest$1 = first3.tail;
+      loop$first = rest$1;
+      loop$second = prepend(item, second2);
+    }
+  }
+}
+function append(first3, second2) {
+  return do_append(reverse(first3), second2);
 }
 function prepend2(list, item) {
   return prepend(item, list);
@@ -541,6 +579,15 @@ function to_string3(builder) {
   return identity(builder);
 }
 
+// build/dev/javascript/gleam_stdlib/gleam/string.mjs
+function lowercase2(string3) {
+  return lowercase(string3);
+}
+function inspect2(term) {
+  let _pipe = inspect(term);
+  return to_string3(_pipe);
+}
+
 // build/dev/javascript/gleam_stdlib/gleam/dynamic.mjs
 var DecodeError = class extends CustomType {
   constructor(expected, found, path2) {
@@ -552,6 +599,9 @@ var DecodeError = class extends CustomType {
 };
 function from(a) {
   return identity(a);
+}
+function dynamic(value) {
+  return new Ok(value);
 }
 function classify(data) {
   return classify_dynamic(data);
@@ -1341,6 +1391,9 @@ function identity(x) {
 function to_string(term) {
   return term.toString();
 }
+function lowercase(string3) {
+  return string3.toLowerCase();
+}
 function concat2(xs) {
   let result = "";
   for (const x of xs) {
@@ -1370,6 +1423,15 @@ var unicode_whitespaces = [
 ].join();
 var left_trim_regex = new RegExp(`^([${unicode_whitespaces}]*)`, "g");
 var right_trim_regex = new RegExp(`([${unicode_whitespaces}]*)$`, "g");
+function print_debug(string3) {
+  if (typeof process === "object" && process.stderr?.write) {
+    process.stderr.write(string3 + "\n");
+  } else if (typeof Deno === "object") {
+    Deno.stderr.writeSync(new TextEncoder().encode(string3 + "\n"));
+  } else {
+    console.log(string3);
+  }
+}
 function round(float3) {
   return Math.round(float3);
 }
@@ -1456,6 +1518,117 @@ function try_get_field(value, field2, or_else) {
   } catch {
     return or_else();
   }
+}
+function inspect(v) {
+  const t = typeof v;
+  if (v === true)
+    return "True";
+  if (v === false)
+    return "False";
+  if (v === null)
+    return "//js(null)";
+  if (v === void 0)
+    return "Nil";
+  if (t === "string")
+    return inspectString(v);
+  if (t === "bigint" || t === "number")
+    return v.toString();
+  if (Array.isArray(v))
+    return `#(${v.map(inspect).join(", ")})`;
+  if (v instanceof List)
+    return inspectList(v);
+  if (v instanceof UtfCodepoint)
+    return inspectUtfCodepoint(v);
+  if (v instanceof BitArray)
+    return inspectBitArray(v);
+  if (v instanceof CustomType)
+    return inspectCustomType(v);
+  if (v instanceof Dict)
+    return inspectDict(v);
+  if (v instanceof Set)
+    return `//js(Set(${[...v].map(inspect).join(", ")}))`;
+  if (v instanceof RegExp)
+    return `//js(${v})`;
+  if (v instanceof Date)
+    return `//js(Date("${v.toISOString()}"))`;
+  if (v instanceof Function) {
+    const args = [];
+    for (const i of Array(v.length).keys())
+      args.push(String.fromCharCode(i + 97));
+    return `//fn(${args.join(", ")}) { ... }`;
+  }
+  return inspectObject(v);
+}
+function inspectString(str) {
+  let new_str = '"';
+  for (let i = 0; i < str.length; i++) {
+    let char = str[i];
+    switch (char) {
+      case "\n":
+        new_str += "\\n";
+        break;
+      case "\r":
+        new_str += "\\r";
+        break;
+      case "	":
+        new_str += "\\t";
+        break;
+      case "\f":
+        new_str += "\\f";
+        break;
+      case "\\":
+        new_str += "\\\\";
+        break;
+      case '"':
+        new_str += '\\"';
+        break;
+      default:
+        if (char < " " || char > "~" && char < "\xA0") {
+          new_str += "\\u{" + char.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0") + "}";
+        } else {
+          new_str += char;
+        }
+    }
+  }
+  new_str += '"';
+  return new_str;
+}
+function inspectDict(map4) {
+  let body = "dict.from_list([";
+  let first3 = true;
+  map4.forEach((value, key) => {
+    if (!first3)
+      body = body + ", ";
+    body = body + "#(" + inspect(key) + ", " + inspect(value) + ")";
+    first3 = false;
+  });
+  return body + "])";
+}
+function inspectObject(v) {
+  const name = Object.getPrototypeOf(v)?.constructor?.name || "Object";
+  const props = [];
+  for (const k of Object.keys(v)) {
+    props.push(`${inspect(k)}: ${inspect(v[k])}`);
+  }
+  const body = props.length ? " " + props.join(", ") + " " : "";
+  const head = name === "Object" ? "" : name + " ";
+  return `//js(${head}{${body}})`;
+}
+function inspectCustomType(record) {
+  const props = Object.keys(record).map((label) => {
+    const value = inspect(record[label]);
+    return isNaN(parseInt(label)) ? `${label}: ${value}` : value;
+  }).join(", ");
+  return props ? `${record.constructor.name}(${props})` : record.constructor.name;
+}
+function inspectList(list) {
+  return `[${list.toArray().map(inspect).join(", ")}]`;
+}
+function inspectBitArray(bits) {
+  return `<<${Array.from(bits.buffer).join(", ")}>>`;
+}
+function inspectUtfCodepoint(codepoint2) {
+  return `//utfcodepoint(${String.fromCodePoint(codepoint2.value)})`;
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/dict.mjs
@@ -1609,6 +1782,14 @@ function map_values(dict, fun) {
   return do_map_values(fun, dict);
 }
 
+// build/dev/javascript/gleam_stdlib/gleam/io.mjs
+function debug(term) {
+  let _pipe = term;
+  let _pipe$1 = inspect2(_pipe);
+  print_debug(_pipe$1);
+  return term;
+}
+
 // build/dev/javascript/gleam_stdlib/gleam/set.mjs
 var Set2 = class extends CustomType {
   constructor(dict) {
@@ -1656,6 +1837,18 @@ function from2(effect) {
 function none() {
   return new Effect(toList([]));
 }
+function batch(effects) {
+  return new Effect(
+    fold(
+      effects,
+      toList([]),
+      (b, _use1) => {
+        let a = _use1.all;
+        return append(b, a);
+      }
+    )
+  );
+}
 
 // build/dev/javascript/lustre/lustre/internals/vdom.mjs
 var Text = class extends CustomType {
@@ -1698,6 +1891,20 @@ function attribute(name, value) {
 }
 function on(name, handler) {
   return new Event("on" + name, handler);
+}
+function style(properties) {
+  return attribute(
+    "style",
+    fold(
+      properties,
+      "",
+      (styles, _use1) => {
+        let name$1 = _use1[0];
+        let value$1 = _use1[1];
+        return styles + name$1 + ":" + value$1 + ";";
+      }
+    )
+  );
 }
 function class$(name) {
   return attribute("class", name);
@@ -1831,7 +2038,7 @@ function createElementNode({ prev, next, dispatch: dispatch2, stack }) {
   const prevHandlers = canMorph ? new Set(handlersForEl.keys()) : null;
   const prevAttributes = canMorph ? new Set(Array.from(prev.attributes, (a) => a.name)) : null;
   let className = null;
-  let style = null;
+  let style2 = null;
   let innerHTML = null;
   for (const attr of next.attrs) {
     const name = attr[0];
@@ -1861,7 +2068,7 @@ function createElementNode({ prev, next, dispatch: dispatch2, stack }) {
     } else if (name === "class") {
       className = className === null ? value : className + " " + value;
     } else if (name === "style") {
-      style = style === null ? value : style + value;
+      style2 = style2 === null ? value : style2 + value;
     } else if (name === "dangerous-unescaped-html") {
       innerHTML = value;
     } else {
@@ -1878,8 +2085,8 @@ function createElementNode({ prev, next, dispatch: dispatch2, stack }) {
     if (canMorph)
       prevAttributes.delete("class");
   }
-  if (style !== null) {
-    el2.setAttribute("style", style);
+  if (style2 !== null) {
+    el2.setAttribute("style", style2);
     if (canMorph)
       prevAttributes.delete("style");
   }
@@ -2215,6 +2422,9 @@ function div(attrs, children) {
 function p(attrs, children) {
   return element("p", attrs, children);
 }
+function button(attrs, children) {
+  return element("button", attrs, children);
+}
 
 // build/dev/javascript/lustre/lustre/element/svg.mjs
 var namespace = "http://www.w3.org/2000/svg";
@@ -2284,7 +2494,15 @@ function mouse_position(event2) {
   );
 }
 
-// build/dev/javascript/nodework/graph/vector.mjs
+// build/dev/javascript/nodework/nodework.ffi.mjs
+function documentResizeEventListener(listener) {
+  return window.addEventListener("resize", listener);
+}
+function mouseUpEventListener(listener) {
+  return window.addEventListener("mouseup", listener);
+}
+
+// build/dev/javascript/nodework/nodework/vector.mjs
 var Vector = class extends CustomType {
   constructor(x, y) {
     super();
@@ -2319,6 +2537,20 @@ function scalar(vec, b) {
     }
   );
 }
+function divide(vec, b) {
+  let _pipe = vec;
+  return map_vector(
+    _pipe,
+    (val) => {
+      let _pipe$1 = val;
+      let _pipe$2 = to_float(_pipe$1);
+      let _pipe$3 = ((x) => {
+        return divideFloat(x, b);
+      })(_pipe$2);
+      return round2(_pipe$3);
+    }
+  );
+}
 function bounded_vector(vec, bound) {
   let _pipe = vec;
   return map_vector(
@@ -2347,7 +2579,7 @@ function to_html(vec, t) {
   })(_pipe);
 }
 
-// build/dev/javascript/nodework/graph/conn.mjs
+// build/dev/javascript/nodework/nodework/conn.mjs
 var Conn = class extends CustomType {
   constructor(p0, p1, source_node_id, target_node_id, target_input_id, active) {
     super();
@@ -2396,7 +2628,63 @@ function unique(conns) {
   return deduplicate_helper(conns, toList([]));
 }
 
-// build/dev/javascript/nodework/graph/navigator.mjs
+// build/dev/javascript/nodework/nodework/menu.mjs
+var Menu = class extends CustomType {
+  constructor(pos, active, nodes) {
+    super();
+    this.pos = pos;
+    this.active = active;
+    this.nodes = nodes;
+  }
+};
+function view_menu_item(item, spawn_func) {
+  let text3 = item[0];
+  let id2 = item[1];
+  return button(
+    toList([
+      id(id2),
+      class$("hover:bg-gray-300"),
+      on2("click", spawn_func)
+    ]),
+    toList([text(text3)])
+  );
+}
+function view_menu(menu, spawn_func) {
+  let pos = "translate(" + to_string2(menu.pos.x) + "px, " + to_string2(
+    menu.pos.y
+  ) + "px)";
+  return div(
+    (() => {
+      let $ = menu.active;
+      if ($) {
+        return toList([
+          class$(
+            "absolute top-0 left-0 w-[100px] h-[300px] bg-gray-200 rounded shadow"
+          ),
+          style(toList([["transform", pos]]))
+        ]);
+      } else {
+        return toList([class$("hidden")]);
+      }
+    })(),
+    toList([
+      div(
+        toList([class$("flex flex-col p-2 gap-1")]),
+        (() => {
+          let _pipe = menu.nodes;
+          return map(
+            _pipe,
+            (item) => {
+              return view_menu_item(item, spawn_func);
+            }
+          );
+        })()
+      )
+    ])
+  );
+}
+
+// build/dev/javascript/nodework/nodework/navigator.mjs
 var Navigator = class extends CustomType {
   constructor(cursor_point2, mouse_down) {
     super();
@@ -2408,7 +2696,7 @@ function set_navigator_mouse_down(nav) {
   return nav.withFields({ mouse_down: true });
 }
 
-// build/dev/javascript/nodework/graph/node.mjs
+// build/dev/javascript/nodework/nodework/node.mjs
 var Node2 = class extends CustomType {
   constructor(position, offset, id2, inputs, output, name) {
     super();
@@ -2619,8 +2907,39 @@ function update_all_node_offsets(nodes, point) {
     }
   );
 }
+function make_node(identifier, id2, position) {
+  if (identifier === "rect") {
+    return new Ok(
+      new Node2(
+        position,
+        new Vector(0, 0),
+        id2,
+        toList([
+          new_input(id2, 0, "foo"),
+          new_input(id2, 1, "bar"),
+          new_input(id2, 2, "baz")
+        ]),
+        new_output(id2),
+        "Rect"
+      )
+    );
+  } else if (identifier === "circle") {
+    return new Ok(
+      new Node2(
+        position,
+        new Vector(0, 0),
+        id2,
+        toList([new_input(id2, 0, "bob")]),
+        new_output(id2),
+        "Circle"
+      )
+    );
+  } else {
+    return new Error(void 0);
+  }
+}
 
-// build/dev/javascript/nodework/graph/viewbox.mjs
+// build/dev/javascript/nodework/nodework/viewbox.mjs
 var Normal = class extends CustomType {
 };
 var Drag = class extends CustomType {
@@ -2645,6 +2964,10 @@ function to_viewbox_space(vb, p2) {
   let _pipe = p2;
   let _pipe$1 = scalar(_pipe, vb.zoom_level);
   return add3(_pipe$1, vb.offset);
+}
+function from_viewbox_scale(vb, p2) {
+  let _pipe = p2;
+  return divide(_pipe, vb.zoom_level);
 }
 function update_resolution(vb, resolution) {
   let _pipe = vb.zoom_level;
@@ -2678,9 +3001,9 @@ function update_zoom_level(vb, delta_y) {
   })(_pipe$4);
 }
 
-// build/dev/javascript/nodework/graph/model.mjs
+// build/dev/javascript/nodework/nodework/model.mjs
 var Model = class extends CustomType {
-  constructor(nodes, connections2, nodes_selected, window_resolution, viewbox, navigator, mode, last_clicked_point) {
+  constructor(nodes, connections2, nodes_selected, window_resolution, viewbox, navigator, mode, last_clicked_point, menu) {
     super();
     this.nodes = nodes;
     this.connections = connections2;
@@ -2690,10 +3013,11 @@ var Model = class extends CustomType {
     this.navigator = navigator;
     this.mode = mode;
     this.last_clicked_point = last_clicked_point;
+    this.menu = menu;
   }
 };
 
-// build/dev/javascript/nodework/graph/draw.mjs
+// build/dev/javascript/nodework/nodework/draw.mjs
 function cursor_point(m, p2) {
   let _pipe = p2;
   let _pipe$1 = ((_capture) => {
@@ -2829,7 +3153,7 @@ function connections(m) {
                 if (!nodes2.hasLength(1)) {
                   throw makeError(
                     "assignment_no_match",
-                    "graph/draw",
+                    "nodework/draw",
                     92,
                     "",
                     "Assignment pattern did not match",
@@ -2862,15 +3186,7 @@ function connections(m) {
   })(_pipe$1);
 }
 
-// build/dev/javascript/nodework/mouse.ffi.mjs
-function mouseUpEventListener(listener) {
-  return window.addEventListener("mouseup", listener);
-}
-
 // build/dev/javascript/nodework/resize.ffi.mjs
-function documentResizeEventListener(listener) {
-  return window.addEventListener("resize", listener);
-}
 function windowSize() {
   return [window.innerWidth, window.innerHeight];
 }
@@ -2945,6 +3261,12 @@ var UserHoverNodeOutput = class extends CustomType {
 };
 var UserUnhoverNodeOutput = class extends CustomType {
 };
+var UserPressedKey = class extends CustomType {
+  constructor(x0) {
+    super();
+    this[0] = x0;
+  }
+};
 var GraphClearSelection = class extends CustomType {
 };
 var GraphSetDragMode = class extends CustomType {
@@ -2969,6 +3291,16 @@ var GraphResizeViewBox = class extends CustomType {
     this[0] = x0;
   }
 };
+var GraphOpenMenu = class extends CustomType {
+};
+var GraphCloseMenu = class extends CustomType {
+};
+var GraphSpawnNode = class extends CustomType {
+  constructor(x0) {
+    super();
+    this[0] = x0;
+  }
+};
 function get_window_size() {
   let _pipe = windowSize();
   return ((z) => {
@@ -2976,6 +3308,23 @@ function get_window_size() {
     let y = z[1];
     return new Vector(x, y);
   })(_pipe);
+}
+function setup(runtime_call) {
+  documentResizeEventListener(
+    (_) => {
+      let _pipe = get_window_size();
+      let _pipe$1 = new GraphResizeViewBox(_pipe);
+      let _pipe$2 = dispatch(_pipe$1);
+      return runtime_call(_pipe$2);
+    }
+  );
+  return mouseUpEventListener(
+    (_) => {
+      let _pipe = new UserUnclicked();
+      let _pipe$1 = dispatch(_pipe);
+      return runtime_call(_pipe$1);
+    }
+  );
 }
 function init2(_) {
   return [
@@ -3016,13 +3365,26 @@ function init2(_) {
       new ViewBox(new Vector(0, 0), get_window_size(), 1),
       new Navigator(new Vector(0, 0), false),
       new Normal(),
-      new Vector(0, 0)
+      new Vector(0, 0),
+      new Menu(
+        new Vector(0, 0),
+        false,
+        toList([["Rect", "rect"], ["Circle", "circle"]])
+      )
     ),
     none()
   ];
 }
 function none_effect_wrapper(model) {
   return [model, none()];
+}
+function simple_effect(msg) {
+  return from2(
+    (dispatch2) => {
+      let _pipe = msg;
+      return dispatch2(_pipe);
+    }
+  );
 }
 function user_added_node(model, node) {
   let _pipe = model.withFields({
@@ -3182,6 +3544,51 @@ function graph_resize_view_box(model, resolution) {
   });
   return none_effect_wrapper(_pipe);
 }
+function graph_open_menu(model) {
+  let _pipe = model.navigator.cursor_point;
+  let _pipe$1 = ((_capture) => {
+    return from_viewbox_scale(model.viewbox, _capture);
+  })(_pipe);
+  let _pipe$2 = ((cursor) => {
+    return model.menu.withFields({ pos: cursor, active: true });
+  })(_pipe$1);
+  let _pipe$3 = ((menu) => {
+    return model.withFields({ menu });
+  })(
+    _pipe$2
+  );
+  return none_effect_wrapper(_pipe$3);
+}
+function graph_close_menu(model) {
+  let _pipe = model.menu.withFields({ active: false });
+  let _pipe$1 = ((menu) => {
+    return model.withFields({ menu });
+  })(_pipe);
+  return none_effect_wrapper(_pipe$1);
+}
+function graph_spawn_node(model, identifier) {
+  let _pipe = model.nodes;
+  let _pipe$1 = map_to_list(_pipe);
+  let _pipe$2 = length(_pipe$1);
+  let _pipe$3 = ((_capture) => {
+    return make_node(
+      identifier,
+      _capture,
+      to_viewbox_space(model.viewbox, model.menu.pos)
+    );
+  })(_pipe$2);
+  let _pipe$4 = ((res) => {
+    if (res.isOk()) {
+      let node = res[0];
+      return model.withFields({ nodes: insert(model.nodes, node.id, node) });
+    } else {
+      return model;
+    }
+  })(_pipe$3);
+  return ((m) => {
+    return [m, simple_effect(new GraphCloseMenu())];
+  })(_pipe$4);
+}
 function update_last_clicked_point(model, event2) {
   let _pipe = event2.position;
   let _pipe$1 = ((_capture) => {
@@ -3221,10 +3628,16 @@ function user_clicked_node(model, node_id, event2) {
     });
   })(_pipe$1);
   return ((m) => {
-    return [m, update_selected_nodes(event2, node_id)];
-  })(
-    _pipe$2
-  );
+    return [
+      m,
+      batch(
+        toList([
+          update_selected_nodes(event2, node_id),
+          simple_effect(new GraphCloseMenu())
+        ])
+      )
+    ];
+  })(_pipe$2);
 }
 function shift_key_check(event2) {
   return from2(
@@ -3245,27 +3658,32 @@ function user_clicked_graph(model, event2) {
   let _pipe = model;
   let _pipe$1 = update_last_clicked_point(_pipe, event2);
   return ((m) => {
-    return [m, shift_key_check(event2)];
+    return [
+      m,
+      batch(
+        toList([shift_key_check(event2), simple_effect(new GraphCloseMenu())])
+      )
+    ];
   })(_pipe$1);
 }
-function mouse_event_decoder(e) {
-  stop_propagation(e);
-  return try$(
-    field("shiftKey", bool)(e),
-    (shift_key) => {
-      return try$(
-        mouse_position(e),
-        (position) => {
-          return new Ok(
-            new MouseEvent(
-              new Vector(round2(position[0]), round2(position[1])),
-              shift_key
-            )
-          );
-        }
-      );
-    }
-  );
+function key_pressed(key) {
+  let $ = lowercase2(key);
+  if ($ === "a") {
+    return from2(
+      (dispatch2) => {
+        let _pipe = new GraphOpenMenu();
+        return dispatch2(_pipe);
+      }
+    );
+  } else {
+    return none();
+  }
+}
+function user_pressed_key(model, key) {
+  let _pipe = model;
+  return ((m) => {
+    return [m, key_pressed(key)];
+  })(_pipe);
 }
 function translate(x, y) {
   let x_string = to_string2(x);
@@ -3374,66 +3792,6 @@ function view_node_output(node) {
     ])
   );
 }
-function view_node(node, selection) {
-  let node_selected_class = (() => {
-    let $ = contains(selection, node.id);
-    if ($) {
-      return class$("text-gray-300 stroke-gray-400");
-    } else {
-      return class$("text-gray-300 stroke-gray-300");
-    }
-  })();
-  let mousedown = (e) => {
-    return try$(
-      mouse_event_decoder(e),
-      (decoded_event) => {
-        return new Ok(new UserClickedNode(node.id, decoded_event));
-      }
-    );
-  };
-  return g(
-    toList([
-      id("node-" + to_string2(node.id)),
-      attribute("transform", translate(node.position.x, node.position.y)),
-      class$("select-none")
-    ]),
-    concat(
-      toList([
-        toList([
-          rect(
-            toList([
-              id(to_string2(node.id)),
-              attribute("width", "200"),
-              attribute("height", "150"),
-              attribute("rx", "25"),
-              attribute("ry", "25"),
-              attribute("fill", "currentColor"),
-              attribute("stroke", "currentColor"),
-              attribute("stroke-width", "2"),
-              node_selected_class,
-              on2("mousedown", mousedown),
-              on_mouse_up(new UserUnclickedNode(node.id))
-            ])
-          ),
-          text2(
-            toList([
-              attribute("x", "20"),
-              attribute("y", "24"),
-              attribute("font-size", "16"),
-              attribute("fill", "currentColor"),
-              class$("text-gray-900")
-            ]),
-            node.name
-          ),
-          view_node_output(node)
-        ]),
-        map(node.inputs, (input) => {
-          return view_node_input(input);
-        })
-      ])
-    )
-  );
-}
 function view_grid_canvas(width, height) {
   let w = to_string2(width) + "%";
   let h = to_string2(height) + "%";
@@ -3507,6 +3865,93 @@ function view_connection(c) {
     )
   );
 }
+function mouse_event_decoder(e) {
+  stop_propagation(e);
+  return try$(
+    field("shiftKey", bool)(e),
+    (shift_key) => {
+      return try$(
+        mouse_position(e),
+        (position) => {
+          return new Ok(
+            new MouseEvent(
+              new Vector(round2(position[0]), round2(position[1])),
+              shift_key
+            )
+          );
+        }
+      );
+    }
+  );
+}
+function view_node(node, selection) {
+  let node_selected_class = (() => {
+    let $ = contains(selection, node.id);
+    if ($) {
+      return class$("text-gray-300 stroke-gray-400");
+    } else {
+      return class$("text-gray-300 stroke-gray-300");
+    }
+  })();
+  let mousedown = (e) => {
+    return try$(
+      mouse_event_decoder(e),
+      (decoded_event) => {
+        return new Ok(new UserClickedNode(node.id, decoded_event));
+      }
+    );
+  };
+  return g(
+    toList([
+      id("node-" + to_string2(node.id)),
+      attribute("transform", translate(node.position.x, node.position.y)),
+      class$("select-none")
+    ]),
+    concat(
+      toList([
+        toList([
+          rect(
+            toList([
+              id(to_string2(node.id)),
+              attribute("width", "200"),
+              attribute("height", "150"),
+              attribute("rx", "25"),
+              attribute("ry", "25"),
+              attribute("fill", "currentColor"),
+              attribute("stroke", "currentColor"),
+              attribute("stroke-width", "2"),
+              node_selected_class,
+              on2("mousedown", mousedown),
+              on_mouse_up(new UserUnclickedNode(node.id))
+            ])
+          ),
+          text2(
+            toList([
+              attribute("x", "20"),
+              attribute("y", "24"),
+              attribute("font-size", "16"),
+              attribute("fill", "currentColor"),
+              class$("text-gray-900")
+            ]),
+            node.name
+          ),
+          view_node_output(node)
+        ]),
+        map(node.inputs, (input) => {
+          return view_node_input(input);
+        })
+      ])
+    )
+  );
+}
+function keydown_event_decoder(e) {
+  return try$(
+    field("key", string)(e),
+    (key) => {
+      return new Ok(key);
+    }
+  );
+}
 function view(model) {
   let user_moved_mouse$1 = (e) => {
     return try$(
@@ -3528,6 +3973,15 @@ function view(model) {
       }
     );
   };
+  let keydown = (e) => {
+    debug("keydown");
+    return try$(
+      keydown_event_decoder(e),
+      (key) => {
+        return new Ok(new UserPressedKey(key));
+      }
+    );
+  };
   let wheel = (e) => {
     return try$(
       field("deltaY", float)(e),
@@ -3536,8 +3990,21 @@ function view(model) {
       }
     );
   };
+  let spawn = (e) => {
+    return try$(
+      field("target", dynamic)(e),
+      (target) => {
+        return try$(
+          field("id", string)(target),
+          (identifier) => {
+            return new Ok(new GraphSpawnNode(identifier));
+          }
+        );
+      }
+    );
+  };
   return div(
-    toList([]),
+    toList([attribute("tabindex", "0"), on2("keydown", keydown)]),
     toList([
       p(
         toList([class$("absolute right-2 top-2 select-none")]),
@@ -3587,7 +4054,8 @@ function view(model) {
             })()
           )
         ])
-      )
+      ),
+      view_menu(model.menu, spawn)
     ])
   );
 }
@@ -3636,6 +4104,9 @@ function update(model, msg) {
     return user_hover_node_output(model, output_id2);
   } else if (msg instanceof UserUnhoverNodeOutput) {
     return user_unhover_node_output(model);
+  } else if (msg instanceof UserPressedKey) {
+    let key = msg[0];
+    return user_pressed_key(model, key);
   } else if (msg instanceof GraphClearSelection) {
     return graph_clear_selection(model);
   } else if (msg instanceof GraphSetDragMode) {
@@ -3650,40 +4121,33 @@ function update(model, msg) {
   } else if (msg instanceof GraphSetNodeAsSelection) {
     let node_id = msg[0];
     return graph_set_node_as_selection(model, node_id);
-  } else {
+  } else if (msg instanceof GraphResizeViewBox) {
     let resolution = msg[0];
     return graph_resize_view_box(model, resolution);
+  } else if (msg instanceof GraphOpenMenu) {
+    return graph_open_menu(model);
+  } else if (msg instanceof GraphCloseMenu) {
+    return graph_close_menu(model);
+  } else {
+    let identifier = msg[0];
+    return graph_spawn_node(model, identifier);
   }
 }
 function main() {
-  let app = application(init2, update, view);
-  let $ = start3(app, "#app", void 0);
+  let app$1 = application(init2, update, view);
+  let $ = start3(app$1, "#app", void 0);
   if (!$.isOk()) {
     throw makeError(
       "assignment_no_match",
       "nodework",
-      52,
+      85,
       "main",
       "Assignment pattern did not match",
       { value: $ }
     );
   }
   let send_to_runtime = $[0];
-  documentResizeEventListener(
-    (_) => {
-      let _pipe = get_window_size();
-      let _pipe$1 = new GraphResizeViewBox(_pipe);
-      let _pipe$2 = dispatch(_pipe$1);
-      return send_to_runtime(_pipe$2);
-    }
-  );
-  mouseUpEventListener(
-    (_) => {
-      let _pipe = new UserUnclicked();
-      let _pipe$1 = dispatch(_pipe);
-      return send_to_runtime(_pipe$1);
-    }
-  );
+  setup(send_to_runtime);
   return void 0;
 }
 
