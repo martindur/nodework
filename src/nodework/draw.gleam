@@ -71,6 +71,18 @@ fn order_connection_nodes(nodes: List(Node), c: Conn) -> List(Node) {
   }
 }
 
+pub fn delete_selected_nodes(m: Model) -> Model {
+  m.nodes
+  |> node.exclude_by_ids(m.nodes_selected)
+  |> fn(nodes) { Model(..m, nodes: nodes) }
+}
+
+pub fn delete_orphaned_connections(m: Model) -> Model {
+  m.connections
+  |> conn.exclude_by_node_ids(m.nodes_selected)
+  |> fn(conns) { Model(..m, connections: conns) }
+}
+
 pub fn connections(m: Model) -> Model {
   m.connections
   |> map(fn(c) {
