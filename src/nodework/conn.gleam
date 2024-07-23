@@ -1,5 +1,6 @@
 import gleam/int.{to_string}
-import gleam/list.{any}
+import gleam/list.{any, filter}
+import gleam/set.{type Set}
 import lustre/attribute.{type Attribute, attribute as attr}
 
 import nodework/vector.{type Vector}
@@ -52,6 +53,21 @@ pub fn map_active(conns: List(Conn), f: fn(Conn) -> Conn) {
     case c.active {
       False -> c
       True -> f(c)
+    }
+  })
+}
+
+pub fn exclude_by_node_ids(conns: List(Conn), ids: Set(Int)) -> List(Conn) {
+  conns
+  |> filter(fn(c) {
+    set.from_list([c.source_node_id, c.target_node_id])
+    |> set.intersection(ids)
+    |> set.to_list
+    |> fn(x) {
+      case x {
+        [] -> True
+        _ -> False
+      }
     }
   })
 }

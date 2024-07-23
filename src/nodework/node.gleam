@@ -2,6 +2,7 @@ import gleam/dict.{type Dict}
 import gleam/int
 import gleam/list.{filter, filter_map, map}
 import gleam/pair
+import gleam/set.{type Set}
 import nodework/vector.{type Vector, Vector}
 
 pub type Node {
@@ -194,6 +195,22 @@ pub fn update_all_node_offsets(
 ) -> Dict(NodeId, Node) {
   nodes
   |> dict.map_values(fn(_, node) { update_offset(node, point) })
+}
+
+pub fn filter_by_ids(
+  nodes: Dict(NodeId, Node),
+  ids: Set(NodeId),
+) -> Dict(NodeId, Node) {
+  nodes
+  |> dict.take(set.to_list(ids))
+}
+
+pub fn exclude_by_ids(
+  nodes: Dict(NodeId, Node),
+  ids: Set(NodeId),
+) -> Dict(NodeId, Node) {
+  nodes
+  |> dict.drop(set.to_list(ids))
 }
 
 pub fn make_node(

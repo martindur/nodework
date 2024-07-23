@@ -162,6 +162,7 @@ pub opaque type Msg {
   GraphOpenMenu
   GraphCloseMenu
   GraphSpawnNode(String)
+  GraphDeleteSelectedNodes
 }
 
 fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
@@ -194,6 +195,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     GraphOpenMenu -> graph_open_menu(model)
     GraphCloseMenu -> graph_close_menu(model)
     GraphSpawnNode(identifier) -> graph_spawn_node(model, identifier)
+    GraphDeleteSelectedNodes -> graph_delete_selected_nodes(model)
   }
 }
 
@@ -439,6 +441,13 @@ fn graph_spawn_node(model: Model, identifier: String) -> #(Model, Effect(Msg)) {
   |> fn(m) { #(m, simple_effect(GraphCloseMenu)) }
 }
 
+fn graph_delete_selected_nodes(model: Model) -> #(Model, Effect(Msg)) {
+  model
+  |> draw.delete_selected_nodes
+  |> draw.delete_orphaned_connections
+  |> none_effect_wrapper
+}
+
 fn update_last_clicked_point(model: Model, event: MouseEvent) -> Model {
   event.position
   |> viewbox.to_viewbox_space(model.viewbox, _)
@@ -467,8 +476,11 @@ fn shift_key_check(event: MouseEvent) -> Effect(Msg) {
 
 fn key_pressed(key: Key) -> Effect(Msg) {
   case string.lowercase(key) {
-    "a" -> effect.from(fn(dispatch) { GraphOpenMenu |> dispatch })
     // Menu key
+    "a" -> simple_effect(GraphOpenMenu)
+    // Delete key
+    "backspace" -> simple_effect(GraphDeleteSelectedNodes)
+    "delete" -> simple_effect(GraphDeleteSelectedNodes)
     _ -> effect.none()
   }
 }

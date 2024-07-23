@@ -1846,8 +1846,14 @@ function random_uniform() {
 function new_map() {
   return Dict.new();
 }
+function map_size(map4) {
+  return map4.size;
+}
 function map_to_list(map4) {
   return List.fromArray(map4.entries());
+}
+function map_remove(key, map4) {
+  return map4.delete(key);
 }
 function map_get(map4, key) {
   const value = map4.get(key, NOT_FOUND);
@@ -2046,6 +2052,23 @@ function do_merge(dict, new_entries) {
 function merge(dict, new_entries) {
   return do_merge(dict, new_entries);
 }
+function delete$(dict, key) {
+  return map_remove(key, dict);
+}
+function drop2(loop$dict, loop$disallowed_keys) {
+  while (true) {
+    let dict = loop$dict;
+    let disallowed_keys = loop$disallowed_keys;
+    if (disallowed_keys.hasLength(0)) {
+      return dict;
+    } else {
+      let x = disallowed_keys.head;
+      let xs = disallowed_keys.tail;
+      loop$dict = delete$(dict, x);
+      loop$disallowed_keys = xs;
+    }
+  }
+}
 function do_fold(loop$list, loop$initial, loop$fun) {
   while (true) {
     let list = loop$list;
@@ -2097,9 +2120,36 @@ function contains(set, member) {
 function to_list2(set) {
   return keys(set.dict);
 }
+function take4(set, desired) {
+  return new Set2(take3(set.dict, desired));
+}
+function order(first3, second2) {
+  let $ = map_size(first3.dict) > map_size(second2.dict);
+  if ($) {
+    return [first3, second2];
+  } else {
+    return [second2, first3];
+  }
+}
+function intersection(first3, second2) {
+  let $ = order(first3, second2);
+  let larger = $[0];
+  let smaller = $[1];
+  return take4(larger, to_list2(smaller));
+}
 var token = void 0;
 function insert2(set, member) {
   return new Set2(insert(set.dict, member, token));
+}
+function from_list2(members) {
+  let dict = fold(
+    members,
+    new$(),
+    (m, k) => {
+      return insert(m, k, token);
+    }
+  );
+  return new Set2(dict);
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/bool.mjs
@@ -2934,6 +2984,24 @@ function map_active(conns, f) {
     }
   );
 }
+function exclude_by_node_ids(conns, ids) {
+  let _pipe = conns;
+  return filter(
+    _pipe,
+    (c) => {
+      let _pipe$1 = from_list2(toList([c.source_node_id, c.target_node_id]));
+      let _pipe$2 = intersection(_pipe$1, ids);
+      let _pipe$3 = to_list2(_pipe$2);
+      return ((x) => {
+        if (x.hasLength(0)) {
+          return true;
+        } else {
+          return false;
+        }
+      })(_pipe$3);
+    }
+  );
+}
 
 // build/dev/javascript/nodework/nodework/menu.mjs
 var Menu = class extends CustomType {
@@ -3214,6 +3282,10 @@ function update_all_node_offsets(nodes, point) {
     }
   );
 }
+function exclude_by_ids(nodes, ids) {
+  let _pipe = nodes;
+  return drop2(_pipe, to_list2(ids));
+}
 function make_node(identifier, id2, position) {
   if (identifier === "rect") {
     return new Ok(
@@ -3426,6 +3498,20 @@ function order_connection_nodes(nodes, c) {
     }
   }
 }
+function delete_selected_nodes(m) {
+  let _pipe = m.nodes;
+  let _pipe$1 = exclude_by_ids(_pipe, m.nodes_selected);
+  return ((nodes) => {
+    return m.withFields({ nodes });
+  })(_pipe$1);
+}
+function delete_orphaned_connections(m) {
+  let _pipe = m.connections;
+  let _pipe$1 = exclude_by_node_ids(_pipe, m.nodes_selected);
+  return ((conns) => {
+    return m.withFields({ connections: conns });
+  })(_pipe$1);
+}
 function connections(m) {
   let _pipe = m.connections;
   let _pipe$1 = map(
@@ -3461,7 +3547,7 @@ function connections(m) {
                   throw makeError(
                     "assignment_no_match",
                     "nodework/draw",
-                    92,
+                    104,
                     "",
                     "Assignment pattern did not match",
                     { value: nodes2 }
@@ -3658,6 +3744,8 @@ var GraphSpawnNode = class extends CustomType {
     super();
     this[0] = x0;
   }
+};
+var GraphDeleteSelectedNodes = class extends CustomType {
 };
 function get_window_size() {
   let _pipe = windowSize();
@@ -3967,6 +4055,12 @@ function graph_spawn_node(model, identifier) {
     return [m, simple_effect(new GraphCloseMenu())];
   })(_pipe$4);
 }
+function graph_delete_selected_nodes(model) {
+  let _pipe = model;
+  let _pipe$1 = delete_selected_nodes(_pipe);
+  let _pipe$2 = delete_orphaned_connections(_pipe$1);
+  return none_effect_wrapper(_pipe$2);
+}
 function update_last_clicked_point(model, event2) {
   let _pipe = event2.position;
   let _pipe$1 = ((_capture) => {
@@ -4047,12 +4141,11 @@ function user_clicked_graph(model, event2) {
 function key_pressed(key) {
   let $ = lowercase2(key);
   if ($ === "a") {
-    return from2(
-      (dispatch2) => {
-        let _pipe = new GraphOpenMenu();
-        return dispatch2(_pipe);
-      }
-    );
+    return simple_effect(new GraphOpenMenu());
+  } else if ($ === "backspace") {
+    return simple_effect(new GraphDeleteSelectedNodes());
+  } else if ($ === "delete") {
+    return simple_effect(new GraphDeleteSelectedNodes());
   } else {
     return none();
   }
@@ -4539,9 +4632,11 @@ function update(model, msg) {
     return graph_open_menu(model);
   } else if (msg instanceof GraphCloseMenu) {
     return graph_close_menu(model);
-  } else {
+  } else if (msg instanceof GraphSpawnNode) {
     let identifier = msg[0];
     return graph_spawn_node(model, identifier);
+  } else {
+    return graph_delete_selected_nodes(model);
   }
 }
 function main() {
