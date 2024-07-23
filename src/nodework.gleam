@@ -24,9 +24,12 @@ import nodework/navigator.{type Navigator, Navigator}
 import nodework/node.{
   type Node, type NodeError, type NodeId, type NodeInput, Node, NotFound,
 } as nd
+import nodework/node/process.{type NodeWork}
 import nodework/vector.{type Vector, Vector}
 import nodework/viewbox.{type ViewBox, Drag, Normal, ViewBox}
 import util/random
+
+import nodework/examples
 
 pub type ResizeEvent
 
@@ -82,8 +85,9 @@ pub fn setup(runtime_call) {
 }
 
 pub fn main() {
+  let nodes = examples.math_nodes()
   let app = lustre.application(init, update, view)
-  let assert Ok(send_to_runtime) = lustre.start(app, "#app", Nil)
+  let assert Ok(send_to_runtime) = lustre.start(app, "#app", nodes)
 
   setup(send_to_runtime)
 
@@ -94,7 +98,9 @@ type MouseEvent {
   MouseEvent(position: Vector, shift_key_active: Bool)
 }
 
-fn init(_flags) -> #(Model, Effect(Msg)) {
+fn init(process_nodes: List(NodeWork)) -> #(Model, Effect(Msg)) {
+  let menu_nodes = menu.generate_library(process_nodes)
+
   #(
     Model(
       nodes: dict.from_list([
@@ -132,7 +138,8 @@ fn init(_flags) -> #(Model, Effect(Msg)) {
       navigator: Navigator(Vector(0, 0), False),
       mode: Normal,
       last_clicked_point: Vector(0, 0),
-      menu: Menu(Vector(0, 0), False, [#("Rect", "rect"), #("Circle", "circle")]),
+      // menu: Menu(Vector(0, 0), False, [#("Rect", "rect"), #("Circle", "circle")]),
+      menu: Menu(Vector(0, 0), False, menu_nodes)
     ),
     effect.none(),
   )

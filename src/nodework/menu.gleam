@@ -1,10 +1,12 @@
 import gleam/dynamic.{type DecodeError, type Dynamic}
 import gleam/int
 import gleam/list
+import gleam/string
 import lustre/attribute
 import lustre/element
 import lustre/element/html
 import lustre/event
+import nodework/node/process.{type NodeWork}
 import nodework/vector.{type Vector}
 
 pub type Menu {
@@ -55,4 +57,11 @@ pub fn view_menu(
       ),
     ],
   )
+}
+
+pub fn generate_library(nodes: List(NodeWork)) -> List(#(String, String)) {
+  nodes
+  |> list.map(fn(node) {
+    #(string.capitalise(node.label), string.lowercase(node.label))
+  })
 }

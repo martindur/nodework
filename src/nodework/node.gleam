@@ -4,6 +4,7 @@ import gleam/list.{filter, filter_map, map}
 import gleam/pair
 import gleam/set.{type Set}
 import nodework/vector.{type Vector, Vector}
+import nodework/node/process.{type NodeWork}
 
 pub type Node {
   Node(
