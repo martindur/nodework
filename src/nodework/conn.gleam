@@ -10,8 +10,8 @@ pub type Conn {
     id: String,
     p0: Vector,
     p1: Vector,
-    source_node_id: Int,
-    target_node_id: Int,
+    source_node_id: String,
+    target_node_id: String,
     target_input_id: String,
     active: Bool,
   )
@@ -57,7 +57,7 @@ pub fn map_active(conns: List(Conn), f: fn(Conn) -> Conn) {
   })
 }
 
-pub fn exclude_by_node_ids(conns: List(Conn), ids: Set(Int)) -> List(Conn) {
+pub fn exclude_by_node_ids(conns: List(Conn), ids: Set(String)) -> List(Conn) {
   conns
   |> filter(fn(c) {
     set.from_list([c.source_node_id, c.target_node_id])

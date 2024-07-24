@@ -3,8 +3,10 @@ import gleam/int
 import gleam/list.{filter, filter_map, map}
 import gleam/pair
 import gleam/set.{type Set}
+import gleam/string
+import nodework/flow.{type FlowNode}
 import nodework/vector.{type Vector, Vector}
-import nodework/node/process.{type NodeWork}
+import util/random
 
 pub type Node {
   Node(
@@ -18,7 +20,7 @@ pub type Node {
 }
 
 pub type NodeId =
-  Int
+  String
 
 pub type NodeError {
   NotFound
@@ -43,7 +45,7 @@ fn input_position_from_index(index: Int) -> Vector {
 }
 
 pub fn new_input(id: NodeId, index: Int, label: String) -> NodeInput {
-  { int.to_string(id) <> "-" <> int.to_string(index) }
+  { id <> "-" <> int.to_string(index) }
   |> fn(input_id) {
     NodeInput(input_id, input_position_from_index(index), label, False)
   }
@@ -135,7 +137,7 @@ pub fn get_node_from_input_hovered(
 
 pub fn new_output(id: NodeId) -> NodeOutput {
   NodeOutput(
-    "out-" <> int.to_string(id),
+    "out-" <> id,
     Vector(200, 50),
     // NOTE: For now we just have a single output, which sits the same place. We might want to change it if node needs to be wider
     False,
@@ -212,6 +214,31 @@ pub fn exclude_by_ids(
 ) -> Dict(NodeId, Node) {
   nodes
   |> dict.drop(set.to_list(ids))
+}
+
+pub fn new_node(library: Dict(String, FlowNode), identifier: String, position: Vector) -> Result(Node, Nil) {
+  library
+  |> dict.get(identifier)
+  |> fn(res: Result(FlowNode, Nil)) {
+    case res {
+      Error(Nil) -> Error(Nil)
+      Ok(flow_node) -> {
+  let id = random.generate_random_id("node")
+
+  Ok(Node(
+    position: position,
+    offset: Vector(0, 0),
+    id: id,
+    name: string.capitalise(flow_node.label),
+    output: new_output(id),
+    inputs: flow_node.inputs
+      |> set.to_list
+      |> list.index_map(fn(label, i) { new_input(id, i, label) }),
+  ))
+      }
+    }
+  }
+
 }
 
 pub fn make_node(

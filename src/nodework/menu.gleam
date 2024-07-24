@@ -6,8 +6,12 @@ import lustre/attribute
 import lustre/element
 import lustre/element/html
 import lustre/event
-import nodework/node/process.{type NodeWork}
-import nodework/vector.{type Vector}
+import nodework/flow.{type FlowNode}
+import nodework/vector.{type Vector, Vector}
+
+// type MenuItem {
+//   MenuItem(label: String, identifier: String, 
+// }
 
 pub type Menu {
   Menu(pos: Vector, active: Bool, nodes: List(#(String, String)))
@@ -59,9 +63,10 @@ pub fn view_menu(
   )
 }
 
-pub fn generate_library(nodes: List(NodeWork)) -> List(#(String, String)) {
+pub fn new(nodes: List(FlowNode)) -> Menu {
   nodes
   |> list.map(fn(node) {
     #(string.capitalise(node.label), string.lowercase(node.label))
   })
+  |> fn(nodes) { Menu(Vector(0, 0), False, nodes: nodes) }
 }

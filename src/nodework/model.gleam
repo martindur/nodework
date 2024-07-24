@@ -1,6 +1,7 @@
 import gleam/dict.{type Dict}
 import gleam/set.{type Set}
 import nodework/conn.{type Conn}
+import nodework/flow.{type FlowNode}
 import nodework/menu.{type Menu}
 import nodework/navigator.{type Navigator}
 import nodework/node.{type Node, type NodeId}
@@ -18,5 +19,6 @@ pub type Model {
     mode: GraphMode,
     last_clicked_point: Vector,
     menu: Menu,
+    library: Dict(String, FlowNode),
   )
 }

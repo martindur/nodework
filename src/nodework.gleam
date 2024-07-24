@@ -24,7 +24,7 @@ import nodework/navigator.{type Navigator, Navigator}
 import nodework/node.{
   type Node, type NodeError, type NodeId, type NodeInput, Node, NotFound,
 } as nd
-import nodework/node/process.{type NodeWork}
+import nodework/flow.{type FlowNode}
 import nodework/vector.{type Vector, Vector}
 import nodework/viewbox.{type ViewBox, Drag, Normal, ViewBox}
 import util/random
@@ -98,35 +98,33 @@ type MouseEvent {
   MouseEvent(position: Vector, shift_key_active: Bool)
 }
 
-fn init(process_nodes: List(NodeWork)) -> #(Model, Effect(Msg)) {
-  let menu_nodes = menu.generate_library(process_nodes)
-
+fn init(flow_nodes: List(FlowNode)) -> #(Model, Effect(Msg)) {
   #(
     Model(
       nodes: dict.from_list([
         #(
-          0,
+          "foo",
           Node(
             position: Vector(0, 0),
             offset: Vector(0, 0),
-            id: 0,
+            id: "foo",
             inputs: [
-              nd.new_input(0, 0, "foo"),
-              nd.new_input(0, 1, "bar"),
-              nd.new_input(0, 2, "baz"),
+              nd.new_input("foo", 0, "foo"),
+              nd.new_input("foo", 1, "bar"),
+              nd.new_input("foo", 2, "baz"),
             ],
-            output: nd.new_output(0),
+            output: nd.new_output("foo"),
             name: "Rect",
           ),
         ),
         #(
-          1,
+          "bar",
           Node(
             position: Vector(300, 300),
             offset: Vector(0, 0),
-            id: 1,
-            inputs: [nd.new_input(1, 0, "bob")],
-            output: nd.new_output(1),
+            id: "bar",
+            inputs: [nd.new_input("bar", 0, "bob")],
+            output: nd.new_output("bar"),
             name: "Circle",
           ),
         ),
@@ -138,9 +136,9 @@ fn init(process_nodes: List(NodeWork)) -> #(Model, Effect(Msg)) {
       navigator: Navigator(Vector(0, 0), False),
       mode: Normal,
       last_clicked_point: Vector(0, 0),
-      // menu: Menu(Vector(0, 0), False, [#("Rect", "rect"), #("Circle", "circle")]),
-      menu: Menu(Vector(0, 0), False, menu_nodes)
-    ),
+      menu: menu.new(flow_nodes),
+      library: flow_nodes |> list.fold(dict.new(), fn(d, n) { dict.insert(d, string.lowercase(n.label), n) })
+   ),
     effect.none(),
   )
 }
@@ -271,7 +269,7 @@ fn user_clicked_node_output(
   let p2 =
     model.viewbox |> viewbox.to_viewbox_translate(model.navigator.cursor_point)
   let id = random.generate_random_id("conn")
-  let new_conn = Conn(id, p1, p2, node_id, -1, "", True)
+  let new_conn = Conn(id, p1, p2, node_id, "", "", True)
 
   model.connections
   |> list.prepend(new_conn)
@@ -298,7 +296,7 @@ fn user_unclicked(model: Model) -> #(Model, Effect(Msg)) {
       })
     }
   }
-  |> filter(fn(c) { c.target_node_id != -1 && c.active != True })
+  |> filter(fn(c) { c.target_node_id != "" && c.active != True })
   |> conn.unique
   |> fn(c) { Model(..model, connections: c) }
   |> none_effect_wrapper
@@ -317,7 +315,7 @@ fn user_clicked_conn(
         Conn(
           ..c,
           p1: event.position,
-          target_node_id: -1,
+          target_node_id: "",
           target_input_id: "",
           active: True,
         )
@@ -431,14 +429,10 @@ fn graph_close_menu(model: Model) -> #(Model, Effect(Msg)) {
 }
 
 fn graph_spawn_node(model: Model, identifier: String) -> #(Model, Effect(Msg)) {
-  model.nodes
-  |> dict.to_list
-  |> list.length
-  |> nd.make_node(
-    identifier,
-    _,
-    viewbox.to_viewbox_space(model.viewbox, model.menu.pos),
-  )
+  let position = viewbox.to_viewbox_space(model.viewbox, model.menu.pos)
+
+  model.library
+  |> nd.new_node(identifier, position)
   |> fn(res: Result(Node, Nil)) {
     case res {
       Ok(node) -> Model(..model, nodes: dict.insert(model.nodes, node.id, node))
@@ -600,14 +594,14 @@ fn view_node(node: Node, selection: Set(NodeId)) -> element.Element(Msg) {
 
   svg.g(
     [
-      attribute.id("node-" <> int.to_string(node.id)),
+      attribute.id("g-" <> node.id),
       attr("transform", translate(node.position.x, node.position.y)),
       attribute.class("select-none"),
     ],
     list.concat([
       [
         svg.rect([
-          attribute.id(int.to_string(node.id)),
+          attribute.id(node.id),
           attr("width", "200"),
           attr("height", "150"),
           attr("rx", "25"),
