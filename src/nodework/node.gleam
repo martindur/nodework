@@ -241,34 +241,13 @@ pub fn new_node(library: Dict(String, FlowNode), identifier: String, position: V
 
 }
 
-pub fn make_node(
-  identifier: String,
-  id: NodeId,
-  position: Vector,
-) -> Result(Node, Nil) {
-  case identifier {
-    "rect" ->
-      Ok(Node(
-        position: position,
-        offset: Vector(0, 0),
-        id: id,
-        inputs: [
-          new_input(id, 0, "foo"),
-          new_input(id, 1, "bar"),
-          new_input(id, 2, "baz"),
-        ],
-        output: new_output(id),
-        name: "Rect",
-      ))
-    "circle" ->
-      Ok(Node(
-        position: position,
-        offset: Vector(0, 0),
-        id: id,
-        inputs: [new_input(id, 0, "bob")],
-        output: new_output(id),
-        name: "Circle",
-      ))
-    _ -> Error(Nil)
-  }
+pub fn output_node(position: Vector) -> Result(Node, Nil) {
+  Ok(Node(
+    position: position,
+    offset: Vector(0, 0),
+    id: "output-node",
+    name: "Output",
+    output: new_output("output-node"),
+    inputs: [new_input("output-node", 0, "eval")]
+  ))
 }

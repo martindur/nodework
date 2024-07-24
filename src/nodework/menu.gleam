@@ -68,5 +68,6 @@ pub fn new(nodes: List(FlowNode)) -> Menu {
   |> list.map(fn(node) {
     #(string.capitalise(node.label), string.lowercase(node.label))
   })
+  |> list.prepend(#("Output", "output"))
   |> fn(nodes) { Menu(Vector(0, 0), False, nodes: nodes) }
 }

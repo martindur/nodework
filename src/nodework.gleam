@@ -1,6 +1,7 @@
 import gleam/dict
 import gleam/dynamic.{type DecodeError}
 import gleam/float
+import gleam/function
 import gleam/int
 import gleam/io
 import gleam/list.{filter, map}
@@ -22,7 +23,7 @@ import nodework/menu.{type Menu, Menu}
 import nodework/model.{type Model, Model}
 import nodework/navigator.{type Navigator, Navigator}
 import nodework/node.{
-  type Node, type NodeError, type NodeId, type NodeInput, Node, NotFound,
+  type Node, type NodeId, type NodeInput, Node, NotFound,
 } as nd
 import nodework/flow.{type FlowNode}
 import nodework/vector.{type Vector, Vector}
@@ -101,34 +102,7 @@ type MouseEvent {
 fn init(flow_nodes: List(FlowNode)) -> #(Model, Effect(Msg)) {
   #(
     Model(
-      nodes: dict.from_list([
-        #(
-          "foo",
-          Node(
-            position: Vector(0, 0),
-            offset: Vector(0, 0),
-            id: "foo",
-            inputs: [
-              nd.new_input("foo", 0, "foo"),
-              nd.new_input("foo", 1, "bar"),
-              nd.new_input("foo", 2, "baz"),
-            ],
-            output: nd.new_output("foo"),
-            name: "Rect",
-          ),
-        ),
-        #(
-          "bar",
-          Node(
-            position: Vector(300, 300),
-            offset: Vector(0, 0),
-            id: "bar",
-            inputs: [nd.new_input("bar", 0, "bob")],
-            output: nd.new_output("bar"),
-            name: "Circle",
-          ),
-        ),
-      ]),
+      nodes: dict.from_list([]),
       connections: [],
       nodes_selected: set.new(),
       window_resolution: get_window_size(),
@@ -431,8 +405,13 @@ fn graph_close_menu(model: Model) -> #(Model, Effect(Msg)) {
 fn graph_spawn_node(model: Model, identifier: String) -> #(Model, Effect(Msg)) {
   let position = viewbox.to_viewbox_space(model.viewbox, model.menu.pos)
 
-  model.library
-  |> nd.new_node(identifier, position)
+  let spawn_fn =
+    case identifier {
+      "output" -> nd.output_node
+      _ -> function.curry3(nd.new_node) |> fn(x) { x(model.library) } |> fn(x) { x(identifier) }
+    }
+
+  spawn_fn(position)
   |> fn(res: Result(Node, Nil)) {
     case res {
       Ok(node) -> Model(..model, nodes: dict.insert(model.nodes, node.id, node))
@@ -558,6 +537,10 @@ fn view_node_output(node: Node) -> element.Element(Msg) {
   let id = nd.output_id(node.output)
   let hovered = nd.output_hovered(node.output)
 
+  // TODO: Consider having an output node type, as this becomes quite hidden. It's much easier at the moment though!
+  case node.id == "output-node" {
+    False ->
+      {
   svg.g([attr("transform", pos |> vector.to_html(vector.Translate))], [
     svg.circle([
       attr("cx", "0"),
@@ -575,7 +558,11 @@ fn view_node_output(node: Node) -> element.Element(Msg) {
       event.on_mouse_leave(UserUnhoverNodeOutput),
     ]),
   ])
+      }
+    True -> element.none()
+  }
 }
+
 
 // TODO: Dragging multiple nodes requires holding down shift.
 // Dragging should be done with "mousedown(no shift)" |> "mousemove"

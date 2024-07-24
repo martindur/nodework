@@ -9,3 +9,11 @@ pub type FlowNode {
     output: fn(Dict(String, Dynamic)) -> Dynamic,
   )
 }
+
+pub type ConstNode {
+  ConstNode(
+    label: String,
+    input: Dynamic,
+    output: fn(Dynamic) -> Dynamic
+  )
+}

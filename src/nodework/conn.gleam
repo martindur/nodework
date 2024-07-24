@@ -71,3 +71,16 @@ pub fn exclude_by_node_ids(conns: List(Conn), ids: Set(String)) -> List(Conn) {
     }
   })
 }
+
+fn calculate_connection(conns: List(Conn), c: Conn) -> List(String) {}
+
+pub fn generate_graph(conns: List(Conn)) -> List(String) {
+  conns
+  |> filter(fn(c) { c.id == "output-node-0" })
+  |> fn(cs) {
+    case cs {
+      [root] -> calculate_connection(conns, root)
+      _ -> []
+    }
+  }
+}
