@@ -2,14 +2,14 @@ import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/result
 import gleam/set
-import nodework/flow.{type FlowNode, FlowNode, type ConstNode, ConstNode}
+import nodework/node.{type NodeFunction, NodeFunction}
 
-pub fn math_nodes() -> List(FlowNode)  {
+pub fn math_nodes() -> List(NodeFunction)  {
   [
-    FlowNode("add", set.from_list(["a", "b"]), add),
-    FlowNode("double", set.from_list(["x"]), double),
-    FlowNode("ten", set.from_list([]), return_ten),
-    FlowNode("one", set.from_list([]), return_one)
+    NodeFunction("add", set.from_list(["a", "b"]), add),
+    NodeFunction("double", set.from_list(["x"]), double),
+    NodeFunction("ten", set.from_list([]), return_ten),
+    NodeFunction("one", set.from_list([]), return_one)
   ]
 }
 

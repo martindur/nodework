@@ -6,7 +6,7 @@ import lustre/attribute
 import lustre/element
 import lustre/element/html
 import lustre/event
-import nodework/flow.{type FlowNode}
+import nodework/node.{type NodeFunction}
 import nodework/vector.{type Vector, Vector}
 
 // type MenuItem {
@@ -63,7 +63,7 @@ pub fn view_menu(
   )
 }
 
-pub fn new(nodes: List(FlowNode)) -> Menu {
+pub fn new(nodes: List(NodeFunction)) -> Menu {
   nodes
   |> list.map(fn(node) {
     #(string.capitalise(node.label), string.lowercase(node.label))

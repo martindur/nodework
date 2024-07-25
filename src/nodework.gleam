@@ -22,12 +22,11 @@ import nodework/draw
 import nodework/menu.{type Menu, Menu}
 import nodework/model.{type Model, Model}
 import nodework/navigator.{type Navigator, Navigator}
-import nodework/node.{
-  type Node, type NodeId, type NodeInput, Node, NotFound,
-} as nd
-import nodework/flow.{type FlowNode}
+import nodework/node.{type Node, type NodeId, type NodeInput, Node, NotFound, type NodeFunction, NodeFunction} as nd
 import nodework/vector.{type Vector, Vector}
 import nodework/viewbox.{type ViewBox, Drag, Normal, ViewBox}
+import nodework/calc
+import nodework/dag
 import util/random
 
 import nodework/examples
@@ -99,7 +98,7 @@ type MouseEvent {
   MouseEvent(position: Vector, shift_key_active: Bool)
 }
 
-fn init(flow_nodes: List(FlowNode)) -> #(Model, Effect(Msg)) {
+fn init(node_functions: List(NodeFunction)) -> #(Model, Effect(Msg)) {
   #(
     Model(
       nodes: dict.from_list([]),
@@ -110,9 +109,13 @@ fn init(flow_nodes: List(FlowNode)) -> #(Model, Effect(Msg)) {
       navigator: Navigator(Vector(0, 0), False),
       mode: Normal,
       last_clicked_point: Vector(0, 0),
-      menu: menu.new(flow_nodes),
-      library: flow_nodes |> list.fold(dict.new(), fn(d, n) { dict.insert(d, string.lowercase(n.label), n) })
-   ),
+      menu: menu.new(node_functions),
+      library: node_functions
+        |> list.fold(dict.new(), fn(d, n) {
+          dict.insert(d, string.lowercase(n.label), n)
+        }),
+      graph: dag.new()
+    ),
     effect.none(),
   )
 }
@@ -142,6 +145,7 @@ pub opaque type Msg {
   GraphCloseMenu
   GraphSpawnNode(String)
   GraphDeleteSelectedNodes
+  GraphChangedConnections
 }
 
 fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
@@ -175,6 +179,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     GraphCloseMenu -> graph_close_menu(model)
     GraphSpawnNode(identifier) -> graph_spawn_node(model, identifier)
     GraphDeleteSelectedNodes -> graph_delete_selected_nodes(model)
+    GraphChangedConnections -> graph_changed_connections(model)
   }
 }
 
@@ -405,11 +410,13 @@ fn graph_close_menu(model: Model) -> #(Model, Effect(Msg)) {
 fn graph_spawn_node(model: Model, identifier: String) -> #(Model, Effect(Msg)) {
   let position = viewbox.to_viewbox_space(model.viewbox, model.menu.pos)
 
-  let spawn_fn =
-    case identifier {
-      "output" -> nd.output_node
-      _ -> function.curry3(nd.new_node) |> fn(x) { x(model.library) } |> fn(x) { x(identifier) }
-    }
+  let spawn_fn = case identifier {
+    "output" -> nd.output_node
+    _ ->
+      function.curry3(nd.new_node)
+      |> fn(x) { x(model.library) }
+      |> fn(x) { x(identifier) }
+  }
 
   spawn_fn(position)
   |> fn(res: Result(Node, Nil)) {
@@ -418,6 +425,8 @@ fn graph_spawn_node(model: Model, identifier: String) -> #(Model, Effect(Msg)) {
       Error(Nil) -> model
     }
   }
+  |> calc.update_nodes
+  |> calc.recalc_graph
   |> fn(m) { #(m, simple_effect(GraphCloseMenu)) }
 }
 
@@ -426,6 +435,13 @@ fn graph_delete_selected_nodes(model: Model) -> #(Model, Effect(Msg)) {
   |> draw.delete_selected_nodes
   |> draw.delete_orphaned_connections
   |> none_effect_wrapper
+}
+
+fn graph_changed_connections(model: Model) -> #(Model, Effect(Msg)) {
+  model
+  |> none_effect_wrapper
+  // model.connections
+  // |> conn.generate_graph
 }
 
 fn update_last_clicked_point(model: Model, event: MouseEvent) -> Model {
@@ -539,30 +555,28 @@ fn view_node_output(node: Node) -> element.Element(Msg) {
 
   // TODO: Consider having an output node type, as this becomes quite hidden. It's much easier at the moment though!
   case node.id == "output-node" {
-    False ->
-      {
-  svg.g([attr("transform", pos |> vector.to_html(vector.Translate))], [
-    svg.circle([
-      attr("cx", "0"),
-      attr("cy", "0"),
-      attr("r", "10"),
-      attr("fill", "currentColor"),
-      attr("stroke", "black"),
-      case hovered {
-        True -> attr("stroke-width", "3")
-        False -> attr("stroke-width", "0")
-      },
-      attribute.class("text-gray-500"),
-      event.on_mouse_down(UserClickedNodeOutput(node.id, pos)),
-      event.on_mouse_enter(UserHoverNodeOutput(id)),
-      event.on_mouse_leave(UserUnhoverNodeOutput),
-    ]),
-  ])
-      }
+    False -> {
+      svg.g([attr("transform", pos |> vector.to_html(vector.Translate))], [
+        svg.circle([
+          attr("cx", "0"),
+          attr("cy", "0"),
+          attr("r", "10"),
+          attr("fill", "currentColor"),
+          attr("stroke", "black"),
+          case hovered {
+            True -> attr("stroke-width", "3")
+            False -> attr("stroke-width", "0")
+          },
+          attribute.class("text-gray-500"),
+          event.on_mouse_down(UserClickedNodeOutput(node.id, pos)),
+          event.on_mouse_enter(UserHoverNodeOutput(id)),
+          event.on_mouse_leave(UserUnhoverNodeOutput),
+        ]),
+      ])
+    }
     True -> element.none()
   }
 }
-
 
 // TODO: Dragging multiple nodes requires holding down shift.
 // Dragging should be done with "mousedown(no shift)" |> "mousemove"

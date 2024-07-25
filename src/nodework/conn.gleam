@@ -1,3 +1,4 @@
+import gleam/dict
 import gleam/int.{to_string}
 import gleam/list.{any, filter}
 import gleam/set.{type Set}
@@ -72,15 +73,26 @@ pub fn exclude_by_node_ids(conns: List(Conn), ids: Set(String)) -> List(Conn) {
   })
 }
 
-fn calculate_connection(conns: List(Conn), c: Conn) -> List(String) {}
+// fn calculate_connection(conns: List(Conn), c: Conn) -> List(String) {
+//   conns
+//   |> filter(fn(c2) { c.source_node_id == c2.target_node_id })
+//   |> fn(cns) {
+//     case cns {
+//       [] -> dict.from_list([#(c.target_node_id, c.source_node_id)])
+//       _ ->
+//         list.map(cns, fn(c2) { calculate_connection(conns, c2) })
+//         |> fn(res) { dict.from_list([#(c.target_node_id, res)]) }
+//     }
+//   }
+// }
 
-pub fn generate_graph(conns: List(Conn)) -> List(String) {
-  conns
-  |> filter(fn(c) { c.id == "output-node-0" })
-  |> fn(cs) {
-    case cs {
-      [root] -> calculate_connection(conns, root)
-      _ -> []
-    }
-  }
-}
+// pub fn generate_graph(conns: List(Conn)) -> List(String) {
+//   conns
+//   |> filter(fn(c) { c.id == "output-node-0" })
+//   |> fn(cs) {
+//     case cs {
+//       [root] -> calculate_connection(conns, root)
+//       _ -> []
+//     }
+//   }
+// }

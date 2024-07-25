@@ -1,10 +1,10 @@
 import gleam/dict.{type Dict}
+import gleam/dynamic.{type Dynamic}
 import gleam/int
 import gleam/list.{filter, filter_map, map}
 import gleam/pair
 import gleam/set.{type Set}
 import gleam/string
-import nodework/flow.{type FlowNode}
 import nodework/vector.{type Vector, Vector}
 import util/random
 
@@ -16,6 +16,14 @@ pub type Node {
     inputs: List(NodeInput),
     output: NodeOutput,
     name: String,
+  )
+}
+
+pub type NodeFunction {
+  NodeFunction(
+    label: String,
+    inputs: Set(String),
+    output: fn(Dict(String, Dynamic)) -> Dynamic,
   )
 }
 
@@ -216,38 +224,43 @@ pub fn exclude_by_ids(
   |> dict.drop(set.to_list(ids))
 }
 
-pub fn new_node(library: Dict(String, FlowNode), identifier: String, position: Vector) -> Result(Node, Nil) {
+pub fn new_node(
+  library: Dict(String, NodeFunction),
+  identifier: String,
+  position: Vector,
+) -> Result(Node, Nil) {
   library
   |> dict.get(identifier)
-  |> fn(res: Result(FlowNode, Nil)) {
+  |> fn(res: Result(NodeFunction, Nil)) {
     case res {
       Error(Nil) -> Error(Nil)
-      Ok(flow_node) -> {
-  let id = random.generate_random_id("node")
+      Ok(node_function) -> {
+        let id = random.generate_random_id("node")
 
-  Ok(Node(
-    position: position,
-    offset: Vector(0, 0),
-    id: id,
-    name: string.capitalise(flow_node.label),
-    output: new_output(id),
-    inputs: flow_node.inputs
-      |> set.to_list
-      |> list.index_map(fn(label, i) { new_input(id, i, label) }),
-  ))
+        Ok(Node(
+          position: position,
+          offset: Vector(0, 0),
+          id: id,
+          name: string.capitalise(node_function.label),
+          output: new_output(id),
+          inputs: node_function.inputs
+            |> set.to_list
+            |> list.index_map(fn(label, i) { new_input(id, i, label) }),
+        ))
       }
     }
   }
-
 }
 
 pub fn output_node(position: Vector) -> Result(Node, Nil) {
-  Ok(Node(
-    position: position,
-    offset: Vector(0, 0),
-    id: "output-node",
-    name: "Output",
-    output: new_output("output-node"),
-    inputs: [new_input("output-node", 0, "eval")]
-  ))
+  Ok(
+    Node(
+      position: position,
+      offset: Vector(0, 0),
+      id: "output-node",
+      name: "Output",
+      output: new_output("output-node"),
+      inputs: [new_input("output-node", 0, "eval")],
+    ),
+  )
 }
