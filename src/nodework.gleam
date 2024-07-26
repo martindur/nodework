@@ -111,10 +111,10 @@ fn init(node_functions: List(NodeFunction)) -> #(Model, Effect(Msg)) {
       last_clicked_point: Vector(0, 0),
       menu: menu.new(node_functions),
       library: node_functions
-        |> list.fold(dict.new(), fn(d, n) {
-          dict.insert(d, string.lowercase(n.label), n)
-        }),
-      graph: dag.new()
+        |> map(fn(nf) { #(string.lowercase(nf.label), nf)})
+        |> dict.from_list,
+      graph: dag.new(),
+      output: dynamic.from(0)
     ),
     effect.none(),
   )
@@ -278,6 +278,8 @@ fn user_unclicked(model: Model) -> #(Model, Effect(Msg)) {
   |> filter(fn(c) { c.target_node_id != "" && c.active != True })
   |> conn.unique
   |> fn(c) { Model(..model, connections: c) }
+  |> calc.sync_edges
+  |> calc.recalc_graph
   |> none_effect_wrapper
 }
 
@@ -410,22 +412,15 @@ fn graph_close_menu(model: Model) -> #(Model, Effect(Msg)) {
 fn graph_spawn_node(model: Model, identifier: String) -> #(Model, Effect(Msg)) {
   let position = viewbox.to_viewbox_space(model.viewbox, model.menu.pos)
 
-  let spawn_fn = case identifier {
-    "output" -> nd.output_node
-    _ ->
-      function.curry3(nd.new_node)
-      |> fn(x) { x(model.library) }
-      |> fn(x) { x(identifier) }
-  }
-
-  spawn_fn(position)
+  model.library
+  |> nd.new_node(identifier, position)
   |> fn(res: Result(Node, Nil)) {
     case res {
       Ok(node) -> Model(..model, nodes: dict.insert(model.nodes, node.id, node))
       Error(Nil) -> model
     }
   }
-  |> calc.update_nodes
+  |> calc.sync_verts
   |> calc.recalc_graph
   |> fn(m) { #(m, simple_effect(GraphCloseMenu)) }
 }
@@ -554,7 +549,7 @@ fn view_node_output(node: Node) -> element.Element(Msg) {
   let hovered = nd.output_hovered(node.output)
 
   // TODO: Consider having an output node type, as this becomes quite hidden. It's much easier at the moment though!
-  case node.id == "output-node" {
+  case node.id == "node.output" {
     False -> {
       svg.g([attr("transform", pos |> vector.to_html(vector.Translate))], [
         svg.circle([

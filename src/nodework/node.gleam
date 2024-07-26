@@ -235,7 +235,10 @@ pub fn new_node(
     case res {
       Error(Nil) -> Error(Nil)
       Ok(node_function) -> {
-        let id = random.generate_random_id("node")
+        let id = case string.lowercase(node_function.label) == "output" {
+          True -> "node.output"
+          False -> random.generate_random_id("node")
+        }
 
         Ok(Node(
           position: position,
@@ -250,17 +253,4 @@ pub fn new_node(
       }
     }
   }
-}
-
-pub fn output_node(position: Vector) -> Result(Node, Nil) {
-  Ok(
-    Node(
-      position: position,
-      offset: Vector(0, 0),
-      id: "output-node",
-      name: "Output",
-      output: new_output("output-node"),
-      inputs: [new_input("output-node", 0, "eval")],
-    ),
-  )
 }

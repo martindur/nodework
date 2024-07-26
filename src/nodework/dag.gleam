@@ -1,9 +1,9 @@
 import gleam/dict.{type Dict}
 import gleam/io
-import gleam/result
 import gleam/list.{contains, filter, fold, map, partition}
 import gleam/pair
 import gleam/queue.{type Queue}
+import gleam/result
 
 import util/debug.{labeled_debug}
 
@@ -11,7 +11,7 @@ pub type VertexId =
   String
 
 pub type Vertex {
-  Vertex(id: VertexId, value: String)
+  Vertex(id: VertexId, value: String, inputs: List(String))
 }
 
 pub type Edge {
@@ -28,7 +28,7 @@ pub fn new() -> Graph {
 
 pub fn test_data() -> Graph {
   ["a", "b", "c", "d", "e"]
-  |> map(fn(val) { #(val, Vertex(val, val)) })
+  |> map(fn(val) { #(val, Vertex(val, val, [])) })
   |> dict.from_list
   |> fn(verts) {
     let edges = [
@@ -36,10 +36,22 @@ pub fn test_data() -> Graph {
       Edge("b", "c"),
       Edge("c", "d"),
       Edge("b", "e"),
-      Edge("d", "e")
+      Edge("d", "e"),
     ]
     Graph(verts: verts, edges: edges)
   }
+  |> sync_vertex_inputs
+}
+
+pub fn sync_vertex_inputs(graph: Graph) -> Graph {
+  graph.verts
+  |> dict.map_values(fn(id, v) {
+    graph.edges
+    |> filter(fn(edge) { id == edge.to })
+    |> map(fn(edge) { edge.from })
+    |> fn(inputs) { Vertex(..v, inputs: inputs) }
+  })
+  |> fn(verts) { Graph(..graph, verts: verts) }
 }
 
 pub fn add_vertex(graph: Graph, vert: Vertex) -> Graph {
@@ -48,23 +60,29 @@ pub fn add_vertex(graph: Graph, vert: Vertex) -> Graph {
   |> fn(verts) { Graph(..graph, verts: verts) }
 }
 
-pub fn add_edge(graph: Graph, edge: Edge) -> Result(Graph, String) {
-  case has_cycle(graph, edge) {
-    True -> Error("Adding this edge would create a cycle")
-    False -> {
-      graph.edges
-      |> list.prepend(edge)
-      |> fn(edges) { Ok(Graph(..graph, edges: edges)) }
-    }
-  }
-}
+// pub fn add_edge(graph: Graph, edge: Edge) -> Result(Graph, String) {
+//   case has_cycle(graph, edge) {
+//     True -> Error("Adding this edge would create a cycle")
+//     False -> {
+//       graph.edges
+//       |> list.prepend(edge)
+//       |> fn(edges) { Ok(Graph(..graph, edges: edges)) }
+//     }
+//   }
+// }
 
-fn has_cycle(graph: Graph, new_edge: Edge) -> Bool {
-  // TODO: cycle detection logic (e.g. using DFS)
-  False
-}
+// fn has_cycle(graph: Graph, edge: Edge) -> Bool {
+//   graph.edges
+//   |> list.prepend(edge)
+//   |> fn(edges) { 
+//   False
+// }
 
-fn sort(sorted: List(Vertex), unsorted: List(Vertex), edges: List(Edge)) -> Result(List(Vertex), String) {
+fn sort(
+  sorted: List(Vertex),
+  unsorted: List(Vertex),
+  edges: List(Edge),
+) -> Result(List(Vertex), String) {
   let edges = prune(edges, sorted)
 
   unsorted

@@ -9,8 +9,16 @@ pub fn math_nodes() -> List(NodeFunction)  {
     NodeFunction("add", set.from_list(["a", "b"]), add),
     NodeFunction("double", set.from_list(["x"]), double),
     NodeFunction("ten", set.from_list([]), return_ten),
-    NodeFunction("one", set.from_list([]), return_one)
+    NodeFunction("one", set.from_list([]), return_one),
+    NodeFunction("output", set.from_list(["eval"]), output)
   ]
+}
+
+fn output(inputs: Dict(String, Dynamic)) -> Dynamic {
+  case dict.get(inputs, "eval") {
+    Ok(eval) -> eval
+    Error(_) -> dynamic.from(0)
+  }
 }
 
 fn return_ten(inputs: Dict(String, Dynamic)) -> Dynamic {

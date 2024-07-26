@@ -1,4 +1,5 @@
 import gleam/dict.{type Dict}
+import gleam/dynamic.{type Dynamic}
 import gleam/set.{type Set}
 import nodework/conn.{type Conn}
 import nodework/dag.{type Graph}
@@ -21,5 +22,6 @@ pub type Model {
     menu: Menu,
     library: Dict(String, NodeFunction),
     graph: Graph,
+    output: Dynamic
   )
 }
