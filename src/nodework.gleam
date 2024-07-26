@@ -429,6 +429,9 @@ fn graph_delete_selected_nodes(model: Model) -> #(Model, Effect(Msg)) {
   model
   |> draw.delete_selected_nodes
   |> draw.delete_orphaned_connections
+  |> calc.sync_verts
+  |> calc.sync_edges
+  |> calc.recalc_graph
   |> none_effect_wrapper
 }
 
