@@ -1,9 +1,12 @@
 import gleam/dict.{type Dict}
+import gleam/dynamic.{type Dynamic}
 import gleam/int
 import gleam/list.{filter, filter_map, map}
 import gleam/pair
 import gleam/set.{type Set}
+import gleam/string
 import nodework/vector.{type Vector, Vector}
+import util/random
 
 pub type Node {
   Node(
@@ -16,8 +19,16 @@ pub type Node {
   )
 }
 
+pub type NodeFunction {
+  NodeFunction(
+    label: String,
+    inputs: Set(String),
+    output: fn(Dict(String, Dynamic)) -> Dynamic,
+  )
+}
+
 pub type NodeId =
-  Int
+  String
 
 pub type NodeError {
   NotFound
@@ -42,7 +53,7 @@ fn input_position_from_index(index: Int) -> Vector {
 }
 
 pub fn new_input(id: NodeId, index: Int, label: String) -> NodeInput {
-  { int.to_string(id) <> "-" <> int.to_string(index) }
+  { id <> "-" <> int.to_string(index) }
   |> fn(input_id) {
     NodeInput(input_id, input_position_from_index(index), label, False)
   }
@@ -134,7 +145,7 @@ pub fn get_node_from_input_hovered(
 
 pub fn new_output(id: NodeId) -> NodeOutput {
   NodeOutput(
-    "out-" <> int.to_string(id),
+    "out-" <> id,
     Vector(200, 50),
     // NOTE: For now we just have a single output, which sits the same place. We might want to change it if node needs to be wider
     False,
@@ -213,34 +224,33 @@ pub fn exclude_by_ids(
   |> dict.drop(set.to_list(ids))
 }
 
-pub fn make_node(
+pub fn new_node(
+  library: Dict(String, NodeFunction),
   identifier: String,
-  id: NodeId,
   position: Vector,
 ) -> Result(Node, Nil) {
-  case identifier {
-    "rect" ->
-      Ok(Node(
-        position: position,
-        offset: Vector(0, 0),
-        id: id,
-        inputs: [
-          new_input(id, 0, "foo"),
-          new_input(id, 1, "bar"),
-          new_input(id, 2, "baz"),
-        ],
-        output: new_output(id),
-        name: "Rect",
-      ))
-    "circle" ->
-      Ok(Node(
-        position: position,
-        offset: Vector(0, 0),
-        id: id,
-        inputs: [new_input(id, 0, "bob")],
-        output: new_output(id),
-        name: "Circle",
-      ))
-    _ -> Error(Nil)
+  library
+  |> dict.get(identifier)
+  |> fn(res: Result(NodeFunction, Nil)) {
+    case res {
+      Error(Nil) -> Error(Nil)
+      Ok(node_function) -> {
+        let id = case string.lowercase(node_function.label) == "output" {
+          True -> "node.output"
+          False -> random.generate_random_id("node")
+        }
+
+        Ok(Node(
+          position: position,
+          offset: Vector(0, 0),
+          id: id,
+          name: string.capitalise(node_function.label),
+          output: new_output(id),
+          inputs: node_function.inputs
+            |> set.to_list
+            |> list.index_map(fn(label, i) { new_input(id, i, label) }),
+        ))
+      }
+    }
   }
 }

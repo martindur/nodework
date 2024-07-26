@@ -1,6 +1,7 @@
 import gleam/dict
 import gleam/dynamic.{type DecodeError}
 import gleam/float
+import gleam/function
 import gleam/int
 import gleam/io
 import gleam/list.{filter, map}
@@ -16,17 +17,22 @@ import lustre/element/html
 import lustre/element/svg
 import lustre/event
 
+import nodework/calc
 import nodework/conn.{type Conn, Conn}
+import nodework/dag
 import nodework/draw
 import nodework/menu.{type Menu, Menu}
 import nodework/model.{type Model, Model}
 import nodework/navigator.{type Navigator, Navigator}
 import nodework/node.{
-  type Node, type NodeError, type NodeId, type NodeInput, Node, NotFound,
+  type Node, type NodeFunction, type NodeId, type NodeInput, Node, NodeFunction,
+  NotFound,
 } as nd
 import nodework/vector.{type Vector, Vector}
 import nodework/viewbox.{type ViewBox, Drag, Normal, ViewBox}
 import util/random
+
+import nodework/examples
 
 pub type ResizeEvent
 
@@ -82,8 +88,9 @@ pub fn setup(runtime_call) {
 }
 
 pub fn main() {
+  let nodes = examples.math_nodes()
   let app = lustre.application(init, update, view)
-  let assert Ok(send_to_runtime) = lustre.start(app, "#app", Nil)
+  let assert Ok(send_to_runtime) = lustre.start(app, "#app", nodes)
 
   setup(send_to_runtime)
 
@@ -94,37 +101,10 @@ type MouseEvent {
   MouseEvent(position: Vector, shift_key_active: Bool)
 }
 
-fn init(_flags) -> #(Model, Effect(Msg)) {
+fn init(node_functions: List(NodeFunction)) -> #(Model, Effect(Msg)) {
   #(
     Model(
-      nodes: dict.from_list([
-        #(
-          0,
-          Node(
-            position: Vector(0, 0),
-            offset: Vector(0, 0),
-            id: 0,
-            inputs: [
-              nd.new_input(0, 0, "foo"),
-              nd.new_input(0, 1, "bar"),
-              nd.new_input(0, 2, "baz"),
-            ],
-            output: nd.new_output(0),
-            name: "Rect",
-          ),
-        ),
-        #(
-          1,
-          Node(
-            position: Vector(300, 300),
-            offset: Vector(0, 0),
-            id: 1,
-            inputs: [nd.new_input(1, 0, "bob")],
-            output: nd.new_output(1),
-            name: "Circle",
-          ),
-        ),
-      ]),
+      nodes: dict.from_list([]),
       connections: [],
       nodes_selected: set.new(),
       window_resolution: get_window_size(),
@@ -132,7 +112,12 @@ fn init(_flags) -> #(Model, Effect(Msg)) {
       navigator: Navigator(Vector(0, 0), False),
       mode: Normal,
       last_clicked_point: Vector(0, 0),
-      menu: Menu(Vector(0, 0), False, [#("Rect", "rect"), #("Circle", "circle")]),
+      menu: menu.new(node_functions),
+      library: node_functions
+        |> map(fn(nf) { #(string.lowercase(nf.label), nf) })
+        |> dict.from_list,
+      graph: dag.new(),
+      output: dynamic.from(0),
     ),
     effect.none(),
   )
@@ -163,6 +148,7 @@ pub opaque type Msg {
   GraphCloseMenu
   GraphSpawnNode(String)
   GraphDeleteSelectedNodes
+  GraphChangedConnections
 }
 
 fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
@@ -196,6 +182,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     GraphCloseMenu -> graph_close_menu(model)
     GraphSpawnNode(identifier) -> graph_spawn_node(model, identifier)
     GraphDeleteSelectedNodes -> graph_delete_selected_nodes(model)
+    GraphChangedConnections -> graph_changed_connections(model)
   }
 }
 
@@ -264,7 +251,7 @@ fn user_clicked_node_output(
   let p2 =
     model.viewbox |> viewbox.to_viewbox_translate(model.navigator.cursor_point)
   let id = random.generate_random_id("conn")
-  let new_conn = Conn(id, p1, p2, node_id, -1, "", True)
+  let new_conn = Conn(id, p1, p2, node_id, "", "", True)
 
   model.connections
   |> list.prepend(new_conn)
@@ -291,9 +278,11 @@ fn user_unclicked(model: Model) -> #(Model, Effect(Msg)) {
       })
     }
   }
-  |> filter(fn(c) { c.target_node_id != -1 && c.active != True })
+  |> filter(fn(c) { c.target_node_id != "" && c.active != True })
   |> conn.unique
   |> fn(c) { Model(..model, connections: c) }
+  |> calc.sync_edges
+  |> calc.recalc_graph
   |> none_effect_wrapper
 }
 
@@ -310,7 +299,7 @@ fn user_clicked_conn(
         Conn(
           ..c,
           p1: event.position,
-          target_node_id: -1,
+          target_node_id: "",
           target_input_id: "",
           active: True,
         )
@@ -424,20 +413,18 @@ fn graph_close_menu(model: Model) -> #(Model, Effect(Msg)) {
 }
 
 fn graph_spawn_node(model: Model, identifier: String) -> #(Model, Effect(Msg)) {
-  model.nodes
-  |> dict.to_list
-  |> list.length
-  |> nd.make_node(
-    identifier,
-    _,
-    viewbox.to_viewbox_space(model.viewbox, model.menu.pos),
-  )
+  let position = viewbox.to_viewbox_space(model.viewbox, model.menu.pos)
+
+  model.library
+  |> nd.new_node(identifier, position)
   |> fn(res: Result(Node, Nil)) {
     case res {
       Ok(node) -> Model(..model, nodes: dict.insert(model.nodes, node.id, node))
       Error(Nil) -> model
     }
   }
+  |> calc.sync_verts
+  |> calc.recalc_graph
   |> fn(m) { #(m, simple_effect(GraphCloseMenu)) }
 }
 
@@ -445,7 +432,17 @@ fn graph_delete_selected_nodes(model: Model) -> #(Model, Effect(Msg)) {
   model
   |> draw.delete_selected_nodes
   |> draw.delete_orphaned_connections
+  |> calc.sync_verts
+  |> calc.sync_edges
+  |> calc.recalc_graph
   |> none_effect_wrapper
+}
+
+fn graph_changed_connections(model: Model) -> #(Model, Effect(Msg)) {
+  model
+  |> none_effect_wrapper
+  // model.connections
+  // |> conn.generate_graph
 }
 
 fn update_last_clicked_point(model: Model, event: MouseEvent) -> Model {
@@ -557,23 +554,29 @@ fn view_node_output(node: Node) -> element.Element(Msg) {
   let id = nd.output_id(node.output)
   let hovered = nd.output_hovered(node.output)
 
-  svg.g([attr("transform", pos |> vector.to_html(vector.Translate))], [
-    svg.circle([
-      attr("cx", "0"),
-      attr("cy", "0"),
-      attr("r", "10"),
-      attr("fill", "currentColor"),
-      attr("stroke", "black"),
-      case hovered {
-        True -> attr("stroke-width", "3")
-        False -> attr("stroke-width", "0")
-      },
-      attribute.class("text-gray-500"),
-      event.on_mouse_down(UserClickedNodeOutput(node.id, pos)),
-      event.on_mouse_enter(UserHoverNodeOutput(id)),
-      event.on_mouse_leave(UserUnhoverNodeOutput),
-    ]),
-  ])
+  // TODO: Consider having an output node type, as this becomes quite hidden. It's much easier at the moment though!
+  case node.id == "node.output" {
+    False -> {
+      svg.g([attr("transform", pos |> vector.to_html(vector.Translate))], [
+        svg.circle([
+          attr("cx", "0"),
+          attr("cy", "0"),
+          attr("r", "10"),
+          attr("fill", "currentColor"),
+          attr("stroke", "black"),
+          case hovered {
+            True -> attr("stroke-width", "3")
+            False -> attr("stroke-width", "0")
+          },
+          attribute.class("text-gray-500"),
+          event.on_mouse_down(UserClickedNodeOutput(node.id, pos)),
+          event.on_mouse_enter(UserHoverNodeOutput(id)),
+          event.on_mouse_leave(UserUnhoverNodeOutput),
+        ]),
+      ])
+    }
+    True -> element.none()
+  }
 }
 
 // TODO: Dragging multiple nodes requires holding down shift.
@@ -593,14 +596,14 @@ fn view_node(node: Node, selection: Set(NodeId)) -> element.Element(Msg) {
 
   svg.g(
     [
-      attribute.id("node-" <> int.to_string(node.id)),
+      attribute.id("g-" <> node.id),
       attr("transform", translate(node.position.x, node.position.y)),
       attribute.class("select-none"),
     ],
     list.concat([
       [
         svg.rect([
-          attribute.id(int.to_string(node.id)),
+          attribute.id(node.id),
           attr("width", "200"),
           attr("height", "150"),
           attr("rx", "25"),

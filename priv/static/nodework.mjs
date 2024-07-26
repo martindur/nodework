@@ -108,6 +108,11 @@ var BitArray = class _BitArray {
     return new _BitArray(this.buffer.slice(index2));
   }
 };
+var UtfCodepoint = class {
+  constructor(value) {
+    this.value = value;
+  }
+};
 function byteArrayToInt(byteArray) {
   byteArray = byteArray.reverse();
   let value = 0;
@@ -374,6 +379,22 @@ function do_reverse(loop$remaining, loop$accumulator) {
 function reverse(xs) {
   return do_reverse(xs, toList([]));
 }
+function contains(loop$list, loop$elem) {
+  while (true) {
+    let list = loop$list;
+    let elem = loop$elem;
+    if (list.hasLength(0)) {
+      return false;
+    } else if (list.atLeastLength(1) && isEqual(list.head, elem)) {
+      let first$1 = list.head;
+      return true;
+    } else {
+      let rest$1 = list.tail;
+      loop$list = rest$1;
+      loop$elem = elem;
+    }
+  }
+}
 function first(list) {
   if (list.hasLength(0)) {
     return new Error(void 0);
@@ -455,6 +476,28 @@ function do_map(loop$list, loop$fun, loop$acc) {
 }
 function map(list, fun) {
   return do_map(list, fun, toList([]));
+}
+function do_index_map(loop$list, loop$fun, loop$index, loop$acc) {
+  while (true) {
+    let list = loop$list;
+    let fun = loop$fun;
+    let index2 = loop$index;
+    let acc = loop$acc;
+    if (list.hasLength(0)) {
+      return reverse(acc);
+    } else {
+      let x = list.head;
+      let xs = list.tail;
+      let acc$1 = prepend(fun(x, index2), acc);
+      loop$list = xs;
+      loop$fun = fun;
+      loop$index = index2 + 1;
+      loop$acc = acc$1;
+    }
+  }
+}
+function index_map(list, fun) {
+  return do_index_map(list, fun, 0, toList([]));
 }
 function do_take(loop$list, loop$n, loop$acc) {
   while (true) {
@@ -565,6 +608,27 @@ function any(loop$list, loop$predicate) {
       }
     }
   }
+}
+function do_zip(loop$xs, loop$ys, loop$acc) {
+  while (true) {
+    let xs = loop$xs;
+    let ys = loop$ys;
+    let acc = loop$acc;
+    if (xs.atLeastLength(1) && ys.atLeastLength(1)) {
+      let x = xs.head;
+      let xs$1 = xs.tail;
+      let y = ys.head;
+      let ys$1 = ys.tail;
+      loop$xs = xs$1;
+      loop$ys = ys$1;
+      loop$acc = prepend([x, y], acc);
+    } else {
+      return reverse(acc);
+    }
+  }
+}
+function zip(list, other) {
+  return do_zip(list, other, toList([]));
 }
 function sequences(loop$list, loop$compare, loop$growing, loop$direction, loop$prev, loop$acc) {
   while (true) {
@@ -889,6 +953,35 @@ function sort(list, compare3) {
     return merge_all(sequences$1, new Ascending(), compare3);
   }
 }
+function do_partition(loop$list, loop$categorise, loop$trues, loop$falses) {
+  while (true) {
+    let list = loop$list;
+    let categorise = loop$categorise;
+    let trues = loop$trues;
+    let falses = loop$falses;
+    if (list.hasLength(0)) {
+      return [reverse(trues), reverse(falses)];
+    } else {
+      let x = list.head;
+      let xs = list.tail;
+      let $ = categorise(x);
+      if ($) {
+        loop$list = xs;
+        loop$categorise = categorise;
+        loop$trues = prepend(x, trues);
+        loop$falses = falses;
+      } else {
+        loop$list = xs;
+        loop$categorise = categorise;
+        loop$trues = trues;
+        loop$falses = prepend(x, falses);
+      }
+    }
+  }
+}
+function partition(list, categorise) {
+  return do_partition(list, categorise, toList([]), toList([]));
+}
 function reduce(list, fun) {
   if (list.hasLength(0)) {
     return new Error(void 0);
@@ -971,10 +1064,27 @@ function try$(result, fun) {
 function then$(result, fun) {
   return try$(result, fun);
 }
+function unwrap(result, default$) {
+  if (result.isOk()) {
+    let v = result[0];
+    return v;
+  } else {
+    return default$;
+  }
+}
 
 // build/dev/javascript/gleam_stdlib/gleam/string_builder.mjs
+function append_builder(builder, suffix) {
+  return add2(builder, suffix);
+}
 function from_strings(strings) {
   return concat2(strings);
+}
+function from_string(string3) {
+  return identity(string3);
+}
+function append2(builder, second2) {
+  return append_builder(builder, from_string(second2));
 }
 function to_string3(builder) {
   return identity(builder);
@@ -984,8 +1094,34 @@ function to_string3(builder) {
 function lowercase2(string3) {
   return lowercase(string3);
 }
+function uppercase2(string3) {
+  return uppercase(string3);
+}
+function append4(first3, second2) {
+  let _pipe = first3;
+  let _pipe$1 = from_string(_pipe);
+  let _pipe$2 = append2(_pipe$1, second2);
+  return to_string3(_pipe$2);
+}
 function join2(strings, separator) {
   return join(strings, separator);
+}
+function pop_grapheme2(string3) {
+  return pop_grapheme(string3);
+}
+function capitalise(s) {
+  let $ = pop_grapheme2(s);
+  if ($.isOk()) {
+    let first$1 = $[0][0];
+    let rest = $[0][1];
+    return append4(uppercase2(first$1), lowercase2(rest));
+  } else {
+    return "";
+  }
+}
+function inspect2(term) {
+  let _pipe = inspect(term);
+  return to_string3(_pipe);
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/dynamic.mjs
@@ -1791,8 +1927,33 @@ function identity(x) {
 function to_string(term) {
   return term.toString();
 }
+function graphemes_iterator(string3) {
+  if (Intl && Intl.Segmenter) {
+    return new Intl.Segmenter().segment(string3)[Symbol.iterator]();
+  }
+}
+function pop_grapheme(string3) {
+  let first3;
+  const iterator = graphemes_iterator(string3);
+  if (iterator) {
+    first3 = iterator.next().value?.segment;
+  } else {
+    first3 = string3.match(/./su)?.[0];
+  }
+  if (first3) {
+    return new Ok([first3, string3.slice(first3.length)]);
+  } else {
+    return new Error(Nil);
+  }
+}
 function lowercase(string3) {
   return string3.toLowerCase();
+}
+function uppercase(string3) {
+  return string3.toUpperCase();
+}
+function add2(a, b) {
+  return a + b;
 }
 function join(xs, separator) {
   const iterator = xs[Symbol.iterator]();
@@ -1833,6 +1994,15 @@ var unicode_whitespaces = [
 ].join();
 var left_trim_regex = new RegExp(`^([${unicode_whitespaces}]*)`, "g");
 var right_trim_regex = new RegExp(`([${unicode_whitespaces}]*)$`, "g");
+function print_debug(string3) {
+  if (typeof process === "object" && process.stderr?.write) {
+    process.stderr.write(string3 + "\n");
+  } else if (typeof Deno === "object") {
+    Deno.stderr.writeSync(new TextEncoder().encode(string3 + "\n"));
+  } else {
+    console.log(string3);
+  }
+}
 function round(float3) {
   return Math.round(float3);
 }
@@ -1932,6 +2102,117 @@ function try_get_field(value, field2, or_else) {
   } catch {
     return or_else();
   }
+}
+function inspect(v) {
+  const t = typeof v;
+  if (v === true)
+    return "True";
+  if (v === false)
+    return "False";
+  if (v === null)
+    return "//js(null)";
+  if (v === void 0)
+    return "Nil";
+  if (t === "string")
+    return inspectString(v);
+  if (t === "bigint" || t === "number")
+    return v.toString();
+  if (Array.isArray(v))
+    return `#(${v.map(inspect).join(", ")})`;
+  if (v instanceof List)
+    return inspectList(v);
+  if (v instanceof UtfCodepoint)
+    return inspectUtfCodepoint(v);
+  if (v instanceof BitArray)
+    return inspectBitArray(v);
+  if (v instanceof CustomType)
+    return inspectCustomType(v);
+  if (v instanceof Dict)
+    return inspectDict(v);
+  if (v instanceof Set)
+    return `//js(Set(${[...v].map(inspect).join(", ")}))`;
+  if (v instanceof RegExp)
+    return `//js(${v})`;
+  if (v instanceof Date)
+    return `//js(Date("${v.toISOString()}"))`;
+  if (v instanceof Function) {
+    const args = [];
+    for (const i of Array(v.length).keys())
+      args.push(String.fromCharCode(i + 97));
+    return `//fn(${args.join(", ")}) { ... }`;
+  }
+  return inspectObject(v);
+}
+function inspectString(str) {
+  let new_str = '"';
+  for (let i = 0; i < str.length; i++) {
+    let char = str[i];
+    switch (char) {
+      case "\n":
+        new_str += "\\n";
+        break;
+      case "\r":
+        new_str += "\\r";
+        break;
+      case "	":
+        new_str += "\\t";
+        break;
+      case "\f":
+        new_str += "\\f";
+        break;
+      case "\\":
+        new_str += "\\\\";
+        break;
+      case '"':
+        new_str += '\\"';
+        break;
+      default:
+        if (char < " " || char > "~" && char < "\xA0") {
+          new_str += "\\u{" + char.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0") + "}";
+        } else {
+          new_str += char;
+        }
+    }
+  }
+  new_str += '"';
+  return new_str;
+}
+function inspectDict(map4) {
+  let body = "dict.from_list([";
+  let first3 = true;
+  map4.forEach((value, key) => {
+    if (!first3)
+      body = body + ", ";
+    body = body + "#(" + inspect(key) + ", " + inspect(value) + ")";
+    first3 = false;
+  });
+  return body + "])";
+}
+function inspectObject(v) {
+  const name = Object.getPrototypeOf(v)?.constructor?.name || "Object";
+  const props = [];
+  for (const k of Object.keys(v)) {
+    props.push(`${inspect(k)}: ${inspect(v[k])}`);
+  }
+  const body = props.length ? " " + props.join(", ") + " " : "";
+  const head = name === "Object" ? "" : name + " ";
+  return `//js(${head}{${body}})`;
+}
+function inspectCustomType(record) {
+  const props = Object.keys(record).map((label) => {
+    const value = inspect(record[label]);
+    return isNaN(parseInt(label)) ? `${label}: ${value}` : value;
+  }).join(", ");
+  return props ? `${record.constructor.name}(${props})` : record.constructor.name;
+}
+function inspectList(list) {
+  return `[${list.toArray().map(inspect).join(", ")}]`;
+}
+function inspectBitArray(bits) {
+  return `<<${Array.from(bits.buffer).join(", ")}>>`;
+}
+function inspectUtfCodepoint(codepoint2) {
+  return `//utfcodepoint(${String.fromCodePoint(codepoint2.value)})`;
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/dict.mjs
@@ -2102,6 +2383,14 @@ function map_values(dict, fun) {
   return do_map_values(fun, dict);
 }
 
+// build/dev/javascript/gleam_stdlib/gleam/io.mjs
+function debug(term) {
+  let _pipe = term;
+  let _pipe$1 = inspect2(_pipe);
+  print_debug(_pipe$1);
+  return term;
+}
+
 // build/dev/javascript/gleam_stdlib/gleam/set.mjs
 var Set2 = class extends CustomType {
   constructor(dict) {
@@ -2112,7 +2401,7 @@ var Set2 = class extends CustomType {
 function new$2() {
   return new Set2(new$());
 }
-function contains(set, member) {
+function contains2(set, member) {
   let _pipe = set.dict;
   let _pipe$1 = get(_pipe, member);
   return is_ok(_pipe$1);
@@ -2291,6 +2580,9 @@ function namespaced(namespace2, tag, attrs, children) {
 }
 function text(content) {
   return new Text(content);
+}
+function none2() {
+  return new Text("");
 }
 
 // build/dev/javascript/lustre/lustre/internals/runtime.mjs
@@ -3003,62 +3295,6 @@ function exclude_by_node_ids(conns, ids) {
   );
 }
 
-// build/dev/javascript/nodework/nodework/menu.mjs
-var Menu = class extends CustomType {
-  constructor(pos, active, nodes) {
-    super();
-    this.pos = pos;
-    this.active = active;
-    this.nodes = nodes;
-  }
-};
-function view_menu_item(item, spawn_func) {
-  let text3 = item[0];
-  let id2 = item[1];
-  return button(
-    toList([
-      id(id2),
-      class$("hover:bg-gray-300"),
-      on2("click", spawn_func)
-    ]),
-    toList([text(text3)])
-  );
-}
-function view_menu(menu, spawn_func) {
-  let pos = "translate(" + to_string2(menu.pos.x) + "px, " + to_string2(
-    menu.pos.y
-  ) + "px)";
-  return div(
-    (() => {
-      let $ = menu.active;
-      if ($) {
-        return toList([
-          class$(
-            "absolute top-0 left-0 w-[100px] h-[300px] bg-gray-200 rounded shadow"
-          ),
-          style(toList([["transform", pos]]))
-        ]);
-      } else {
-        return toList([class$("hidden")]);
-      }
-    })(),
-    toList([
-      div(
-        toList([class$("flex flex-col p-2 gap-1")]),
-        (() => {
-          let _pipe = menu.nodes;
-          return map(
-            _pipe,
-            (item) => {
-              return view_menu_item(item, spawn_func);
-            }
-          );
-        })()
-      )
-    ])
-  );
-}
-
 // build/dev/javascript/nodework/nodework/navigator.mjs
 var Navigator = class extends CustomType {
   constructor(cursor_point2, mouse_down) {
@@ -3071,16 +3307,73 @@ function set_navigator_mouse_down(nav) {
   return nav.withFields({ mouse_down: true });
 }
 
+// build/dev/javascript/nodework/util/random.mjs
+var lib = /* @__PURE__ */ toList([
+  "a",
+  "b",
+  "c",
+  "d",
+  "e",
+  "f",
+  "g",
+  "h",
+  "i",
+  "j",
+  "k",
+  "l",
+  "m",
+  "n",
+  "o",
+  "p",
+  "q",
+  "r",
+  "s",
+  "t",
+  "u",
+  "v",
+  "w",
+  "x",
+  "y",
+  "z",
+  "0",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9"
+]);
+function generate_random_id(prefix) {
+  let _pipe = lib;
+  let _pipe$1 = shuffle(_pipe);
+  let _pipe$2 = take(_pipe$1, 12);
+  let _pipe$3 = join2(_pipe$2, "");
+  return ((id2) => {
+    return prefix + "." + id2;
+  })(_pipe$3);
+}
+
 // build/dev/javascript/nodework/nodework/node.mjs
 var Node2 = class extends CustomType {
-  constructor(position, offset, id2, inputs, output, name) {
+  constructor(position, offset, id2, inputs, output2, name) {
     super();
     this.position = position;
     this.offset = offset;
     this.id = id2;
     this.inputs = inputs;
-    this.output = output;
+    this.output = output2;
     this.name = name;
+  }
+};
+var NodeFunction = class extends CustomType {
+  constructor(label, inputs, output2) {
+    super();
+    this.label = label;
+    this.inputs = inputs;
+    this.output = output2;
   }
 };
 var NotFound = class extends CustomType {
@@ -3106,7 +3399,7 @@ function input_position_from_index(index2) {
   return new Vector(0, 50 + index2 * 30);
 }
 function new_input(id2, index2, label) {
-  let _pipe = to_string2(id2) + "-" + to_string2(index2);
+  let _pipe = id2 + "-" + to_string2(index2);
   return ((input_id2) => {
     return new NodeInput(
       input_id2,
@@ -3186,8 +3479,8 @@ function set_output_hover(ins, id2) {
           return node.output;
         }
       })();
-      return ((output) => {
-        return node.withFields({ output });
+      return ((output2) => {
+        return node.withFields({ output: output2 });
       })(
         _pipe$1
       );
@@ -3200,8 +3493,8 @@ function reset_output_hover(ins) {
     _pipe,
     (_, node) => {
       let _pipe$1 = node.output.withFields({ hovered: false });
-      return ((output) => {
-        return node.withFields({ output });
+      return ((output2) => {
+        return node.withFields({ output: output2 });
       })(
         _pipe$1
       );
@@ -3243,7 +3536,7 @@ function get_node_from_input_hovered(ins) {
   })(_pipe$3);
 }
 function new_output(id2) {
-  return new NodeOutput("out-" + to_string2(id2), new Vector(200, 50), false);
+  return new NodeOutput("out-" + id2, new Vector(200, 50), false);
 }
 function output_position(out) {
   return out.position;
@@ -3286,36 +3579,230 @@ function exclude_by_ids(nodes, ids) {
   let _pipe = nodes;
   return drop2(_pipe, to_list2(ids));
 }
-function make_node(identifier, id2, position) {
-  if (identifier === "rect") {
-    return new Ok(
-      new Node2(
-        position,
-        new Vector(0, 0),
-        id2,
-        toList([
-          new_input(id2, 0, "foo"),
-          new_input(id2, 1, "bar"),
-          new_input(id2, 2, "baz")
-        ]),
-        new_output(id2),
-        "Rect"
-      )
-    );
-  } else if (identifier === "circle") {
-    return new Ok(
-      new Node2(
-        position,
-        new Vector(0, 0),
-        id2,
-        toList([new_input(id2, 0, "bob")]),
-        new_output(id2),
-        "Circle"
-      )
-    );
-  } else {
-    return new Error(void 0);
+function new_node(library, identifier, position) {
+  let _pipe = library;
+  let _pipe$1 = get(_pipe, identifier);
+  return ((res) => {
+    if (!res.isOk() && !res[0]) {
+      return new Error(void 0);
+    } else {
+      let node_function = res[0];
+      let id2 = (() => {
+        let $ = lowercase2(node_function.label) === "output";
+        if ($) {
+          return "node.output";
+        } else {
+          return generate_random_id("node");
+        }
+      })();
+      return new Ok(
+        new Node2(
+          position,
+          new Vector(0, 0),
+          id2,
+          (() => {
+            let _pipe$2 = node_function.inputs;
+            let _pipe$3 = to_list2(_pipe$2);
+            return index_map(
+              _pipe$3,
+              (label, i) => {
+                return new_input(id2, i, label);
+              }
+            );
+          })(),
+          new_output(id2),
+          capitalise(node_function.label)
+        )
+      );
+    }
+  })(_pipe$1);
+}
+
+// build/dev/javascript/nodework/nodework/dag.mjs
+var Vertex = class extends CustomType {
+  constructor(id2, value, inputs) {
+    super();
+    this.id = id2;
+    this.value = value;
+    this.inputs = inputs;
   }
+};
+var Edge = class extends CustomType {
+  constructor(from3, to) {
+    super();
+    this.from = from3;
+    this.to = to;
+  }
+};
+var Graph = class extends CustomType {
+  constructor(verts, edges) {
+    super();
+    this.verts = verts;
+    this.edges = edges;
+  }
+};
+function new$4() {
+  return new Graph(new$(), toList([]));
+}
+function sync_vertex_inputs(graph) {
+  let _pipe = graph.verts;
+  let _pipe$1 = map_values(
+    _pipe,
+    (id2, v) => {
+      let _pipe$12 = graph.edges;
+      let _pipe$2 = filter(_pipe$12, (edge) => {
+        return id2 === edge.to;
+      });
+      let _pipe$3 = map(_pipe$2, (edge) => {
+        return edge.from;
+      });
+      return ((inputs) => {
+        return v.withFields({ inputs });
+      })(_pipe$3);
+    }
+  );
+  return ((verts) => {
+    return graph.withFields({ verts });
+  })(_pipe$1);
+}
+function prune(edges, verts) {
+  let ids = map(verts, (v) => {
+    return v.id;
+  });
+  let _pipe = edges;
+  let _pipe$1 = partition(
+    _pipe,
+    (e) => {
+      return contains(ids, e.to) || contains(ids, e.from);
+    }
+  );
+  return ((x) => {
+    return second(x);
+  })(_pipe$1);
+}
+function indegree(vert, edges) {
+  let _pipe = edges;
+  let _pipe$1 = filter(_pipe, (edge) => {
+    return edge.to === vert.id;
+  });
+  return length(_pipe$1);
+}
+function partition_source_verts(verts, edges) {
+  let _pipe = verts;
+  return partition(
+    _pipe,
+    (vert) => {
+      return indegree(vert, edges) === 0;
+    }
+  );
+}
+function sort2(sorted, unsorted, edges) {
+  let edges$1 = prune(edges, sorted);
+  let _pipe = unsorted;
+  let _pipe$1 = partition_source_verts(_pipe, edges$1);
+  return ((res) => {
+    if (res[0].hasLength(0) && res[1].hasLength(0)) {
+      return new Ok(sorted);
+    } else if (res[1].hasLength(0)) {
+      let source = res[0];
+      return new Ok(append(sorted, source));
+    } else if (res[0].hasLength(0)) {
+      return new Error("Cyclical relationship detected");
+    } else {
+      let source = res[0];
+      let rest = res[1];
+      let sorted$1 = append(sorted, source);
+      let $ = sort2(sorted$1, rest, edges$1);
+      if ($.isOk()) {
+        let res$1 = $[0];
+        return new Ok(res$1);
+      } else {
+        let err = $[0];
+        return new Error(err);
+      }
+    }
+  })(_pipe$1);
+}
+function topological_sort(graph) {
+  return sort2(
+    toList([]),
+    (() => {
+      let _pipe = graph.verts;
+      let _pipe$1 = map_to_list(_pipe);
+      return map(_pipe$1, second);
+    })(),
+    graph.edges
+  );
+}
+
+// build/dev/javascript/nodework/nodework/menu.mjs
+var Menu = class extends CustomType {
+  constructor(pos, active, nodes) {
+    super();
+    this.pos = pos;
+    this.active = active;
+    this.nodes = nodes;
+  }
+};
+function view_menu_item(item, spawn_func) {
+  let text3 = item[0];
+  let id2 = item[1];
+  return button(
+    toList([
+      id(id2),
+      class$("hover:bg-gray-300"),
+      on2("click", spawn_func)
+    ]),
+    toList([text(text3)])
+  );
+}
+function view_menu(menu, spawn_func) {
+  let pos = "translate(" + to_string2(menu.pos.x) + "px, " + to_string2(
+    menu.pos.y
+  ) + "px)";
+  return div(
+    (() => {
+      let $ = menu.active;
+      if ($) {
+        return toList([
+          class$(
+            "absolute top-0 left-0 w-[100px] h-[300px] bg-gray-200 rounded shadow"
+          ),
+          style(toList([["transform", pos]]))
+        ]);
+      } else {
+        return toList([class$("hidden")]);
+      }
+    })(),
+    toList([
+      div(
+        toList([class$("flex flex-col p-2 gap-1")]),
+        (() => {
+          let _pipe = menu.nodes;
+          return map(
+            _pipe,
+            (item) => {
+              return view_menu_item(item, spawn_func);
+            }
+          );
+        })()
+      )
+    ])
+  );
+}
+function new$5(nodes) {
+  let _pipe = nodes;
+  let _pipe$1 = map(
+    _pipe,
+    (node) => {
+      return [capitalise(node.label), lowercase2(node.label)];
+    }
+  );
+  return ((nodes2) => {
+    return new Menu(new Vector(0, 0), false, nodes2);
+  })(
+    _pipe$1
+  );
 }
 
 // build/dev/javascript/nodework/nodework/viewbox.mjs
@@ -3382,7 +3869,7 @@ function update_zoom_level(vb, delta_y) {
 
 // build/dev/javascript/nodework/nodework/model.mjs
 var Model = class extends CustomType {
-  constructor(nodes, connections2, nodes_selected, window_resolution, viewbox, navigator, mode, last_clicked_point, menu) {
+  constructor(nodes, connections2, nodes_selected, window_resolution, viewbox, navigator, mode, last_clicked_point, menu, library, graph, output2) {
     super();
     this.nodes = nodes;
     this.connections = connections2;
@@ -3393,8 +3880,150 @@ var Model = class extends CustomType {
     this.mode = mode;
     this.last_clicked_point = last_clicked_point;
     this.menu = menu;
+    this.library = library;
+    this.graph = graph;
+    this.output = output2;
   }
 };
+
+// build/dev/javascript/nodework/nodework/calc.mjs
+function nodes_to_vertices(nodes) {
+  let _pipe = nodes;
+  return map(
+    _pipe,
+    (n) => {
+      return [n.id, new Vertex(n.id, lowercase2(n.name), toList([]))];
+    }
+  );
+}
+function conns_to_edges(conns) {
+  let _pipe = conns;
+  return map(
+    _pipe,
+    (c) => {
+      return new Edge(c.source_node_id, c.target_node_id);
+    }
+  );
+}
+function filter_conns_by_edges(conns, edges) {
+  let edge_source_ids = map(edges, (e) => {
+    return e.from;
+  });
+  let _pipe = conns;
+  return filter(
+    _pipe,
+    (c) => {
+      return contains(edge_source_ids, c.source_node_id);
+    }
+  );
+}
+function sync_verts(model) {
+  let _pipe = model.nodes;
+  let _pipe$1 = map_to_list(_pipe);
+  let _pipe$2 = map(_pipe$1, second);
+  let _pipe$3 = nodes_to_vertices(_pipe$2);
+  let _pipe$4 = from_list(_pipe$3);
+  let _pipe$5 = ((verts) => {
+    return model.graph.withFields({ verts });
+  })(
+    _pipe$4
+  );
+  return ((graph) => {
+    return model.withFields({ graph });
+  })(_pipe$5);
+}
+function sync_edges(model) {
+  let _pipe = model.connections;
+  let _pipe$1 = conns_to_edges(_pipe);
+  let _pipe$2 = ((edges) => {
+    return model.graph.withFields({ edges });
+  })(
+    _pipe$1
+  );
+  return ((graph) => {
+    let $ = topological_sort(graph);
+    if ($.isOk()) {
+      return model.withFields({ graph });
+    } else {
+      let _pipe$3 = filter_conns_by_edges(model.connections, model.graph.edges);
+      return ((conns) => {
+        return model.withFields({ graph: model.graph, connections: conns });
+      })(_pipe$3);
+    }
+  })(_pipe$2);
+}
+function eval_graph(verts, model) {
+  let _pipe = verts;
+  let _pipe$1 = fold(
+    _pipe,
+    new$(),
+    (evaluated, vert) => {
+      let $ = get(model.library, vert.value);
+      if (!$.isOk() && !$[0]) {
+        return insert(evaluated, vert.id, from(0));
+      } else {
+        let nodefunc = $[0];
+        let input_collection = zip(to_list2(nodefunc.inputs), vert.inputs);
+        let inputs = (() => {
+          let _pipe$13 = input_collection;
+          let _pipe$23 = map(
+            _pipe$13,
+            (collection) => {
+              let ref = collection[0];
+              let key = collection[1];
+              let $1 = get(evaluated, key);
+              if (!$1.isOk() && !$1[0]) {
+                return [ref, from(0)];
+              } else {
+                let val = $1[0];
+                return [ref, val];
+              }
+            }
+          );
+          return from_list(_pipe$23);
+        })();
+        let _pipe$12 = inputs;
+        let _pipe$22 = nodefunc.output(_pipe$12);
+        return ((val) => {
+          return insert(evaluated, vert.id, val);
+        })(
+          _pipe$22
+        );
+      }
+    }
+  );
+  let _pipe$2 = get(_pipe$1, "node.output");
+  let _pipe$3 = ((res) => {
+    if (res.isOk()) {
+      let output2 = res[0];
+      return output2;
+    } else {
+      return from(0);
+    }
+  })(_pipe$2);
+  return ((output2) => {
+    return model.withFields({ output: output2 });
+  })(_pipe$3);
+}
+function recalc_graph(model) {
+  let _pipe = model.graph;
+  let _pipe$1 = sync_vertex_inputs(_pipe);
+  let _pipe$2 = topological_sort(_pipe$1);
+  let _pipe$3 = ((res) => {
+    if (res.isOk()) {
+      let verts = res[0];
+      return verts;
+    } else {
+      let msg = res[0];
+      return toList([]);
+    }
+  })(_pipe$2);
+  let _pipe$4 = eval_graph(_pipe$3, model);
+  return ((m) => {
+    debug(m.output);
+    return m;
+  })(_pipe$4);
+}
 
 // build/dev/javascript/nodework/nodework/draw.mjs
 function cursor_point(m, p2) {
@@ -3579,53 +4208,63 @@ function connections(m) {
   })(_pipe$1);
 }
 
-// build/dev/javascript/nodework/util/random.mjs
-var lib = /* @__PURE__ */ toList([
-  "a",
-  "b",
-  "c",
-  "d",
-  "e",
-  "f",
-  "g",
-  "h",
-  "i",
-  "j",
-  "k",
-  "l",
-  "m",
-  "n",
-  "o",
-  "p",
-  "q",
-  "r",
-  "s",
-  "t",
-  "u",
-  "v",
-  "w",
-  "x",
-  "y",
-  "z",
-  "0",
-  "1",
-  "2",
-  "3",
-  "4",
-  "5",
-  "6",
-  "7",
-  "8",
-  "9"
-]);
-function generate_random_id(prefix) {
-  let _pipe = lib;
-  let _pipe$1 = shuffle(_pipe);
-  let _pipe$2 = take(_pipe$1, 12);
-  let _pipe$3 = join2(_pipe$2, "");
-  return ((id2) => {
-    return prefix + "." + id2;
-  })(_pipe$3);
+// build/dev/javascript/nodework/nodework/examples.mjs
+function output(inputs) {
+  let $ = get(inputs, "eval");
+  if ($.isOk()) {
+    let eval$ = $[0];
+    return eval$;
+  } else {
+    return from(0);
+  }
+}
+function return_ten(inputs) {
+  return from(10);
+}
+function return_one(inputs) {
+  return from(1);
+}
+function add4(inputs) {
+  let $ = get(inputs, "a");
+  let $1 = get(inputs, "b");
+  if ($.isOk() && $1.isOk()) {
+    let a = $[0];
+    let b = $1[0];
+    let a$1 = unwrap(int(a), 0);
+    let b$1 = unwrap(int(b), 0);
+    return from(a$1 + b$1);
+  } else if ($.isOk() && !$1.isOk()) {
+    let a = $[0];
+    let a$1 = unwrap(int(a), 0);
+    let b = 0;
+    return from(a$1 + b);
+  } else if (!$.isOk() && $1.isOk()) {
+    let b = $1[0];
+    let a = 0;
+    let b$1 = unwrap(int(b), 0);
+    return from(a + b$1);
+  } else {
+    return from(0);
+  }
+}
+function double(inputs) {
+  let $ = get(inputs, "x");
+  if ($.isOk()) {
+    let x = $[0];
+    let x$1 = unwrap(int(x), 0);
+    return from(x$1 * 2);
+  } else {
+    return from(0);
+  }
+}
+function math_nodes() {
+  return toList([
+    new NodeFunction("add", from_list2(toList(["a", "b"])), add4),
+    new NodeFunction("double", from_list2(toList(["x"])), double),
+    new NodeFunction("ten", from_list2(toList([])), return_ten),
+    new NodeFunction("one", from_list2(toList([])), return_one),
+    new NodeFunction("output", from_list2(toList(["eval"])), output)
+  ]);
 }
 
 // build/dev/javascript/nodework/nodework.mjs
@@ -3772,39 +4411,10 @@ function setup(runtime_call) {
     }
   );
 }
-function init2(_) {
+function init2(node_functions) {
   return [
     new Model(
-      from_list(
-        toList([
-          [
-            0,
-            new Node2(
-              new Vector(0, 0),
-              new Vector(0, 0),
-              0,
-              toList([
-                new_input(0, 0, "foo"),
-                new_input(0, 1, "bar"),
-                new_input(0, 2, "baz")
-              ]),
-              new_output(0),
-              "Rect"
-            )
-          ],
-          [
-            1,
-            new Node2(
-              new Vector(300, 300),
-              new Vector(0, 0),
-              1,
-              toList([new_input(1, 0, "bob")]),
-              new_output(1),
-              "Circle"
-            )
-          ]
-        ])
-      ),
+      from_list(toList([])),
       toList([]),
       new$2(),
       get_window_size(),
@@ -3812,11 +4422,19 @@ function init2(_) {
       new Navigator(new Vector(0, 0), false),
       new Normal(),
       new Vector(0, 0),
-      new Menu(
-        new Vector(0, 0),
-        false,
-        toList([["Rect", "rect"], ["Circle", "circle"]])
-      )
+      new$5(node_functions),
+      (() => {
+        let _pipe = node_functions;
+        let _pipe$1 = map(
+          _pipe,
+          (nf) => {
+            return [lowercase2(nf.label), nf];
+          }
+        );
+        return from_list(_pipe$1);
+      })(),
+      new$4(),
+      from(0)
     ),
     none()
   ];
@@ -3857,7 +4475,7 @@ function user_clicked_node_output(model, node_id, offset) {
     return to_viewbox_translate(_pipe2, model.navigator.cursor_point);
   })();
   let id2 = generate_random_id("conn");
-  let new_conn = new Conn(id2, p1, p2, node_id, -1, "", true);
+  let new_conn = new Conn(id2, p1, p2, node_id, "", "", true);
   let _pipe = model.connections;
   let _pipe$1 = prepend2(_pipe, new_conn);
   let _pipe$2 = ((c) => {
@@ -3896,7 +4514,7 @@ function user_unclicked(model) {
   let _pipe$1 = filter(
     _pipe,
     (c) => {
-      return c.target_node_id !== -1 && c.active !== true;
+      return c.target_node_id !== "" && c.active !== true;
     }
   );
   let _pipe$2 = unique(_pipe$1);
@@ -3905,7 +4523,9 @@ function user_unclicked(model) {
   })(
     _pipe$2
   );
-  return none_effect_wrapper(_pipe$3);
+  let _pipe$4 = sync_edges(_pipe$3);
+  let _pipe$5 = recalc_graph(_pipe$4);
+  return none_effect_wrapper(_pipe$5);
 }
 function user_clicked_conn(model, conn_id, event2) {
   let _pipe = model.connections;
@@ -3918,7 +4538,7 @@ function user_clicked_conn(model, conn_id, event2) {
       } else {
         return c.withFields({
           p1: event2.position,
-          target_node_id: -1,
+          target_node_id: "",
           target_input_id: "",
           active: true
         });
@@ -4033,24 +4653,19 @@ function graph_close_menu(model) {
   return none_effect_wrapper(_pipe$1);
 }
 function graph_spawn_node(model, identifier) {
-  let _pipe = model.nodes;
-  let _pipe$1 = map_to_list(_pipe);
-  let _pipe$2 = length(_pipe$1);
-  let _pipe$3 = ((_capture) => {
-    return make_node(
-      identifier,
-      _capture,
-      to_viewbox_space(model.viewbox, model.menu.pos)
-    );
-  })(_pipe$2);
-  let _pipe$4 = ((res) => {
+  let position = to_viewbox_space(model.viewbox, model.menu.pos);
+  let _pipe = model.library;
+  let _pipe$1 = new_node(_pipe, identifier, position);
+  let _pipe$2 = ((res) => {
     if (res.isOk()) {
       let node = res[0];
       return model.withFields({ nodes: insert(model.nodes, node.id, node) });
     } else {
       return model;
     }
-  })(_pipe$3);
+  })(_pipe$1);
+  let _pipe$3 = sync_verts(_pipe$2);
+  let _pipe$4 = recalc_graph(_pipe$3);
   return ((m) => {
     return [m, simple_effect(new GraphCloseMenu())];
   })(_pipe$4);
@@ -4059,7 +4674,14 @@ function graph_delete_selected_nodes(model) {
   let _pipe = model;
   let _pipe$1 = delete_selected_nodes(_pipe);
   let _pipe$2 = delete_orphaned_connections(_pipe$1);
-  return none_effect_wrapper(_pipe$2);
+  let _pipe$3 = sync_verts(_pipe$2);
+  let _pipe$4 = sync_edges(_pipe$3);
+  let _pipe$5 = recalc_graph(_pipe$4);
+  return none_effect_wrapper(_pipe$5);
+}
+function graph_changed_connections(model) {
+  let _pipe = model;
+  return none_effect_wrapper(_pipe);
 }
 function update_last_clicked_point(model, event2) {
   let _pipe = event2.position;
@@ -4229,39 +4851,44 @@ function view_node_output(node) {
   let pos = output_position(node.output);
   let id2 = output_id(node.output);
   let hovered = output_hovered(node.output);
-  return g(
-    toList([
-      attribute(
-        "transform",
-        (() => {
-          let _pipe = pos;
-          return to_html(_pipe, new Translate());
-        })()
-      )
-    ]),
-    toList([
-      circle(
-        toList([
-          attribute("cx", "0"),
-          attribute("cy", "0"),
-          attribute("r", "10"),
-          attribute("fill", "currentColor"),
-          attribute("stroke", "black"),
+  let $ = node.id === "node.output";
+  if (!$) {
+    return g(
+      toList([
+        attribute(
+          "transform",
           (() => {
-            if (hovered) {
-              return attribute("stroke-width", "3");
-            } else {
-              return attribute("stroke-width", "0");
-            }
-          })(),
-          class$("text-gray-500"),
-          on_mouse_down(new UserClickedNodeOutput(node.id, pos)),
-          on_mouse_enter(new UserHoverNodeOutput(id2)),
-          on_mouse_leave(new UserUnhoverNodeOutput())
-        ])
-      )
-    ])
-  );
+            let _pipe = pos;
+            return to_html(_pipe, new Translate());
+          })()
+        )
+      ]),
+      toList([
+        circle(
+          toList([
+            attribute("cx", "0"),
+            attribute("cy", "0"),
+            attribute("r", "10"),
+            attribute("fill", "currentColor"),
+            attribute("stroke", "black"),
+            (() => {
+              if (hovered) {
+                return attribute("stroke-width", "3");
+              } else {
+                return attribute("stroke-width", "0");
+              }
+            })(),
+            class$("text-gray-500"),
+            on_mouse_down(new UserClickedNodeOutput(node.id, pos)),
+            on_mouse_enter(new UserHoverNodeOutput(id2)),
+            on_mouse_leave(new UserUnhoverNodeOutput())
+          ])
+        )
+      ])
+    );
+  } else {
+    return none2();
+  }
 }
 function view_grid_canvas(width, height) {
   let w = to_string2(width) + "%";
@@ -4349,7 +4976,7 @@ function mouse_event_decoder(e) {
 }
 function view_node(node, selection) {
   let node_selected_class = (() => {
-    let $ = contains(selection, node.id);
+    let $ = contains2(selection, node.id);
     if ($) {
       return class$("text-gray-300 stroke-gray-400");
     } else {
@@ -4366,7 +4993,7 @@ function view_node(node, selection) {
   };
   return g(
     toList([
-      id("node-" + to_string2(node.id)),
+      id("g-" + node.id),
       attribute("transform", translate(node.position.x, node.position.y)),
       class$("select-none")
     ]),
@@ -4375,7 +5002,7 @@ function view_node(node, selection) {
         toList([
           rect(
             toList([
-              id(to_string2(node.id)),
+              id(node.id),
               attribute("width", "200"),
               attribute("height", "150"),
               attribute("rx", "25"),
@@ -4635,18 +5262,21 @@ function update(model, msg) {
   } else if (msg instanceof GraphSpawnNode) {
     let identifier = msg[0];
     return graph_spawn_node(model, identifier);
-  } else {
+  } else if (msg instanceof GraphDeleteSelectedNodes) {
     return graph_delete_selected_nodes(model);
+  } else {
+    return graph_changed_connections(model);
   }
 }
 function main() {
+  let nodes = math_nodes();
   let app$1 = application(init2, update, view);
-  let $ = start3(app$1, "#app", void 0);
+  let $ = start3(app$1, "#app", nodes);
   if (!$.isOk()) {
     throw makeError(
       "assignment_no_match",
       "nodework",
-      86,
+      90,
       "main",
       "Assignment pattern did not match",
       { value: $ }
