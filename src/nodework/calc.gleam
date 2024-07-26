@@ -1,15 +1,17 @@
-import gleam/io
-import gleam/set
 import gleam/dict
 import gleam/dynamic
-import gleam/string
-import gleam/list.{map, filter, contains, zip}
+import gleam/io
+import gleam/list.{contains, filter, map, zip}
 import gleam/pair
 import gleam/result
-import nodework/dag.{type Vertex, type VertexId, type Graph, Graph, Vertex, type Edge, Edge}
+import gleam/set
+import gleam/string
+import nodework/conn.{type Conn}
+import nodework/dag.{
+  type Edge, type Graph, type Vertex, type VertexId, Edge, Graph, Vertex,
+}
 import nodework/model.{type Model, Model}
 import nodework/node.{type Node}
-import nodework/conn.{type Conn}
 
 fn nodes_to_vertices(nodes: List(Node)) -> List(#(VertexId, Vertex)) {
   nodes
@@ -56,26 +58,25 @@ pub fn sync_edges(model: Model) -> Model {
 fn eval_graph(verts: List(Vertex), model: Model) -> Model {
   verts
   |> list.fold(dict.new(), fn(evaluated, vert) {
-
     case dict.get(model.library, vert.value) {
       Error(Nil) -> dict.insert(evaluated, vert.id, dynamic.from(0))
       Ok(nodefunc) -> {
-    let input_collection = zip(set.to_list(nodefunc.inputs), vert.inputs)
+        let input_collection = zip(set.to_list(nodefunc.inputs), vert.inputs)
 
-    let inputs =
-      input_collection
-      |> map(fn(collection) {
-        let #(ref, key) = collection
-        case dict.get(evaluated, key) {
-          Error(Nil) -> #(ref, dynamic.from(0))
-          Ok(val) -> #(ref, val)
-        }
-      })
-      |> dict.from_list
+        let inputs =
+          input_collection
+          |> map(fn(collection) {
+            let #(ref, key) = collection
+            case dict.get(evaluated, key) {
+              Error(Nil) -> #(ref, dynamic.from(0))
+              Ok(val) -> #(ref, val)
+            }
+          })
+          |> dict.from_list
 
-    inputs
-    |> nodefunc.output
-    |> fn(val) { dict.insert(evaluated, vert.id, val) }
+        inputs
+        |> nodefunc.output
+        |> fn(val) { dict.insert(evaluated, vert.id, val) }
       }
     }
   })
@@ -96,7 +97,9 @@ pub fn recalc_graph(model: Model) -> Model {
   |> fn(res: Result(List(Vertex), String)) {
     case res {
       Ok(verts) -> verts
-      Error(msg) -> { [] }
+      Error(msg) -> {
+        []
+      }
     }
   }
   |> eval_graph(model)

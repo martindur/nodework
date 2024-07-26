@@ -72,7 +72,6 @@ pub fn exclude_by_node_ids(conns: List(Conn), ids: Set(String)) -> List(Conn) {
     }
   })
 }
-
 // fn calculate_connection(conns: List(Conn), c: Conn) -> List(String) {
 //   conns
 //   |> filter(fn(c2) { c.source_node_id == c2.target_node_id })

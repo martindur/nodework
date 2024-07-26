@@ -4,13 +4,13 @@ import gleam/result
 import gleam/set
 import nodework/node.{type NodeFunction, NodeFunction}
 
-pub fn math_nodes() -> List(NodeFunction)  {
+pub fn math_nodes() -> List(NodeFunction) {
   [
     NodeFunction("add", set.from_list(["a", "b"]), add),
     NodeFunction("double", set.from_list(["x"]), double),
     NodeFunction("ten", set.from_list([]), return_ten),
     NodeFunction("one", set.from_list([]), return_one),
-    NodeFunction("output", set.from_list(["eval"]), output)
+    NodeFunction("output", set.from_list(["eval"]), output),
   ]
 }
 

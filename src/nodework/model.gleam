@@ -5,7 +5,7 @@ import nodework/conn.{type Conn}
 import nodework/dag.{type Graph}
 import nodework/menu.{type Menu}
 import nodework/navigator.{type Navigator}
-import nodework/node.{type Node, type NodeId, type NodeFunction}
+import nodework/node.{type Node, type NodeFunction, type NodeId}
 import nodework/vector.{type Vector}
 import nodework/viewbox.{type GraphMode, type ViewBox}
 
@@ -22,6 +22,6 @@ pub type Model {
     menu: Menu,
     library: Dict(String, NodeFunction),
     graph: Graph,
-    output: Dynamic
+    output: Dynamic,
   )
 }

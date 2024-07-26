@@ -17,16 +17,19 @@ import lustre/element/html
 import lustre/element/svg
 import lustre/event
 
+import nodework/calc
 import nodework/conn.{type Conn, Conn}
+import nodework/dag
 import nodework/draw
 import nodework/menu.{type Menu, Menu}
 import nodework/model.{type Model, Model}
 import nodework/navigator.{type Navigator, Navigator}
-import nodework/node.{type Node, type NodeId, type NodeInput, Node, NotFound, type NodeFunction, NodeFunction} as nd
+import nodework/node.{
+  type Node, type NodeFunction, type NodeId, type NodeInput, Node, NodeFunction,
+  NotFound,
+} as nd
 import nodework/vector.{type Vector, Vector}
 import nodework/viewbox.{type ViewBox, Drag, Normal, ViewBox}
-import nodework/calc
-import nodework/dag
 import util/random
 
 import nodework/examples
@@ -111,10 +114,10 @@ fn init(node_functions: List(NodeFunction)) -> #(Model, Effect(Msg)) {
       last_clicked_point: Vector(0, 0),
       menu: menu.new(node_functions),
       library: node_functions
-        |> map(fn(nf) { #(string.lowercase(nf.label), nf)})
+        |> map(fn(nf) { #(string.lowercase(nf.label), nf) })
         |> dict.from_list,
       graph: dag.new(),
-      output: dynamic.from(0)
+      output: dynamic.from(0),
     ),
     effect.none(),
   )
