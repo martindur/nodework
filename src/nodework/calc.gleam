@@ -63,7 +63,6 @@ fn eval_graph(verts: List(Vertex), model: Model) -> Model {
     case dict.get(model.library, vert.value) {
       Error(Nil) -> dict.insert(evaluated, vert.id, dynamic.from(0))
       Ok(nodefunc) -> {
-
         let inputs =
           vert.inputs
           |> dict.to_list
