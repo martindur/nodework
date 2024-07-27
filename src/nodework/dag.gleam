@@ -11,11 +11,11 @@ pub type VertexId =
   String
 
 pub type Vertex {
-  Vertex(id: VertexId, value: String, inputs: List(String))
+  Vertex(id: VertexId, value: String, inputs: Dict(String, String))
 }
 
 pub type Edge {
-  Edge(from: VertexId, to: VertexId)
+  Edge(from: VertexId, to: VertexId, input: String)
 }
 
 pub type Graph {
@@ -28,15 +28,15 @@ pub fn new() -> Graph {
 
 pub fn test_data() -> Graph {
   ["a", "b", "c", "d", "e"]
-  |> map(fn(val) { #(val, Vertex(val, val, [])) })
+  |> map(fn(val) { #(val, Vertex(val, val, dict.new())) })
   |> dict.from_list
   |> fn(verts) {
     let edges = [
-      Edge("a", "c"),
-      Edge("b", "c"),
-      Edge("c", "d"),
-      Edge("b", "e"),
-      Edge("d", "e"),
+      Edge("a", "c", ""),
+      Edge("b", "c", ""),
+      Edge("c", "d", ""),
+      Edge("b", "e", ""),
+      Edge("d", "e", ""),
     ]
     Graph(verts: verts, edges: edges)
   }
@@ -48,7 +48,8 @@ pub fn sync_vertex_inputs(graph: Graph) -> Graph {
   |> dict.map_values(fn(id, v) {
     graph.edges
     |> filter(fn(edge) { id == edge.to })
-    |> map(fn(edge) { edge.from })
+    |> map(fn(edge) { #(edge.input, edge.from) })
+    |> dict.from_list
     |> fn(inputs) { Vertex(..v, inputs: inputs) }
   })
   |> fn(verts) { Graph(..graph, verts: verts) }
@@ -59,24 +60,6 @@ pub fn add_vertex(graph: Graph, vert: Vertex) -> Graph {
   |> dict.insert(vert.id, vert)
   |> fn(verts) { Graph(..graph, verts: verts) }
 }
-
-// pub fn add_edge(graph: Graph, edge: Edge) -> Result(Graph, String) {
-//   case has_cycle(graph, edge) {
-//     True -> Error("Adding this edge would create a cycle")
-//     False -> {
-//       graph.edges
-//       |> list.prepend(edge)
-//       |> fn(edges) { Ok(Graph(..graph, edges: edges)) }
-//     }
-//   }
-// }
-
-// fn has_cycle(graph: Graph, edge: Edge) -> Bool {
-//   graph.edges
-//   |> list.prepend(edge)
-//   |> fn(edges) { 
-//   False
-// }
 
 fn sort(
   sorted: List(Vertex),

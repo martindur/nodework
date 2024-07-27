@@ -14,6 +14,7 @@ pub type Conn {
     source_node_id: String,
     target_node_id: String,
     target_input_id: String,
+    target_input_value: String,
     active: Bool,
   )
 }
