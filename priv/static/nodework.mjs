@@ -108,11 +108,6 @@ var BitArray = class _BitArray {
     return new _BitArray(this.buffer.slice(index2));
   }
 };
-var UtfCodepoint = class {
-  constructor(value) {
-    this.value = value;
-  }
-};
 function byteArrayToInt(byteArray) {
   byteArray = byteArray.reverse();
   let value = 0;
@@ -264,6 +259,9 @@ var Gt = class extends CustomType {
 };
 
 // build/dev/javascript/gleam_stdlib/gleam/float.mjs
+function to_string(x) {
+  return float_to_string(x);
+}
 function compare(a, b) {
   let $ = a === b;
   if ($) {
@@ -312,8 +310,8 @@ function add(a, b) {
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/int.mjs
-function to_string2(x) {
-  return to_string(x);
+function to_string3(x) {
+  return to_string2(x);
 }
 function to_float(x) {
   return identity(x);
@@ -608,27 +606,6 @@ function any(loop$list, loop$predicate) {
       }
     }
   }
-}
-function do_zip(loop$xs, loop$ys, loop$acc) {
-  while (true) {
-    let xs = loop$xs;
-    let ys = loop$ys;
-    let acc = loop$acc;
-    if (xs.atLeastLength(1) && ys.atLeastLength(1)) {
-      let x = xs.head;
-      let xs$1 = xs.tail;
-      let y = ys.head;
-      let ys$1 = ys.tail;
-      loop$xs = xs$1;
-      loop$ys = ys$1;
-      loop$acc = prepend([x, y], acc);
-    } else {
-      return reverse(acc);
-    }
-  }
-}
-function zip(list, other) {
-  return do_zip(list, other, toList([]));
 }
 function sequences(loop$list, loop$compare, loop$growing, loop$direction, loop$prev, loop$acc) {
   while (true) {
@@ -1086,7 +1063,7 @@ function from_string(string3) {
 function append2(builder, second2) {
   return append_builder(builder, from_string(second2));
 }
-function to_string3(builder) {
+function to_string4(builder) {
   return identity(builder);
 }
 
@@ -1101,7 +1078,7 @@ function append4(first3, second2) {
   let _pipe = first3;
   let _pipe$1 = from_string(_pipe);
   let _pipe$2 = append2(_pipe$1, second2);
-  return to_string3(_pipe$2);
+  return to_string4(_pipe$2);
 }
 function join2(strings, separator) {
   return join(strings, separator);
@@ -1118,10 +1095,6 @@ function capitalise(s) {
   } else {
     return "";
   }
-}
-function inspect2(term) {
-  let _pipe = inspect(term);
-  return to_string3(_pipe);
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/dynamic.mjs
@@ -1174,7 +1147,7 @@ function push_path(error, name) {
   let name$1 = from(name);
   let decoder = any2(
     toList([string, (x) => {
-      return map2(int(x), to_string2);
+      return map2(int(x), to_string3);
     }])
   );
   let name$2 = (() => {
@@ -1185,7 +1158,7 @@ function push_path(error, name) {
     } else {
       let _pipe = toList(["<", classify(name$1), ">"]);
       let _pipe$1 = from_strings(_pipe);
-      return to_string3(_pipe$1);
+      return to_string4(_pipe$1);
     }
   })();
   return error.withFields({ path: prepend(name$2, error.path) });
@@ -1924,8 +1897,16 @@ var NOT_FOUND = {};
 function identity(x) {
   return x;
 }
-function to_string(term) {
+function to_string2(term) {
   return term.toString();
+}
+function float_to_string(float3) {
+  const string3 = float3.toString();
+  if (string3.indexOf(".") >= 0) {
+    return string3;
+  } else {
+    return string3 + ".0";
+  }
 }
 function graphemes_iterator(string3) {
   if (Intl && Intl.Segmenter) {
@@ -1994,15 +1975,6 @@ var unicode_whitespaces = [
 ].join();
 var left_trim_regex = new RegExp(`^([${unicode_whitespaces}]*)`, "g");
 var right_trim_regex = new RegExp(`([${unicode_whitespaces}]*)$`, "g");
-function print_debug(string3) {
-  if (typeof process === "object" && process.stderr?.write) {
-    process.stderr.write(string3 + "\n");
-  } else if (typeof Deno === "object") {
-    Deno.stderr.writeSync(new TextEncoder().encode(string3 + "\n"));
-  } else {
-    console.log(string3);
-  }
-}
 function round(float3) {
   return Math.round(float3);
 }
@@ -2102,117 +2074,6 @@ function try_get_field(value, field2, or_else) {
   } catch {
     return or_else();
   }
-}
-function inspect(v) {
-  const t = typeof v;
-  if (v === true)
-    return "True";
-  if (v === false)
-    return "False";
-  if (v === null)
-    return "//js(null)";
-  if (v === void 0)
-    return "Nil";
-  if (t === "string")
-    return inspectString(v);
-  if (t === "bigint" || t === "number")
-    return v.toString();
-  if (Array.isArray(v))
-    return `#(${v.map(inspect).join(", ")})`;
-  if (v instanceof List)
-    return inspectList(v);
-  if (v instanceof UtfCodepoint)
-    return inspectUtfCodepoint(v);
-  if (v instanceof BitArray)
-    return inspectBitArray(v);
-  if (v instanceof CustomType)
-    return inspectCustomType(v);
-  if (v instanceof Dict)
-    return inspectDict(v);
-  if (v instanceof Set)
-    return `//js(Set(${[...v].map(inspect).join(", ")}))`;
-  if (v instanceof RegExp)
-    return `//js(${v})`;
-  if (v instanceof Date)
-    return `//js(Date("${v.toISOString()}"))`;
-  if (v instanceof Function) {
-    const args = [];
-    for (const i of Array(v.length).keys())
-      args.push(String.fromCharCode(i + 97));
-    return `//fn(${args.join(", ")}) { ... }`;
-  }
-  return inspectObject(v);
-}
-function inspectString(str) {
-  let new_str = '"';
-  for (let i = 0; i < str.length; i++) {
-    let char = str[i];
-    switch (char) {
-      case "\n":
-        new_str += "\\n";
-        break;
-      case "\r":
-        new_str += "\\r";
-        break;
-      case "	":
-        new_str += "\\t";
-        break;
-      case "\f":
-        new_str += "\\f";
-        break;
-      case "\\":
-        new_str += "\\\\";
-        break;
-      case '"':
-        new_str += '\\"';
-        break;
-      default:
-        if (char < " " || char > "~" && char < "\xA0") {
-          new_str += "\\u{" + char.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0") + "}";
-        } else {
-          new_str += char;
-        }
-    }
-  }
-  new_str += '"';
-  return new_str;
-}
-function inspectDict(map4) {
-  let body = "dict.from_list([";
-  let first3 = true;
-  map4.forEach((value, key) => {
-    if (!first3)
-      body = body + ", ";
-    body = body + "#(" + inspect(key) + ", " + inspect(value) + ")";
-    first3 = false;
-  });
-  return body + "])";
-}
-function inspectObject(v) {
-  const name = Object.getPrototypeOf(v)?.constructor?.name || "Object";
-  const props = [];
-  for (const k of Object.keys(v)) {
-    props.push(`${inspect(k)}: ${inspect(v[k])}`);
-  }
-  const body = props.length ? " " + props.join(", ") + " " : "";
-  const head = name === "Object" ? "" : name + " ";
-  return `//js(${head}{${body}})`;
-}
-function inspectCustomType(record) {
-  const props = Object.keys(record).map((label) => {
-    const value = inspect(record[label]);
-    return isNaN(parseInt(label)) ? `${label}: ${value}` : value;
-  }).join(", ");
-  return props ? `${record.constructor.name}(${props})` : record.constructor.name;
-}
-function inspectList(list) {
-  return `[${list.toArray().map(inspect).join(", ")}]`;
-}
-function inspectBitArray(bits) {
-  return `<<${Array.from(bits.buffer).join(", ")}>>`;
-}
-function inspectUtfCodepoint(codepoint2) {
-  return `//utfcodepoint(${String.fromCodePoint(codepoint2.value)})`;
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/dict.mjs
@@ -2381,14 +2242,6 @@ function do_map_values(f, dict) {
 }
 function map_values(dict, fun) {
   return do_map_values(fun, dict);
-}
-
-// build/dev/javascript/gleam_stdlib/gleam/io.mjs
-function debug(term) {
-  let _pipe = term;
-  let _pipe$1 = inspect2(_pipe);
-  print_debug(_pipe$1);
-  return term;
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/set.mjs
@@ -3209,13 +3062,13 @@ function to_html(vec, t) {
     }
   })();
   return ((t2) => {
-    return t2 + to_string2(vec.x) + "," + to_string2(vec.y) + ")";
+    return t2 + to_string3(vec.x) + "," + to_string3(vec.y) + ")";
   })(_pipe);
 }
 
 // build/dev/javascript/nodework/nodework/conn.mjs
 var Conn = class extends CustomType {
-  constructor(id2, p0, p1, source_node_id, target_node_id, target_input_id, active) {
+  constructor(id2, p0, p1, source_node_id, target_node_id, target_input_id, target_input_value, active) {
     super();
     this.id = id2;
     this.p0 = p0;
@@ -3223,15 +3076,16 @@ var Conn = class extends CustomType {
     this.source_node_id = source_node_id;
     this.target_node_id = target_node_id;
     this.target_input_id = target_input_id;
+    this.target_input_value = target_input_value;
     this.active = active;
   }
 };
 function to_attributes(conn) {
   return toList([
-    attribute("x1", to_string2(conn.p0.x)),
-    attribute("y1", to_string2(conn.p0.y)),
-    attribute("x2", to_string2(conn.p1.x)),
-    attribute("y2", to_string2(conn.p1.y))
+    attribute("x1", to_string3(conn.p0.x)),
+    attribute("y1", to_string3(conn.p0.y)),
+    attribute("x2", to_string3(conn.p1.x)),
+    attribute("y2", to_string3(conn.p1.y))
   ]);
 }
 function conn_duplicate(a, b) {
@@ -3399,7 +3253,7 @@ function input_position_from_index(index2) {
   return new Vector(0, 50 + index2 * 30);
 }
 function new_input(id2, index2, label) {
-  let _pipe = id2 + "-" + to_string2(index2);
+  let _pipe = id2 + "-" + to_string3(index2);
   return ((input_id2) => {
     return new NodeInput(
       input_id2,
@@ -3628,10 +3482,11 @@ var Vertex = class extends CustomType {
   }
 };
 var Edge = class extends CustomType {
-  constructor(from3, to) {
+  constructor(from3, to, input) {
     super();
     this.from = from3;
     this.to = to;
+    this.input = input;
   }
 };
 var Graph = class extends CustomType {
@@ -3654,11 +3509,12 @@ function sync_vertex_inputs(graph) {
         return id2 === edge.to;
       });
       let _pipe$3 = map(_pipe$2, (edge) => {
-        return edge.from;
+        return [edge.input, edge.from];
       });
+      let _pipe$4 = from_list(_pipe$3);
       return ((inputs) => {
         return v.withFields({ inputs });
-      })(_pipe$3);
+      })(_pipe$4);
     }
   );
   return ((verts) => {
@@ -3757,7 +3613,7 @@ function view_menu_item(item, spawn_func) {
   );
 }
 function view_menu(menu, spawn_func) {
-  let pos = "translate(" + to_string2(menu.pos.x) + "px, " + to_string2(
+  let pos = "translate(" + to_string3(menu.pos.x) + "px, " + to_string3(
     menu.pos.y
   ) + "px)";
   return div(
@@ -3892,7 +3748,7 @@ function nodes_to_vertices(nodes) {
   return map(
     _pipe,
     (n) => {
-      return [n.id, new Vertex(n.id, lowercase2(n.name), toList([]))];
+      return [n.id, new Vertex(n.id, lowercase2(n.name), new$())];
     }
   );
 }
@@ -3901,7 +3757,7 @@ function conns_to_edges(conns) {
   return map(
     _pipe,
     (c) => {
-      return new Edge(c.source_node_id, c.target_node_id);
+      return new Edge(c.source_node_id, c.target_node_id, c.target_input_value);
     }
   );
 }
@@ -3963,14 +3819,14 @@ function eval_graph(verts, model) {
         return insert(evaluated, vert.id, from(0));
       } else {
         let nodefunc = $[0];
-        let input_collection = zip(to_list2(nodefunc.inputs), vert.inputs);
         let inputs = (() => {
-          let _pipe$13 = input_collection;
-          let _pipe$23 = map(
-            _pipe$13,
-            (collection) => {
-              let ref = collection[0];
-              let key = collection[1];
+          let _pipe$13 = vert.inputs;
+          let _pipe$23 = map_to_list(_pipe$13);
+          let _pipe$32 = map(
+            _pipe$23,
+            (keypair) => {
+              let ref = keypair[0];
+              let key = keypair[1];
               let $1 = get(evaluated, key);
               if (!$1.isOk() && !$1[0]) {
                 return [ref, from(0)];
@@ -3980,7 +3836,7 @@ function eval_graph(verts, model) {
               }
             }
           );
-          return from_list(_pipe$23);
+          return from_list(_pipe$32);
         })();
         let _pipe$12 = inputs;
         let _pipe$22 = nodefunc.output(_pipe$12);
@@ -4018,11 +3874,7 @@ function recalc_graph(model) {
       return toList([]);
     }
   })(_pipe$2);
-  let _pipe$4 = eval_graph(_pipe$3, model);
-  return ((m) => {
-    debug(m.output);
-    return m;
-  })(_pipe$4);
+  return eval_graph(_pipe$3, model);
 }
 
 // build/dev/javascript/nodework/nodework/draw.mjs
@@ -4475,7 +4327,7 @@ function user_clicked_node_output(model, node_id, offset) {
     return to_viewbox_translate(_pipe2, model.navigator.cursor_point);
   })();
   let id2 = generate_random_id("conn");
-  let new_conn = new Conn(id2, p1, p2, node_id, "", "", true);
+  let new_conn = new Conn(id2, p1, p2, node_id, "", "", "", true);
   let _pipe = model.connections;
   let _pipe$1 = prepend2(_pipe, new_conn);
   let _pipe$2 = ((c) => {
@@ -4504,6 +4356,7 @@ function user_unclicked(model) {
             return c.withFields({
               target_node_id: node.id,
               target_input_id: input_id(input),
+              target_input_value: input_label(input),
               active: false
             });
           }
@@ -4779,13 +4632,13 @@ function user_pressed_key(model, key) {
   })(_pipe);
 }
 function translate(x, y) {
-  let x_string = to_string2(x);
-  let y_string = to_string2(y);
+  let x_string = to_string3(x);
+  let y_string = to_string3(y);
   return "translate(" + x_string + "," + y_string + ")";
 }
 function attr_viewbox(offset, resolution) {
   let _pipe = toList([offset.x, offset.y, resolution.x, resolution.y]);
-  let _pipe$1 = map(_pipe, to_string2);
+  let _pipe$1 = map(_pipe, to_string3);
   let _pipe$2 = reduce(_pipe$1, (a, b) => {
     return a + " " + b;
   });
@@ -4891,10 +4744,10 @@ function view_node_output(node) {
   }
 }
 function view_grid_canvas(width, height) {
-  let w = to_string2(width) + "%";
-  let h = to_string2(height) + "%";
-  let x = "-" + to_string2(divideInt(width, 2)) + "%";
-  let y = "-" + to_string2(divideInt(height, 2)) + "%";
+  let w = to_string3(width) + "%";
+  let h = to_string3(height) + "%";
+  let x = "-" + to_string3(divideInt(width, 2)) + "%";
+  let y = "-" + to_string3(divideInt(height, 2)) + "%";
   return rect(
     toList([
       attribute("x", x),
@@ -5080,6 +4933,54 @@ function keydown_event_decoder(e) {
     }
   );
 }
+function output_to_element(output2) {
+  let decoders = any2(
+    toList([
+      string,
+      (x) => {
+        return map2(
+          int(x),
+          (o) => {
+            return to_string3(o);
+          }
+        );
+      },
+      (x) => {
+        return map2(
+          float(x),
+          (o) => {
+            return to_string(o);
+          }
+        );
+      }
+    ])
+  );
+  let _pipe = decoders(from(output2));
+  let _pipe$1 = ((res) => {
+    if (res.isOk()) {
+      let decoded = res[0];
+      return decoded;
+    } else {
+      return "";
+    }
+  })(_pipe);
+  return ((_capture) => {
+    return attribute("dangerous-unescaped-html", _capture);
+  })(
+    _pipe$1
+  );
+}
+function view_output_canvas(model) {
+  return div(
+    toList([
+      class$(
+        "w-80 h-80 absolute bottom-2 right-2 rounded border border-gray-300 bg-white flex items-center justify-center"
+      ),
+      output_to_element(model.output)
+    ]),
+    toList([])
+  );
+}
 function view(model) {
   let user_moved_mouse$1 = (e) => {
     return try$(
@@ -5182,7 +5083,8 @@ function view(model) {
           )
         ])
       ),
-      view_menu(model.menu, spawn)
+      view_menu(model.menu, spawn),
+      view_output_canvas(model)
     ])
   );
 }
@@ -5276,7 +5178,7 @@ function main() {
     throw makeError(
       "assignment_no_match",
       "nodework",
-      90,
+      93,
       "main",
       "Assignment pattern did not match",
       { value: $ }
