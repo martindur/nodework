@@ -1,5 +1,5 @@
 import gleam/dict
-import gleam/dynamic.{type DecodeError}
+import gleam/dynamic.{type DecodeError, type Dynamic}
 import gleam/float
 import gleam/function
 import gleam/int
@@ -251,7 +251,7 @@ fn user_clicked_node_output(
   let p2 =
     model.viewbox |> viewbox.to_viewbox_translate(model.navigator.cursor_point)
   let id = random.generate_random_id("conn")
-  let new_conn = Conn(id, p1, p2, node_id, "", "", True)
+  let new_conn = Conn(id, p1, p2, node_id, "", "", "", True)
 
   model.connections
   |> list.prepend(new_conn)
@@ -272,6 +272,7 @@ fn user_unclicked(model: Model) -> #(Model, Effect(Msg)) {
               ..c,
               target_node_id: node.id,
               target_input_id: nd.input_id(input),
+              target_input_value: nd.input_label(input),
               active: False,
             )
         }
@@ -729,6 +730,36 @@ fn keydown_event_decoder(e) -> Result(Key, List(DecodeError)) {
   Ok(key)
 }
 
+fn output_to_element(output: Dynamic) -> Attribute(msg) {
+  let decoders =
+    dynamic.any([
+      dynamic.string,
+      fn(x) { result.map(dynamic.int(x), fn(o) { int.to_string(o) }) },
+      fn(x) { result.map(dynamic.float(x), fn(o) { float.to_string(o) }) },
+    ])
+
+  decoders(dynamic.from(output))
+  |> fn(res) {
+    case res {
+      Ok(decoded) -> decoded
+      Error(_) -> ""
+    }
+  }
+  |> attr("dangerous-unescaped-html", _)
+}
+
+fn view_output_canvas(model: Model) -> element.Element(Msg) {
+  html.div(
+    [
+      attribute.class(
+        "w-80 h-80 absolute bottom-2 right-2 rounded border border-gray-300 bg-white flex items-center justify-center",
+      ),
+      output_to_element(model.output),
+    ],
+    [],
+  )
+}
+
 fn view(model: Model) -> element.Element(Msg) {
   let user_moved_mouse = fn(e) -> Result(Msg, List(DecodeError)) {
     result.try(event.mouse_position(e), fn(pos) {
@@ -799,5 +830,6 @@ fn view(model: Model) -> element.Element(Msg) {
       ],
     ),
     menu.view_menu(model.menu, spawn),
+    view_output_canvas(model),
   ])
 }

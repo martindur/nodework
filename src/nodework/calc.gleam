@@ -15,12 +15,14 @@ import nodework/node.{type Node}
 
 fn nodes_to_vertices(nodes: List(Node)) -> List(#(VertexId, Vertex)) {
   nodes
-  |> map(fn(n) { #(n.id, Vertex(n.id, string.lowercase(n.name), [])) })
+  |> map(fn(n) { #(n.id, Vertex(n.id, string.lowercase(n.name), dict.new())) })
 }
 
 fn conns_to_edges(conns: List(Conn)) -> List(Edge) {
   conns
-  |> map(fn(c) { Edge(c.source_node_id, c.target_node_id) })
+  |> map(fn(c) {
+    Edge(c.source_node_id, c.target_node_id, c.target_input_value)
+  })
 }
 
 fn filter_conns_by_edges(conns: List(Conn), edges: List(Edge)) -> List(Conn) {
@@ -61,12 +63,12 @@ fn eval_graph(verts: List(Vertex), model: Model) -> Model {
     case dict.get(model.library, vert.value) {
       Error(Nil) -> dict.insert(evaluated, vert.id, dynamic.from(0))
       Ok(nodefunc) -> {
-        let input_collection = zip(set.to_list(nodefunc.inputs), vert.inputs)
 
         let inputs =
-          input_collection
-          |> map(fn(collection) {
-            let #(ref, key) = collection
+          vert.inputs
+          |> dict.to_list
+          |> map(fn(keypair) {
+            let #(ref, key) = keypair
             case dict.get(evaluated, key) {
               Error(Nil) -> #(ref, dynamic.from(0))
               Ok(val) -> #(ref, val)
@@ -103,8 +105,4 @@ pub fn recalc_graph(model: Model) -> Model {
     }
   }
   |> eval_graph(model)
-  |> fn(m: Model) {
-    io.debug(m.output)
-    m
-  }
 }
