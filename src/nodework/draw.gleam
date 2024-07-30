@@ -1,16 +1,27 @@
+import gleam/result
+import gleam/dynamic.{type DecodeError, type Dynamic}
 import gleam/int
+import gleam/float
 import gleam/list.{map, reduce}
-import gleam/dynamic.{type Dynamic, type DecodeError}
 
-import lustre/attribute.{attribute as attr, type Attribute}
-import lustre/event
+import lustre/attribute.{type Attribute, attribute as attr}
 import lustre/element
-import lustre/element/svg
 import lustre/element/html
+import lustre/element/svg
+import lustre/event
 
-import nodework/lib.{type LibraryMenu}
+import nodework/decoder.{mouse_event_decoder}
 import nodework/draw/viewbox.{type ViewBox}
-import nodework/math.{type Vector}
+import nodework/lib.{type LibraryMenu}
+import nodework/math.{type Vector, Vector}
+import nodework/model.{type Model, Model, type Msg, UserClickedGraph, UserMovedMouse}
+
+
+pub fn cursor(m: Model, p: Vector) -> Model {
+  p
+  |> viewbox.scale(m.viewbox, _)
+  |> fn(cursor) { Model(..m, cursor: cursor) }
+}
 
 fn view_menu_item(
   item: #(String, String),
@@ -128,9 +139,27 @@ fn attr_viewbox(offset: Vector, resolution: Vector) -> Attribute(msg) {
   }
 }
 
-pub fn view_canvas(viewbox: ViewBox) -> element.Element(msg) {
-  svg.svg([attribute.id("graph"), attr("contentEditable", "true"), attr_viewbox(viewbox.offset, viewbox.resolution)], [
-    view_grid(),
-    view_grid_canvas(500, 500),
-  ])
+pub fn view_canvas(viewbox: ViewBox) -> element.Element(Msg) {
+  let mousedown = fn(e) -> Result(Msg, List(DecodeError)) {
+    use event <- result.try(mouse_event_decoder(e))
+
+    Ok(UserClickedGraph(event))
+  }
+
+  let mousemove = fn(e) -> Result(Msg, List(DecodeError)) {
+    result.try(event.mouse_position(e), fn(pos) {
+      Ok(UserMovedMouse(Vector(x: float.round(pos.0), y: float.round(pos.1))))
+    })
+  }
+
+  svg.svg(
+    [
+      attribute.id("graph"),
+      attr("contentEditable", "true"),
+      attr_viewbox(viewbox.offset, viewbox.resolution),
+      event.on("mousedown", mousedown),
+      event.on("mousemove", mousemove)
+    ],
+    [view_grid(), view_grid_canvas(500, 500)],
+  )
 }

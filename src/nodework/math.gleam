@@ -25,6 +25,10 @@ pub fn vector_divide(vec: Vector, divisor: Float) -> Vector {
   })
 }
 
+pub fn vector_add(a: Vector, b: Vector) -> Vector {
+  Vector(x: a.x + b.x, y: a.y + b.y)
+}
+
 pub fn map_vector(vec: Vector, func: fn(Int) -> Int) -> Vector {
   Vector(x: func(vec.x), y: func(vec.y))
 }

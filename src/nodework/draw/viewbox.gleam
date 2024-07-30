@@ -15,3 +15,14 @@ pub fn unscale(vb: ViewBox, vec: Vector) -> Vector {
   vec
   |> math.vector_divide(vb.zoom_level)
 }
+
+pub fn scale(vb: ViewBox, vec: Vector) -> Vector {
+  vec
+  |> math.vector_scalar(vb.zoom_level)
+}
+
+pub fn transform(vb: ViewBox, vec: Vector) -> Vector {
+  vec
+  |> math.vector_scalar(vb.zoom_level)
+  |> math.vector_add(vb.offset)
+}

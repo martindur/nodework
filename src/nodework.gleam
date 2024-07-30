@@ -12,22 +12,27 @@ import lustre/element
 import lustre/element/html
 
 import nodework/draw
-import nodework/decoder
+import nodework/decoder.{type MouseEvent}
 import nodework/draw/viewbox.{ViewBox}
 import nodework/handler.{simple_effect}
 import nodework/handler/graph
 import nodework/handler/user
 import nodework/lib.{type NodeLibrary}
 import nodework/math.{type Vector, Vector}
-import nodework/model.{type Model, Model}
-
-pub type Msg {
-  GraphResizeViewBox(Vector)
-  GraphOpenMenu
-  GraphCloseMenu
-  GraphSpawnNode(String)
-  UserPressedKey(String)
+import nodework/model.{
+  type Model, Model, 
+  type Msg,
+  GraphResizeViewBox,
+  GraphOpenMenu,
+  GraphCloseMenu,
+  GraphSpawnNode,
+  GraphSetDragMode,
+  GraphClearSelection,
+  UserPressedKey,
+  UserClickedGraph,
+  UserMovedMouse
 }
+
 
 pub type ResizeEvent
 
@@ -82,7 +87,8 @@ fn init(node_lib: NodeLibrary) -> #(Model, Effect(Msg)) {
       menu: lib.generate_lib_menu(node_lib),
       window_resolution: get_window_size(),
       viewbox: ViewBox(Vector(0, 0), get_window_size(), 1.0),
-      cursor: Vector(0, 0)
+      cursor: Vector(0, 0),
+      last_clicked_point: Vector(0, 0)
     ),
     effect.none(),
   )
@@ -94,7 +100,11 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     GraphOpenMenu -> graph.open_menu(model)
     GraphCloseMenu -> graph.close_menu(model)
     GraphSpawnNode(identifier) -> graph.spawn_node(model, identifier)
+    GraphSetDragMode -> #(model, effect.none())
+    GraphClearSelection -> #(model, effect.none())
     UserPressedKey(key) -> user.pressed_key(model, key, key_lib)
+    UserClickedGraph(event) -> user.clicked_graph(model, event)
+    UserMovedMouse(position) -> user.moved_mouse(model, position)
   }
 }
 
