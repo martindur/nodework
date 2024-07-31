@@ -1,17 +1,18 @@
 import gleam/dynamic.{type DecodeError}
-import gleam/result
-import gleam/set.{type Set}
 import gleam/int
 import gleam/list.{map}
+import gleam/result
+import gleam/set.{type Set}
 
 import lustre/attribute.{attribute as attr}
 import lustre/element.{type Element}
 import lustre/element/svg
 import lustre/event
 
+import nodework/decoder.{mouse_event_decoder}
+import nodework/math
 import nodework/model.{type Msg, UserClickedNode, UserUnclickedNode}
 import nodework/node.{type UINode, type UINodeID}
-import nodework/decoder.{mouse_event_decoder}
 
 fn translate(x: Int, y: Int) -> String {
   [x, y]
@@ -41,7 +42,7 @@ pub fn view_node(n: UINode, selection: Set(UINodeID)) -> Element(Msg) {
       attr("transform", translate(n.position.x, n.position.y)),
       attribute.class("select-none"),
     ],
-   list.concat([
+    list.concat([
       [
         svg.rect([
           attribute.id(n.id),
@@ -66,14 +67,12 @@ pub fn view_node(n: UINode, selection: Set(UINodeID)) -> Element(Msg) {
           ],
           n.label,
         ),
-        // view_node_output(n),
+        view_node_output(n),
       ],
       // list.map(n.inputs, fn(input) { view_node_input(input) }),
     ]),
   )
 }
-
-
 // fn view_node_input(input: NodeInput) -> element.Element(Msg) {
 //   let id = nd.input_id(input)
 //   let label = nd.input_label(input)
@@ -117,32 +116,32 @@ pub fn view_node(n: UINode, selection: Set(UINodeID)) -> Element(Msg) {
 //   )
 // }
 
-// fn view_node_output(node: Node) -> element.Element(Msg) {
-//   let pos = nd.output_position(node.output)
-//   let id = nd.output_id(node.output)
-//   let hovered = nd.output_hovered(node.output)
+fn view_node_output(n: UINode) -> element.Element(Msg) {
+  // let pos = nd.output_position(node.output)
+  // let id = nd.output_id(node.output)
+  // let hovered = nd.output_hovered(node.output)
 
-//   // TODO: Consider having an output node type, as this becomes quite hidden. It's much easier at the moment though!
-//   case node.id == "node.output" {
-//     False -> {
-//       svg.g([attr("transform", pos |> vector.to_html(vector.Translate))], [
-//         svg.circle([
-//           attr("cx", "0"),
-//           attr("cy", "0"),
-//           attr("r", "10"),
-//           attr("fill", "currentColor"),
-//           attr("stroke", "black"),
-//           case hovered {
-//             True -> attr("stroke-width", "3")
-//             False -> attr("stroke-width", "0")
-//           },
-//           attribute.class("text-gray-500"),
-//           event.on_mouse_down(UserClickedNodeOutput(node.id, pos)),
-//           event.on_mouse_enter(UserHoverNodeOutput(id)),
-//           event.on_mouse_leave(UserUnhoverNodeOutput),
-//         ]),
-//       ])
-//     }
-//     True -> element.none()
-//   }
-// }
+  // TODO: Consider having an output node type, as this becomes quite hidden. It's much easier at the moment though!
+  case n.id == "node.output" {
+    False -> {
+      svg.g([attr("transform", n.output.position |> math.vec_to_html(math.Translate))], [
+        svg.circle([
+          attr("cx", "0"),
+          attr("cy", "0"),
+          attr("r", "10"),
+          attr("fill", "currentColor"),
+          attr("stroke", "black"),
+          case n.output.hovered {
+            True -> attr("stroke-width", "3")
+            False -> attr("stroke-width", "0")
+          },
+          attribute.class("text-gray-500"),
+          // event.on_mouse_down(UserClickedNodeOutput(n.id, pos)),
+          // event.on_mouse_enter(UserHoverNodeOutput(n.output.id)),
+          // event.on_mouse_leave(UserUnhoverNodeOutput),
+        ]),
+      ])
+    }
+    True -> element.none()
+  }
+}

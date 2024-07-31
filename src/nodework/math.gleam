@@ -5,6 +5,12 @@ pub type Vector {
   Vector(x: Int, y: Int)
 }
 
+pub type Transform {
+  Translate
+  Scale
+  Rotate
+}
+
 pub fn vector_scalar(vec: Vector, scalar: Float) -> Vector {
   vec
   |> map_vector(fn(val) {
@@ -31,4 +37,13 @@ pub fn vector_add(a: Vector, b: Vector) -> Vector {
 
 pub fn map_vector(vec: Vector, func: fn(Int) -> Int) -> Vector {
   Vector(x: func(vec.x), y: func(vec.y))
+}
+
+pub fn vec_to_html(vec: Vector, t: Transform) -> String {
+  case t {
+    Translate -> "translate("
+    Scale -> "scale("
+    Rotate -> "rotate("
+  }
+  |> fn(t) { t <> int.to_string(vec.x) <> "," <> int.to_string(vec.y) <> ")" }
 }
