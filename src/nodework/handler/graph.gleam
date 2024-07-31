@@ -1,8 +1,13 @@
+import gleam/io
+import gleam/dict
+import gleam/result
+import gleam/set
 import lustre/effect.{type Effect}
 import nodework/draw/viewbox
 import nodework/handler.{none_effect_wrapper}
 import nodework/lib.{LibraryMenu}
 import nodework/math.{type Vector}
+import nodework/node.{type UINode}
 import nodework/model.{type Model, Model}
 
 pub fn resize_view_box(
@@ -32,7 +37,25 @@ pub fn close_menu(model: Model) -> #(Model, Effect(msg)) {
   |> none_effect_wrapper
 }
 
-pub fn spawn_node(model: Model, identifier: String) -> #(Model, Effect(msg)) {
-  model
+pub fn spawn_node(model: Model, keypair: String) -> #(Model, Effect(msg)) {
+  let position = viewbox.transform(model.viewbox, model.menu.position)
+
+  case lib.split_keypair(keypair) {
+    Ok(#("int", key)) -> {
+      lib.get_int_node(model.lib, key)
+      |> result.map(fn(n) { n.inputs })
+      |> result.unwrap(set.new())
+    }
+    Ok(#("string", key)) -> {
+      lib.get_string_node(model.lib, key)
+      |> result.map(fn(n) { n.inputs })
+      |> result.unwrap(set.new())
+    }
+    Error(Nil) -> set.new()
+    _ -> set.new()
+  }
+  |> node.new_ui_node(keypair, _, position)
+  |> io.debug
+  |> fn(n: UINode) { Model(..model, nodes: dict.insert(model.nodes, n.id, n)) }
   |> none_effect_wrapper
 }

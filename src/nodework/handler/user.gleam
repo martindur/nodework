@@ -1,6 +1,7 @@
 import lustre/effect.{type Effect}
 
 import nodework/math.{type Vector}
+import nodework/node.{type UINodeID}
 import nodework/decoder.{type MouseEvent}
 import nodework/handler.{none_effect_wrapper, simple_effect, shift_key_check}
 import nodework/model.{type Model, Model, type Msg, GraphCloseMenu}
@@ -22,6 +23,16 @@ pub fn clicked_graph(model: Model, event: MouseEvent) -> #(Model, Effect(Msg)) {
   |> fn(m) {
     #(m, effect.batch([shift_key_check(event), simple_effect(GraphCloseMenu)]))
   }
+}
+
+pub fn clicked_node(model: Model, node_id: UINodeID, event: MouseEvent) -> #(Model, Effect(Msg)) {
+  model
+  |> none_effect_wrapper
+}
+
+pub fn unclicked_node(model: Model, node_id: UINodeID) -> #(Model, Effect(Msg)) {
+  model
+  |> none_effect_wrapper
 }
 
 pub fn moved_mouse(model: Model, position: Vector) -> #(Model, Effect(Msg)) {

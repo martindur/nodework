@@ -1,8 +1,12 @@
-import gleam/result
+import gleam/dict.{type Dict}
 import gleam/dynamic.{type DecodeError, type Dynamic}
-import gleam/int
 import gleam/float
+import gleam/int
 import gleam/list.{map, reduce}
+import gleam/pair
+import gleam/result
+import gleam/set
+import gleam/string
 
 import lustre/attribute.{type Attribute, attribute as attr}
 import lustre/element
@@ -11,11 +15,14 @@ import lustre/element/svg
 import lustre/event
 
 import nodework/decoder.{mouse_event_decoder}
+import nodework/draw/content
 import nodework/draw/viewbox.{type ViewBox}
 import nodework/lib.{type LibraryMenu}
 import nodework/math.{type Vector, Vector}
-import nodework/model.{type Model, Model, type Msg, UserClickedGraph, UserMovedMouse}
-
+import nodework/model.{
+  type Model, type Msg, Model, UserClickedGraph, UserMovedMouse,
+}
+import nodework/node.{type UINode, type UINodeID}
 
 pub fn cursor(m: Model, p: Vector) -> Model {
   p
@@ -27,10 +34,11 @@ fn view_menu_item(
   item: #(String, String),
   spawn_func: fn(Dynamic) -> Result(msg, List(DecodeError)),
 ) -> element.Element(msg) {
-  let #(text, id) = item
+  let #(category, key) = item
+  let text = string.capitalise(key)
   html.button(
     [
-      attribute.id(id),
+      attr("data-identifier", category <> "." <> key),
       attribute.class("hover:bg-gray-300"),
       event.on("click", spawn_func),
     ],
@@ -139,7 +147,10 @@ fn attr_viewbox(offset: Vector, resolution: Vector) -> Attribute(msg) {
   }
 }
 
-pub fn view_canvas(viewbox: ViewBox) -> element.Element(Msg) {
+pub fn view_canvas(
+  viewbox: ViewBox,
+  nodes: Dict(UINodeID, UINode),
+) -> element.Element(Msg) {
   let mousedown = fn(e) -> Result(Msg, List(DecodeError)) {
     use event <- result.try(mouse_event_decoder(e))
 
@@ -158,8 +169,18 @@ pub fn view_canvas(viewbox: ViewBox) -> element.Element(Msg) {
       attr("contentEditable", "true"),
       attr_viewbox(viewbox.offset, viewbox.resolution),
       event.on("mousedown", mousedown),
-      event.on("mousemove", mousemove)
+      event.on("mousemove", mousemove),
     ],
-    [view_grid(), view_grid_canvas(500, 500)],
+    [
+      view_grid(),
+      view_grid_canvas(500, 500),
+      svg.g(
+        [],
+        nodes
+          |> dict.to_list
+          |> map(pair.second)
+          |> map(fn(node: UINode) { content.view_node(node, set.new()) }),
+      ),
+    ],
   )
 }

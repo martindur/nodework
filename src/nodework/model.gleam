@@ -1,16 +1,20 @@
+import gleam/dict.{type Dict}
+
+import nodework/decoder.{type MouseEvent}
 import nodework/draw/viewbox.{type ViewBox}
 import nodework/lib.{type LibraryMenu, type NodeLibrary}
 import nodework/math.{type Vector}
-import nodework/decoder.{type MouseEvent}
+import nodework/node.{type UINode, type UINodeID}
 
 pub type Model {
   Model(
     lib: NodeLibrary,
+    nodes: Dict(UINodeID, UINode),
     menu: LibraryMenu,
     window_resolution: Vector,
     viewbox: ViewBox,
     cursor: Vector,
-    last_clicked_point: Vector
+    last_clicked_point: Vector,
   )
 }
 
@@ -24,4 +28,6 @@ pub type Msg {
   UserPressedKey(String)
   UserClickedGraph(MouseEvent)
   UserMovedMouse(Vector)
+  UserClickedNode(UINodeID, MouseEvent)
+  UserUnclickedNode(UINodeID)
 }

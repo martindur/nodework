@@ -1,10 +1,12 @@
+import gleam/dict.{type Dict}
 import gleam/string
 import gleam/list.{map}
+import gleam/pair.{swap}
 import nodework/math.{type Vector, Vector}
 import nodework/node.{type IntNode, type StringNode}
 
 pub type NodeLibrary {
-  NodeLibrary(ints: List(IntNode), strings: List(StringNode))
+  NodeLibrary(ints: Dict(String, IntNode), strings: Dict(String, StringNode))
 }
 
 pub type LibraryMenu {
@@ -12,33 +14,56 @@ pub type LibraryMenu {
 }
 
 pub fn new() -> NodeLibrary {
-  NodeLibrary([], [])
+  NodeLibrary(dict.new(), dict.new())
 }
 
 pub fn register_ints(lib: NodeLibrary, ints: List(IntNode)) -> NodeLibrary {
-  NodeLibrary(..lib, ints: ints)
+  ints
+  |> map(fn(n: IntNode) { #(n.key, n) })
+  |> dict.from_list
+  |> fn(nodes) { NodeLibrary(..lib, ints: nodes) }
 }
 
 pub fn register_strings(
   lib: NodeLibrary,
   strings: List(StringNode),
 ) -> NodeLibrary {
-  NodeLibrary(..lib, strings: strings)
+  strings
+  |> map(fn(n: StringNode) { #(n.key, n) })
+  |> dict.from_list
+  |> fn(nodes) { NodeLibrary(..lib, strings: nodes) }
 }
 
-fn lib_identifiers(lib: NodeLibrary) -> List(String) {
-  let ints = map(lib.ints, fn(n) { n.identifier })
-  let strings = map(lib.strings, fn(n) { n.identifier })
+fn keys(lib: NodeLibrary) -> List(#(String, String)) {
+  let ints = dict.map_values(lib.ints, fn(_, _) { "int" }) |> dict.to_list
+  let strings = dict.map_values(lib.strings, fn(_, _) { "string" }) |> dict.to_list
 
   ints
   |> list.append(strings)
+  |> map(swap)
+}
+
+pub fn split_keypair(keypair: String) -> Result(#(String, String), Nil) {
+  case string.split(keypair, ".") {
+    [category, key] -> Ok(#(category, key))
+    _ -> Error(Nil)
+  }
 }
 
 pub fn generate_lib_menu(lib: NodeLibrary) -> LibraryMenu {
   lib
-  |> lib_identifiers
-  |> map(fn(identifier) { #(string.capitalise(identifier), string.lowercase(identifier)) })
+  |> keys
   |> fn(nodes) {
     LibraryMenu(nodes: nodes, position: Vector(0, 0), visible: False)
   }
+}
+
+pub fn get_int_node(lib: NodeLibrary, key: String) -> Result(IntNode, Nil) {
+  lib.ints
+  |> dict.get(key)
+}
+
+pub fn get_string_node(lib: NodeLibrary, key: String) -> Result(StringNode, Nil) {
+  lib.strings
+  |> dict.get(key)
 }

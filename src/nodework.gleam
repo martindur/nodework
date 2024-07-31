@@ -1,5 +1,7 @@
+import gleam/io
 import gleam/int
 import gleam/list
+import gleam/dict
 import gleam/string
 import gleam/result
 import gleam/dynamic.{type DecodeError}
@@ -30,7 +32,9 @@ import nodework/model.{
   GraphClearSelection,
   UserPressedKey,
   UserClickedGraph,
-  UserMovedMouse
+  UserMovedMouse,
+  UserClickedNode,
+  UserUnclickedNode
 }
 
 
@@ -85,6 +89,7 @@ fn init(node_lib: NodeLibrary) -> #(Model, Effect(Msg)) {
     Model(
       lib: node_lib,
       menu: lib.generate_lib_menu(node_lib),
+      nodes: dict.new(),
       window_resolution: get_window_size(),
       viewbox: ViewBox(Vector(0, 0), get_window_size(), 1.0),
       cursor: Vector(0, 0),
@@ -105,6 +110,8 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     UserPressedKey(key) -> user.pressed_key(model, key, key_lib)
     UserClickedGraph(event) -> user.clicked_graph(model, event)
     UserMovedMouse(position) -> user.moved_mouse(model, position)
+    UserClickedNode(node_id, event) -> user.clicked_node(model, node_id, event)
+    UserUnclickedNode(node_id) -> user.unclicked_node(model, node_id)
   }
 }
 
@@ -125,13 +132,14 @@ fn view(model: Model) -> element.Element(Msg) {
 
   let spawn = fn(e) -> Result(Msg, List(DecodeError)) {
     use target <- result.try(dynamic.field("target", dynamic.dynamic)(e))
-    use identifier <- result.try(dynamic.field("id", dynamic.string)(target))
+    use dataset <- result.try(dynamic.field("dataset", dynamic.dynamic)(target))
+    use identifier <- result.try(dynamic.field("identifier", dynamic.string)(dataset))
 
     Ok(GraphSpawnNode(identifier))
   }
 
   html.div([attr("tabindex", "0"), event.on("keydown", keydown)], [
-    draw.view_canvas(model.viewbox),
+    draw.view_canvas(model.viewbox, model.nodes),
     draw.view_menu(model.menu, spawn)
   ])
 }
