@@ -11,7 +11,7 @@ import lustre/event
 
 import nodework/decoder.{mouse_event_decoder}
 import nodework/math
-import nodework/model.{type Msg, UserClickedNode, UserUnclickedNode}
+import nodework/model.{type Msg, UserClickedNode, UserUnclickedNode, UserClickedNodeOutput, UserHoverNodeOutput, UserUnhoverNodeOutputs}
 import nodework/node.{
   type UINode, type UINodeID, type UINodeInput, type UINodeOutput,
 }
@@ -77,10 +77,6 @@ pub fn view_node(n: UINode, selection: Set(UINodeID)) -> Element(Msg) {
 }
 
 fn view_node_input(input: UINodeInput) -> element.Element(Msg) {
-  // let id = nd.input_id(input)
-  // let label = nd.input_label(input)
-  // let hovered = nd.input_hovered(input)
-
   svg.g(
     [attr("transform", input.position |> math.vec_to_html(math.Translate))],
     [
@@ -118,9 +114,6 @@ fn view_node_output(
   output: UINodeOutput,
   node_id: UINodeID,
 ) -> element.Element(Msg) {
-  // let pos = nd.output_position(node.output)
-  // let id = nd.output_id(node.output)
-  // let hovered = nd.output_hovered(node.output)
 
   // TODO: Consider having an output node type, as this becomes quite hidden. It's much easier at the moment though!
   case node_id == "node.output" {
@@ -139,9 +132,9 @@ fn view_node_output(
               False -> attr("stroke-width", "0")
             },
             attribute.class("text-gray-500"),
-            // event.on_mouse_down(UserClickedNodeOutput(n.id, pos)),
-          // event.on_mouse_enter(UserHoverNodeOutput(n.output.id)),
-          // event.on_mouse_leave(UserUnhoverNodeOutput),
+            event.on_mouse_down(UserClickedNodeOutput(node_id, output.position)),
+          event.on_mouse_enter(UserHoverNodeOutput(output.id)),
+          event.on_mouse_leave(UserUnhoverNodeOutputs),
           ]),
         ],
       )

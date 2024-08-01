@@ -1,8 +1,8 @@
 import gleam/dict.{type Dict}
 import gleam/int
+import gleam/list.{index_map, map}
 import gleam/set.{type Set}
 import gleam/string.{capitalise, split}
-import gleam/list.{map, index_map}
 
 import nodework/math.{type Vector, Vector}
 import nodework/util/random.{generate_random_id}
@@ -26,12 +26,18 @@ pub type StringNode {
 pub type UINodeID =
   String
 
+pub type UINodeOutputID =
+  String
+
+pub type UINodeInputID =
+  String
+
 pub type UINodeInput {
-  UINodeInput(id: String, position: Vector, label: String, hovered: Bool)
+  UINodeInput(id: UINodeInputID, position: Vector, label: String, hovered: Bool)
 }
 
 pub type UINodeOutput {
-  UINodeOutput(id: String, position: Vector, hovered: Bool)
+  UINodeOutput(id: UINodeOutputID, position: Vector, hovered: Bool)
 }
 
 pub type UINode {
@@ -87,4 +93,28 @@ fn new_ui_node_output(id: UINodeID) -> UINodeOutput {
     // NOTE: For now we just have a single output, which sits the same place. We might want to change it if node needs to be wider
     False,
   )
+}
+
+pub fn set_output_hover(ins: Dict(UINodeID, UINode), id: UINodeOutputID) -> Dict(UINodeID, UINode) {
+  ins
+  |> dict.map_values(fn(_, node) {
+    case node.output.id == id {
+      True -> UINodeOutput(..node.output, hovered: True)
+      False -> node.output
+    }
+    |> fn(output) { UINode(..node, output: output) }
+  })
+}
+
+pub fn reset_output_hover(ins: Dict(UINodeID, UINode)) -> Dict(UINodeID, UINode) {
+  ins
+  |> dict.map_values(fn(_, node) {
+    UINodeOutput(..node.output, hovered: False)
+    |> fn(output) { UINode(..node, output: output) }
+  })
+}
+
+pub fn get_node(nodes: Dict(UINodeID, UINode), id: UINodeID) -> Result(UINode, Nil) {
+  nodes
+  |> dict.get(id)
 }

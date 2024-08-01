@@ -1,20 +1,20 @@
-import gleam/io
-import gleam/int
-import gleam/list
 import gleam/dict
-import gleam/string
-import gleam/result
 import gleam/dynamic.{type DecodeError}
+import gleam/int
+import gleam/io
+import gleam/list
+import gleam/result
+import gleam/string
 
 import lustre
-import lustre/event
 import lustre/attribute.{attribute as attr}
 import lustre/effect.{type Effect}
 import lustre/element
 import lustre/element/html
+import lustre/event
 
-import nodework/draw
 import nodework/decoder.{type MouseEvent}
+import nodework/draw
 import nodework/draw/viewbox.{ViewBox}
 import nodework/handler.{simple_effect}
 import nodework/handler/graph
@@ -22,23 +22,13 @@ import nodework/handler/user
 import nodework/lib.{type NodeLibrary}
 import nodework/math.{type Vector, Vector}
 import nodework/model.{
-  type Model, Model, 
-  type Msg,
-  GraphResizeViewBox,
-  GraphOpenMenu,
-  GraphCloseMenu,
-  GraphSpawnNode,
-  GraphSetDragMode,
-  GraphClearSelection,
-  UserPressedKey,
-  UserClickedGraph,
-  UserMovedMouse,
-  UserClickedNode,
-  UserUnclickedNode
+  type Model, type Msg, GraphClearSelection, GraphCloseMenu, GraphOpenMenu,
+  GraphResizeViewBox, GraphSetDragMode, GraphSpawnNode, Model, UserClickedGraph,
+  UserClickedNode, UserMovedMouse, UserPressedKey, UserUnclickedNode,
+  UserClickedNodeOutput, UserHoverNodeOutput, UserUnhoverNodeOutputs
 }
 
 import nodework/examples.{example_nodes}
-
 
 pub type ResizeEvent
 
@@ -96,7 +86,7 @@ fn init(node_lib: NodeLibrary) -> #(Model, Effect(Msg)) {
       window_resolution: get_window_size(),
       viewbox: ViewBox(Vector(0, 0), get_window_size(), 1.0),
       cursor: Vector(0, 0),
-      last_clicked_point: Vector(0, 0)
+      last_clicked_point: Vector(0, 0),
     ),
     effect.none(),
   )
@@ -115,6 +105,9 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     UserMovedMouse(position) -> user.moved_mouse(model, position)
     UserClickedNode(node_id, event) -> user.clicked_node(model, node_id, event)
     UserUnclickedNode(node_id) -> user.unclicked_node(model, node_id)
+    UserClickedNodeOutput(node_id, position) -> user.clicked_node_output(model, node_id, position)
+    UserHoverNodeOutput(output_id) -> user.hover_node_output(model, output_id)
+    UserUnhoverNodeOutputs -> user.unhover_node_outputs(model)
   }
 }
 
@@ -136,13 +129,15 @@ fn view(model: Model) -> element.Element(Msg) {
   let spawn = fn(e) -> Result(Msg, List(DecodeError)) {
     use target <- result.try(dynamic.field("target", dynamic.dynamic)(e))
     use dataset <- result.try(dynamic.field("dataset", dynamic.dynamic)(target))
-    use identifier <- result.try(dynamic.field("identifier", dynamic.string)(dataset))
+    use identifier <- result.try(dynamic.field("identifier", dynamic.string)(
+      dataset,
+    ))
 
     Ok(GraphSpawnNode(identifier))
   }
 
   html.div([attr("tabindex", "0"), event.on("keydown", keydown)], [
     draw.view_canvas(model.viewbox, model.nodes),
-    draw.view_menu(model.menu, spawn)
+    draw.view_menu(model.menu, spawn),
   ])
 }

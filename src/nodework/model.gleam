@@ -4,7 +4,7 @@ import nodework/decoder.{type MouseEvent}
 import nodework/draw/viewbox.{type ViewBox}
 import nodework/lib.{type LibraryMenu, type NodeLibrary}
 import nodework/math.{type Vector}
-import nodework/node.{type UINode, type UINodeID}
+import nodework/node.{type UINode, type UINodeID, type UINodeOutputID}
 
 pub type Model {
   Model(
@@ -30,4 +30,7 @@ pub type Msg {
   UserMovedMouse(Vector)
   UserClickedNode(UINodeID, MouseEvent)
   UserUnclickedNode(UINodeID)
+  UserClickedNodeOutput(UINodeID, Vector)
+  UserHoverNodeOutput(UINodeOutputID)
+  UserUnhoverNodeOutputs
 }
