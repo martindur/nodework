@@ -37,6 +37,8 @@ import nodework/model.{
   UserUnclickedNode
 }
 
+import nodework/examples.{example_nodes}
+
 
 pub type ResizeEvent
 
@@ -79,7 +81,8 @@ pub fn setup(runtime_call) {
 
 pub fn main() {
   let app = lustre.application(init, update, view)
-  let assert Ok(_) = lustre.start(app, "#app", lib.new())
+
+  let assert Ok(_) = lustre.start(app, "#app", example_nodes())
 
   Nil
 }

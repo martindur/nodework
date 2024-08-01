@@ -12,7 +12,9 @@ import lustre/event
 import nodework/decoder.{mouse_event_decoder}
 import nodework/math
 import nodework/model.{type Msg, UserClickedNode, UserUnclickedNode}
-import nodework/node.{type UINode, type UINodeID}
+import nodework/node.{
+  type UINode, type UINodeID, type UINodeInput, type UINodeOutput,
+}
 
 fn translate(x: Int, y: Int) -> String {
   [x, y]
@@ -67,80 +69,82 @@ pub fn view_node(n: UINode, selection: Set(UINodeID)) -> Element(Msg) {
           ],
           n.label,
         ),
-        view_node_output(n),
+        view_node_output(n.output, n.id),
       ],
-      // list.map(n.inputs, fn(input) { view_node_input(input) }),
+      list.map(n.inputs, fn(input) { view_node_input(input) }),
     ]),
   )
 }
-// fn view_node_input(input: NodeInput) -> element.Element(Msg) {
-//   let id = nd.input_id(input)
-//   let label = nd.input_label(input)
-//   let hovered = nd.input_hovered(input)
 
-//   svg.g(
-//     [
-//       attr(
-//         "transform",
-//         nd.input_position(input) |> vector.to_html(vector.Translate),
-//       ),
-//     ],
-//     [
-//       svg.circle([
-//         attr("cx", "0"),
-//         attr("cy", "0"),
-//         attr("r", "10"),
-//         attr("fill", "currentColor"),
-//         attr("stroke", "black"),
-//         case hovered {
-//           True -> attr("stroke-width", "3")
-//           False -> attr("stroke-width", "0")
-//         },
-//         attribute.class("text-gray-500"),
-//         attribute.id(id),
-//         event.on_mouse_enter(UserHoverNodeInput(id)),
-//         event.on_mouse_leave(UserUnhoverNodeInput),
-//       ]),
-//       svg.text(
-//         [
-//           attr("x", "16"),
-//           attr("y", "0"),
-//           attr("font-size", "16"),
-//           attr("dominant-baseline", "middle"),
-//           attr("fill", "currentColor"),
-//           attribute.class("text-gray-900"),
-//         ],
-//         label,
-//       ),
-//     ],
-//   )
-// }
+fn view_node_input(input: UINodeInput) -> element.Element(Msg) {
+  // let id = nd.input_id(input)
+  // let label = nd.input_label(input)
+  // let hovered = nd.input_hovered(input)
 
-fn view_node_output(n: UINode) -> element.Element(Msg) {
+  svg.g(
+    [attr("transform", input.position |> math.vec_to_html(math.Translate))],
+    [
+      svg.circle([
+        attr("cx", "0"),
+        attr("cy", "0"),
+        attr("r", "10"),
+        attr("fill", "currentColor"),
+        attr("stroke", "black"),
+        case input.hovered {
+          True -> attr("stroke-width", "3")
+          False -> attr("stroke-width", "0")
+        },
+        attribute.class("text-gray-500"),
+        attribute.id(input.id),
+        // event.on_mouse_enter(UserHoverNodeInput(id)),
+      // event.on_mouse_leave(UserUnhoverNodeInput),
+      ]),
+      svg.text(
+        [
+          attr("x", "16"),
+          attr("y", "0"),
+          attr("font-size", "16"),
+          attr("dominant-baseline", "middle"),
+          attr("fill", "currentColor"),
+          attribute.class("text-gray-900"),
+        ],
+        input.label,
+      ),
+    ],
+  )
+}
+
+fn view_node_output(
+  output: UINodeOutput,
+  node_id: UINodeID,
+) -> element.Element(Msg) {
   // let pos = nd.output_position(node.output)
   // let id = nd.output_id(node.output)
   // let hovered = nd.output_hovered(node.output)
 
   // TODO: Consider having an output node type, as this becomes quite hidden. It's much easier at the moment though!
-  case n.id == "node.output" {
+  case node_id == "node.output" {
     False -> {
-      svg.g([attr("transform", n.output.position |> math.vec_to_html(math.Translate))], [
-        svg.circle([
-          attr("cx", "0"),
-          attr("cy", "0"),
-          attr("r", "10"),
-          attr("fill", "currentColor"),
-          attr("stroke", "black"),
-          case n.output.hovered {
-            True -> attr("stroke-width", "3")
-            False -> attr("stroke-width", "0")
-          },
-          attribute.class("text-gray-500"),
-          // event.on_mouse_down(UserClickedNodeOutput(n.id, pos)),
+      svg.g(
+        [attr("transform", output.position |> math.vec_to_html(math.Translate))],
+        [
+          svg.circle([
+            attr("cx", "0"),
+            attr("cy", "0"),
+            attr("r", "10"),
+            attr("fill", "currentColor"),
+            attr("stroke", "black"),
+            case output.hovered {
+              True -> attr("stroke-width", "3")
+              False -> attr("stroke-width", "0")
+            },
+            attribute.class("text-gray-500"),
+            // event.on_mouse_down(UserClickedNodeOutput(n.id, pos)),
           // event.on_mouse_enter(UserHoverNodeOutput(n.output.id)),
           // event.on_mouse_leave(UserUnhoverNodeOutput),
-        ]),
-      ])
+          ]),
+        ],
+      )
     }
     True -> element.none()
   }

@@ -1,6 +1,8 @@
-import gleam/string.{capitalise, split}
 import gleam/dict.{type Dict}
+import gleam/int
 import gleam/set.{type Set}
+import gleam/string.{capitalise, split}
+import gleam/list.{map, index_map}
 
 import nodework/math.{type Vector, Vector}
 import nodework/util/random.{generate_random_id}
@@ -21,8 +23,12 @@ pub type StringNode {
   )
 }
 
-pub type UINodeID = String
+pub type UINodeID =
+  String
 
+pub type UINodeInput {
+  UINodeInput(id: String, position: Vector, label: String, hovered: Bool)
+}
 
 pub type UINodeOutput {
   UINodeOutput(id: String, position: Vector, hovered: Bool)
@@ -33,9 +39,9 @@ pub type UINode {
     label: String,
     key: String,
     id: UINodeID,
-    inputs: Set(String),
+    inputs: List(UINodeInput),
     output: UINodeOutput,
-    position: Vector
+    position: Vector,
   )
 }
 
@@ -47,21 +53,38 @@ pub fn new_ui_node(key: String, inputs: Set(String), position: Vector) -> UINode
 
   let id = generate_random_id("node")
 
+  let ui_inputs =
+    inputs
+    |> set.to_list
+    |> index_map(fn(label, index) { new_ui_node_input(id, index, label) })
+
   UINode(
     label: capitalise(label),
     key: key,
     id: id,
-    inputs: inputs,
+    inputs: ui_inputs,
     position: position,
-    output: new_ui_node_output(id)
+    output: new_ui_node_output(id),
   )
 }
 
-pub fn new_ui_node_output(id: UINodeID) -> UINodeOutput {
+fn input_position_from_index(index: Int) -> Vector {
+  Vector(0, 50 + index * 30)
+}
+
+fn new_ui_node_input(id: UINodeID, index: Int, label: String) -> UINodeInput {
+  [id, "in", int.to_string(index)]
+  |> string.join(".")
+  |> fn(input_id) {
+    UINodeInput(input_id, input_position_from_index(index), label, False)
+  }
+}
+
+fn new_ui_node_output(id: UINodeID) -> UINodeOutput {
   UINodeOutput(
     id <> ".out",
     Vector(200, 50),
     // NOTE: For now we just have a single output, which sits the same place. We might want to change it if node needs to be wider
-    False
+    False,
   )
 }
