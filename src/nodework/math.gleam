@@ -35,6 +35,10 @@ pub fn vector_add(a: Vector, b: Vector) -> Vector {
   Vector(x: a.x + b.x, y: a.y + b.y)
 }
 
+pub fn vector_subtract(a: Vector, b: Vector) -> Vector {
+  Vector(x: b.x - a.x, y: b.y - a.y)
+}
+
 pub fn map_vector(vec: Vector, func: fn(Int) -> Int) -> Vector {
   Vector(x: func(vec.x), y: func(vec.y))
 }

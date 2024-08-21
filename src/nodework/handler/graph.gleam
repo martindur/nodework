@@ -1,5 +1,5 @@
-import gleam/io
 import gleam/dict
+import gleam/io
 import gleam/result
 import gleam/set
 import lustre/effect.{type Effect}
@@ -7,8 +7,8 @@ import nodework/draw/viewbox
 import nodework/handler.{none_effect_wrapper}
 import nodework/lib.{LibraryMenu}
 import nodework/math.{type Vector}
-import nodework/node.{type UINode}
 import nodework/model.{type Model, Model}
+import nodework/node.{type UINode, type UINodeID}
 
 pub fn resize_view_box(
   model: Model,
@@ -57,5 +57,21 @@ pub fn spawn_node(model: Model, keypair: String) -> #(Model, Effect(msg)) {
   |> node.new_ui_node(keypair, _, position)
   |> io.debug
   |> fn(n: UINode) { Model(..model, nodes: dict.insert(model.nodes, n.id, n)) }
+  |> none_effect_wrapper
+}
+
+pub fn add_node_to_selection(
+  model: Model,
+  id: UINodeID,
+) -> #(Model, Effect(msg)) {
+  Model(..model, nodes_selected: model.nodes_selected |> set.insert(id))
+  |> none_effect_wrapper
+}
+
+pub fn add_node_as_selection(
+  model: Model,
+  id: UINodeID,
+) -> #(Model, Effect(msg)) {
+  Model(..model, nodes_selected: set.new() |> set.insert(id))
   |> none_effect_wrapper
 }

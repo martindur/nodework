@@ -1,4 +1,5 @@
 import gleam/dict
+import gleam/set
 import gleam/dynamic.{type DecodeError}
 import gleam/int
 import gleam/io
@@ -23,9 +24,10 @@ import nodework/lib.{type NodeLibrary}
 import nodework/math.{type Vector, Vector}
 import nodework/model.{
   type Model, type Msg, GraphClearSelection, GraphCloseMenu, GraphOpenMenu,
-  GraphResizeViewBox, GraphSetDragMode, GraphSpawnNode, Model, UserClickedGraph,
-  UserClickedNode, UserMovedMouse, UserPressedKey, UserUnclickedNode,
-  UserClickedNodeOutput, UserHoverNodeOutput, UserUnhoverNodeOutputs
+  GraphResizeViewBox, GraphSetDragMode, GraphSpawnNode, GraphAddNodeToSelection, GraphSetNodeAsSelection, Model, UserClickedGraph,
+  UserClickedNode, UserClickedNodeOutput, UserHoverNodeInput,
+  UserHoverNodeOutput, UserMovedMouse, UserPressedKey, UserUnclickedNode,
+  UserUnhoverNodeInputs, UserUnhoverNodeOutputs,
 }
 
 import nodework/examples.{example_nodes}
@@ -72,7 +74,9 @@ pub fn setup(runtime_call) {
 pub fn main() {
   let app = lustre.application(init, update, view)
 
-  let assert Ok(_) = lustre.start(app, "#app", example_nodes())
+  let assert Ok(runtime_call) = lustre.start(app, "#app", example_nodes())
+
+  setup(runtime_call)
 
   Nil
 }
@@ -83,10 +87,12 @@ fn init(node_lib: NodeLibrary) -> #(Model, Effect(Msg)) {
       lib: node_lib,
       menu: lib.generate_lib_menu(node_lib),
       nodes: dict.new(),
+      nodes_selected: set.new(),
       window_resolution: get_window_size(),
       viewbox: ViewBox(Vector(0, 0), get_window_size(), 1.0),
       cursor: Vector(0, 0),
       last_clicked_point: Vector(0, 0),
+      mouse_down: False
     ),
     effect.none(),
   )
@@ -100,14 +106,19 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     GraphSpawnNode(identifier) -> graph.spawn_node(model, identifier)
     GraphSetDragMode -> #(model, effect.none())
     GraphClearSelection -> #(model, effect.none())
+    GraphAddNodeToSelection(node_id) -> graph.add_node_to_selection(model, node_id)
+    GraphSetNodeAsSelection(node_id) -> graph.add_node_as_selection(model, node_id)
     UserPressedKey(key) -> user.pressed_key(model, key, key_lib)
     UserClickedGraph(event) -> user.clicked_graph(model, event)
     UserMovedMouse(position) -> user.moved_mouse(model, position)
     UserClickedNode(node_id, event) -> user.clicked_node(model, node_id, event)
-    UserUnclickedNode(node_id) -> user.unclicked_node(model, node_id)
-    UserClickedNodeOutput(node_id, position) -> user.clicked_node_output(model, node_id, position)
+    UserUnclickedNode -> user.unclicked_node(model)
+    UserClickedNodeOutput(node_id, position) ->
+      user.clicked_node_output(model, node_id, position)
     UserHoverNodeOutput(output_id) -> user.hover_node_output(model, output_id)
     UserUnhoverNodeOutputs -> user.unhover_node_outputs(model)
+    UserHoverNodeInput(input_id) -> user.hover_node_input(model, input_id)
+    UserUnhoverNodeInputs -> user.unhover_node_inputs(model)
   }
 }
 
@@ -137,7 +148,7 @@ fn view(model: Model) -> element.Element(Msg) {
   }
 
   html.div([attr("tabindex", "0"), event.on("keydown", keydown)], [
-    draw.view_canvas(model.viewbox, model.nodes),
+    draw.view_canvas(model.viewbox, model.nodes, model.nodes_selected),
     draw.view_menu(model.menu, spawn),
   ])
 }

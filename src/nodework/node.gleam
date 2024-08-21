@@ -40,6 +40,11 @@ pub type UINodeOutput {
   UINodeOutput(id: UINodeOutputID, position: Vector, hovered: Bool)
 }
 
+pub type NodeIO {
+  NodeOutput(id: UINodeOutputID)
+  NodeInput(id: UINodeInputID)
+}
+
 pub type UINode {
   UINode(
     label: String,
@@ -48,6 +53,7 @@ pub type UINode {
     inputs: List(UINodeInput),
     output: UINodeOutput,
     position: Vector,
+    offset: Vector
   )
 }
 
@@ -70,6 +76,7 @@ pub fn new_ui_node(key: String, inputs: Set(String), position: Vector) -> UINode
     id: id,
     inputs: ui_inputs,
     position: position,
+    offset: Vector(0, 0),
     output: new_ui_node_output(id),
   )
 }
@@ -95,7 +102,10 @@ fn new_ui_node_output(id: UINodeID) -> UINodeOutput {
   )
 }
 
-pub fn set_output_hover(ins: Dict(UINodeID, UINode), id: UINodeOutputID) -> Dict(UINodeID, UINode) {
+pub fn set_output_hover(
+  ins: Dict(UINodeID, UINode),
+  id: UINodeOutputID,
+) -> Dict(UINodeID, UINode) {
   ins
   |> dict.map_values(fn(_, node) {
     case node.output.id == id {
@@ -114,7 +124,58 @@ pub fn reset_output_hover(ins: Dict(UINodeID, UINode)) -> Dict(UINodeID, UINode)
   })
 }
 
-pub fn get_node(nodes: Dict(UINodeID, UINode), id: UINodeID) -> Result(UINode, Nil) {
+pub fn set_input_hover(
+  ins: Dict(UINodeID, UINode),
+  id: UINodeOutputID,
+) -> Dict(UINodeID, UINode) {
+  ins
+  |> dict.map_values(fn(_, node) {
+    node.inputs
+    |> map(fn(input) {
+      { input.id == id }
+      |> fn(hovered) { UINodeInput(..input, hovered: hovered) }
+    })
+    |> fn(inputs) { UINode(..node, inputs: inputs) }
+  })
+}
+
+pub fn reset_input_hover(ins: Dict(UINodeID, UINode)) -> Dict(UINodeID, UINode) {
+  ins
+  |> dict.map_values(fn(_, node) {
+    node.inputs
+    |> map(fn(input) { UINodeInput(..input, hovered: False) })
+    |> fn(inputs) { UINode(..node, inputs: inputs) }
+  })
+}
+
+pub fn set_hover(
+  ins: Dict(UINodeID, UINode),
+  kind: NodeIO,
+  hover: Bool,
+) -> Dict(UINodeID, UINode) {
+  case kind, hover {
+    NodeInput(id), True -> set_input_hover(ins, id)
+    NodeInput(_), False -> reset_input_hover(ins)
+    NodeOutput(id), True -> set_output_hover(ins, id)
+    NodeOutput(_), False -> reset_output_hover(ins)
+  }
+}
+
+pub fn get_node(
+  nodes: Dict(UINodeID, UINode),
+  id: UINodeID,
+) -> Result(UINode, Nil) {
   nodes
   |> dict.get(id)
+}
+
+pub fn update_all_node_offsets(nodes: Dict(UINodeID, UINode), point: Vector) -> Dict(UINodeID, UINode) {
+  nodes
+  |> dict.map_values(fn(_, n) { update_offset(n, point) })
+}
+
+fn update_offset(n: UINode, point: Vector) -> UINode {
+  n.position
+  |> math.vector_subtract(point)
+  |> fn(p) { UINode(..n, offset: p) }
 }

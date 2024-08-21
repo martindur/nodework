@@ -11,7 +11,10 @@ import lustre/event
 
 import nodework/decoder.{mouse_event_decoder}
 import nodework/math
-import nodework/model.{type Msg, UserClickedNode, UserUnclickedNode, UserClickedNodeOutput, UserHoverNodeOutput, UserUnhoverNodeOutputs}
+import nodework/model.{
+  type Msg, UserClickedNode, UserClickedNodeOutput, UserHoverNodeOutput,
+  UserUnclickedNode, UserUnhoverNodeOutputs, UserHoverNodeInput, UserUnhoverNodeInputs
+}
 import nodework/node.{
   type UINode, type UINodeID, type UINodeInput, type UINodeOutput,
 }
@@ -57,7 +60,7 @@ pub fn view_node(n: UINode, selection: Set(UINodeID)) -> Element(Msg) {
           attr("stroke-width", "2"),
           node_selected_class,
           event.on("mousedown", mousedown),
-          event.on_mouse_up(UserUnclickedNode(n.id)),
+          event.on_mouse_up(UserUnclickedNode),
         ]),
         svg.text(
           [
@@ -92,8 +95,8 @@ fn view_node_input(input: UINodeInput) -> element.Element(Msg) {
         },
         attribute.class("text-gray-500"),
         attribute.id(input.id),
-        // event.on_mouse_enter(UserHoverNodeInput(id)),
-      // event.on_mouse_leave(UserUnhoverNodeInput),
+        event.on_mouse_enter(UserHoverNodeInput(input.id)),
+        event.on_mouse_leave(UserUnhoverNodeInputs),
       ]),
       svg.text(
         [
@@ -114,7 +117,6 @@ fn view_node_output(
   output: UINodeOutput,
   node_id: UINodeID,
 ) -> element.Element(Msg) {
-
   // TODO: Consider having an output node type, as this becomes quite hidden. It's much easier at the moment though!
   case node_id == "node.output" {
     False -> {
@@ -133,8 +135,8 @@ fn view_node_output(
             },
             attribute.class("text-gray-500"),
             event.on_mouse_down(UserClickedNodeOutput(node_id, output.position)),
-          event.on_mouse_enter(UserHoverNodeOutput(output.id)),
-          event.on_mouse_leave(UserUnhoverNodeOutputs),
+            event.on_mouse_enter(UserHoverNodeOutput(output.id)),
+            event.on_mouse_leave(UserUnhoverNodeOutputs),
           ]),
         ],
       )

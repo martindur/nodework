@@ -6,8 +6,8 @@ import nodework/draw
 import nodework/draw/viewbox
 import nodework/handler.{none_effect_wrapper, shift_key_check, simple_effect}
 import nodework/math.{type Vector, Vector}
-import nodework/model.{type Model, type Msg, GraphCloseMenu, Model}
-import nodework/node.{type UINodeID, type UINodeOutputID}
+import nodework/model.{type Model, type Msg, Model, GraphCloseMenu, GraphAddNodeToSelection, GraphSetNodeAsSelection}
+import nodework/node.{type UINodeID, type UINodeOutputID, type UINodeInputID, NodeInput, NodeOutput}
 
 pub fn pressed_key(
   model: Model,
@@ -32,11 +32,25 @@ pub fn clicked_node(
   event: MouseEvent,
 ) -> #(Model, Effect(Msg)) {
   model
-  |> none_effect_wrapper
+  |> fn(m) { 
+    Model(
+      ..m,
+      mouse_down: True,
+      nodes: m.nodes |> node.update_all_node_offsets(m.cursor)
+    )}
+  |> fn(m) {
+    #(
+      m,
+      effect.batch([
+        update_selected_nodes(event, node_id),
+        simple_effect(GraphCloseMenu)
+      ])
+    )
+  }
 }
 
-pub fn unclicked_node(model: Model, node_id: UINodeID) -> #(Model, Effect(Msg)) {
-  model
+pub fn unclicked_node(model: Model) -> #(Model, Effect(Msg)) {
+  Model(..model, mouse_down: False)
   |> none_effect_wrapper
 }
 
@@ -65,14 +79,28 @@ pub fn hover_node_output(
   output_id: UINodeOutputID,
 ) -> #(Model, Effect(Msg)) {
   model.nodes
-  |> node.set_output_hover(output_id)
+  |> node.set_hover(NodeOutput(output_id), True)
   |> fn(nodes) { Model(..model, nodes: nodes) }
   |> none_effect_wrapper
 }
 
 pub fn unhover_node_outputs(model: Model) -> #(Model, Effect(Msg)) {
   model.nodes
-  |> node.reset_output_hover
+  |> node.set_hover(NodeOutput(""), False)
+  |> fn(nodes) { Model(..model, nodes: nodes) }
+  |> none_effect_wrapper
+}
+
+pub fn hover_node_input(model: Model, input_id: UINodeInputID) -> #(Model, Effect(Msg)) {
+  model.nodes
+  |> node.set_hover(NodeInput(input_id), True)
+  |> fn(nodes) { Model(..model, nodes: nodes) }
+  |> none_effect_wrapper
+}
+
+pub fn unhover_node_inputs(model: Model) -> #(Model, Effect(Msg)) {
+  model.nodes
+  |> node.set_hover(NodeInput(""), False)
   |> fn(nodes) { Model(..model, nodes: nodes) }
   |> none_effect_wrapper
 }
@@ -87,4 +115,14 @@ fn update_last_clicked_point(model: Model, event: MouseEvent) -> Model {
   event.position
   |> viewbox.transform(model.viewbox, _)
   |> fn(p) { Model(..model, last_clicked_point: p) }
+}
+
+fn update_selected_nodes(event: MouseEvent, node_id: UINodeID) -> Effect(Msg) {
+  effect.from(fn(dispatch) {
+    case event.shift_key_active {
+      True -> GraphAddNodeToSelection(node_id)
+      False -> GraphSetNodeAsSelection(node_id)
+    }
+    |> dispatch
+  })
 }

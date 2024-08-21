@@ -5,7 +5,7 @@ import gleam/int
 import gleam/list.{map, reduce}
 import gleam/pair
 import gleam/result
-import gleam/set
+import gleam/set.{type Set}
 import gleam/string
 
 import lustre/attribute.{type Attribute, attribute as attr}
@@ -150,6 +150,7 @@ fn attr_viewbox(offset: Vector, resolution: Vector) -> Attribute(msg) {
 pub fn view_canvas(
   viewbox: ViewBox,
   nodes: Dict(UINodeID, UINode),
+  selection: Set(UINodeID)
 ) -> element.Element(Msg) {
   let mousedown = fn(e) -> Result(Msg, List(DecodeError)) {
     use event <- result.try(mouse_event_decoder(e))
@@ -179,7 +180,7 @@ pub fn view_canvas(
         nodes
           |> dict.to_list
           |> map(pair.second)
-          |> map(fn(node: UINode) { content.view_node(node, set.new()) }),
+          |> map(fn(node: UINode) { content.view_node(node, selection) }),
       ),
     ],
   )
