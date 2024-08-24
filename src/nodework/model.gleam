@@ -9,6 +9,11 @@ import nodework/node.{
   type UINode, type UINodeID, type UINodeInputID, type UINodeOutputID,
 }
 
+pub type GraphMode {
+  DragMode
+  NormalMode
+}
+
 pub type Model {
   Model(
     lib: NodeLibrary,
@@ -20,6 +25,7 @@ pub type Model {
     cursor: Vector,
     last_clicked_point: Vector,
     mouse_down: Bool,
+    mode: GraphMode
   )
 }
 
@@ -28,7 +34,7 @@ pub type Msg {
   GraphOpenMenu
   GraphCloseMenu
   GraphSpawnNode(String)
-  GraphSetDragMode
+  GraphSetMode(GraphMode)
   GraphClearSelection
   GraphAddNodeToSelection(UINodeID)
   GraphSetNodeAsSelection(UINodeID)

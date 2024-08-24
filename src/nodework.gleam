@@ -17,17 +17,17 @@ import lustre/event
 import nodework/decoder.{type MouseEvent}
 import nodework/draw
 import nodework/draw/viewbox.{ViewBox}
-import nodework/handler.{simple_effect}
+import nodework/handler.{simple_effect, none_effect_wrapper}
 import nodework/handler/graph
 import nodework/handler/user
 import nodework/lib.{type NodeLibrary}
 import nodework/math.{type Vector, Vector}
 import nodework/model.{
   type Model, type Msg, GraphClearSelection, GraphCloseMenu, GraphOpenMenu,
-  GraphResizeViewBox, GraphSetDragMode, GraphSpawnNode, GraphAddNodeToSelection, GraphSetNodeAsSelection, Model, UserClickedGraph,
+  GraphResizeViewBox, GraphSetMode, GraphSpawnNode, GraphAddNodeToSelection, GraphSetNodeAsSelection, Model, UserClickedGraph,
   UserClickedNode, UserClickedNodeOutput, UserHoverNodeInput,
   UserHoverNodeOutput, UserMovedMouse, UserPressedKey, UserUnclickedNode,
-  UserUnhoverNodeInputs, UserUnhoverNodeOutputs,
+  UserUnhoverNodeInputs, UserUnhoverNodeOutputs, DragMode, NormalMode
 }
 
 import nodework/examples.{example_nodes}
@@ -92,7 +92,8 @@ fn init(node_lib: NodeLibrary) -> #(Model, Effect(Msg)) {
       viewbox: ViewBox(Vector(0, 0), get_window_size(), 1.0),
       cursor: Vector(0, 0),
       last_clicked_point: Vector(0, 0),
-      mouse_down: False
+      mouse_down: False,
+      mode: NormalMode
     ),
     effect.none(),
   )
@@ -104,8 +105,8 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     GraphOpenMenu -> graph.open_menu(model)
     GraphCloseMenu -> graph.close_menu(model)
     GraphSpawnNode(identifier) -> graph.spawn_node(model, identifier)
-    GraphSetDragMode -> #(model, effect.none())
-    GraphClearSelection -> #(model, effect.none())
+    GraphSetMode(mode) -> Model(..model, mode: mode) |> none_effect_wrapper
+    GraphClearSelection -> graph.clear_selection(model)
     GraphAddNodeToSelection(node_id) -> graph.add_node_to_selection(model, node_id)
     GraphSetNodeAsSelection(node_id) -> graph.add_node_as_selection(model, node_id)
     UserPressedKey(key) -> user.pressed_key(model, key, key_lib)

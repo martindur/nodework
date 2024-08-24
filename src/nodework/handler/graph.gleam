@@ -75,3 +75,8 @@ pub fn add_node_as_selection(
   Model(..model, nodes_selected: set.new() |> set.insert(id))
   |> none_effect_wrapper
 }
+
+pub fn clear_selection(model: Model) -> #(Model, Effect(msg)) {
+  Model(..model, nodes_selected: set.new())
+  |> none_effect_wrapper
+}
