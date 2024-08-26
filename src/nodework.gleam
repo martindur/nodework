@@ -26,8 +26,8 @@ import nodework/model.{
   type Model, type Msg, GraphClearSelection, GraphCloseMenu, GraphOpenMenu,
   GraphResizeViewBox, GraphSetMode, GraphSpawnNode, GraphAddNodeToSelection, GraphSetNodeAsSelection, Model, UserClickedGraph,
   UserClickedNode, UserClickedNodeOutput, UserHoverNodeInput,
-  UserHoverNodeOutput, UserMovedMouse, UserPressedKey, UserUnclickedNode,
-  UserUnhoverNodeInputs, UserUnhoverNodeOutputs, DragMode, NormalMode
+  UserHoverNodeOutput, UserMovedMouse, UserPressedKey, UserUnclickedNode, UserClickedConn,
+  UserUnhoverNodeInputs, UserUnhoverNodeOutputs, UserUnclicked, NormalMode
 }
 
 import nodework/examples.{example_nodes}
@@ -64,11 +64,11 @@ pub fn setup(runtime_call) {
     |> lustre.dispatch
     |> runtime_call
   })
-  // document_mouse_up_event_listener(fn(_) {
-  //   UserUnclicked
-  //   |> lustre.dispatch
-  //   |> runtime_call
-  // })
+  document_mouse_up_event_listener(fn(_) {
+    UserUnclicked
+    |> lustre.dispatch
+    |> runtime_call
+  })
 }
 
 pub fn main() {
@@ -87,6 +87,7 @@ fn init(node_lib: NodeLibrary) -> #(Model, Effect(Msg)) {
       lib: node_lib,
       menu: lib.generate_lib_menu(node_lib),
       nodes: dict.new(),
+      connections: [],
       nodes_selected: set.new(),
       window_resolution: get_window_size(),
       viewbox: ViewBox(Vector(0, 0), get_window_size(), 1.0),
@@ -111,6 +112,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     GraphSetNodeAsSelection(node_id) -> graph.add_node_as_selection(model, node_id)
     UserPressedKey(key) -> user.pressed_key(model, key, key_lib)
     UserClickedGraph(event) -> user.clicked_graph(model, event)
+    UserUnclicked -> user.unclicked(model)
     UserMovedMouse(position) -> user.moved_mouse(model, position)
     UserClickedNode(node_id, event) -> user.clicked_node(model, node_id, event)
     UserUnclickedNode -> user.unclicked_node(model)
@@ -120,6 +122,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     UserUnhoverNodeOutputs -> user.unhover_node_outputs(model)
     UserHoverNodeInput(input_id) -> user.hover_node_input(model, input_id)
     UserUnhoverNodeInputs -> user.unhover_node_inputs(model)
+    UserClickedConn(conn_id, event) -> user.clicked_conn(model, conn_id, event)
   }
 }
 
@@ -149,7 +152,7 @@ fn view(model: Model) -> element.Element(Msg) {
   }
 
   html.div([attr("tabindex", "0"), event.on("keydown", keydown)], [
-    draw.view_canvas(model.viewbox, model.nodes, model.nodes_selected),
+    draw.view_canvas(model.viewbox, model.nodes, model.nodes_selected, model.connections),
     draw.view_menu(model.menu, spawn),
   ])
 }

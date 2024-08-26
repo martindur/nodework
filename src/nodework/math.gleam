@@ -43,6 +43,15 @@ pub fn map_vector(vec: Vector, func: fn(Int) -> Int) -> Vector {
   Vector(x: func(vec.x), y: func(vec.y))
 }
 
+pub fn vector_inverse(vec: Vector) -> Vector {
+  Vector(vec.x * -1, vec.y * -1)
+}
+
+pub fn bounded_vector(vec: Vector, bound: Int) -> Vector {
+  vec
+  |> map_vector(fn(val) { int.min(val, bound) |> int.max({ bound * -1 }) })
+}
+
 pub fn vec_to_html(vec: Vector, t: Transform) -> String {
   case t {
     Translate -> "translate("

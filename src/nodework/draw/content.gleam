@@ -13,8 +13,9 @@ import nodework/decoder.{mouse_event_decoder}
 import nodework/math
 import nodework/model.{
   type Msg, UserClickedNode, UserClickedNodeOutput, UserHoverNodeOutput,
-  UserUnclickedNode, UserUnhoverNodeOutputs, UserHoverNodeInput, UserUnhoverNodeInputs
+  UserUnclickedNode, UserUnhoverNodeOutputs, UserHoverNodeInput, UserUnhoverNodeInputs, UserClickedConn
 }
+import nodework/conn.{type Conn}
 import nodework/node.{
   type UINode, type UINodeID, type UINodeInput, type UINodeOutput,
 }
@@ -143,4 +144,25 @@ fn view_node_output(
     }
     True -> element.none()
   }
+}
+
+pub fn view_connection(c: Conn) -> element.Element(Msg) {
+  let mousedown = fn(e) -> Result(Msg, List(DecodeError)) {
+    use decoded_event <- result.try(mouse_event_decoder(e))
+
+    Ok(UserClickedConn(c.id, decoded_event))
+  }
+
+  svg.line([
+    case c.dragged {
+      True -> attribute.class("text-gray-500")
+      False -> attribute.class("text-gray-500 hover:text-indigo-500")
+    },
+    attr("stroke", "currentColor"),
+    attr("stroke-width", "10"),
+    attr("stroke-linecap", "round"),
+    attr("stroke-dasharray", "12,12"),
+    event.on("mousedown", mousedown),
+    ..conn.to_attributes(c)
+  ])
 }

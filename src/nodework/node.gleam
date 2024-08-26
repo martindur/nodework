@@ -1,6 +1,7 @@
 import gleam/dict.{type Dict}
 import gleam/int
-import gleam/list.{index_map, map}
+import gleam/list.{filter, filter_map, index_map, map}
+import gleam/pair
 import gleam/set.{type Set}
 import gleam/string.{capitalise, split}
 
@@ -21,6 +22,10 @@ pub type StringNode {
     inputs: Set(String),
     output: fn(Dict(String, String)) -> String,
   )
+}
+
+pub type NodeError {
+  NodeNotFound
 }
 
 pub type UINodeID =
@@ -53,7 +58,7 @@ pub type UINode {
     inputs: List(UINodeInput),
     output: UINodeOutput,
     position: Vector,
-    offset: Vector
+    offset: Vector,
   )
 }
 
@@ -169,7 +174,10 @@ pub fn get_node(
   |> dict.get(id)
 }
 
-pub fn update_all_node_offsets(nodes: Dict(UINodeID, UINode), point: Vector) -> Dict(UINodeID, UINode) {
+pub fn update_all_node_offsets(
+  nodes: Dict(UINodeID, UINode),
+  point: Vector,
+) -> Dict(UINodeID, UINode) {
   nodes
   |> dict.map_values(fn(_, n) { update_offset(n, point) })
 }
@@ -178,4 +186,26 @@ fn update_offset(n: UINode, point: Vector) -> UINode {
   n.position
   |> math.vector_subtract(point)
   |> fn(p) { UINode(..n, offset: p) }
+}
+
+pub fn get_node_from_input_hovered(
+  ins: Dict(UINodeID, UINode),
+) -> Result(#(UINode, UINodeInput), NodeError) {
+  ins
+  |> dict.to_list
+  |> map(pair.second)
+  |> filter_map(fn(node) {
+    case node.inputs |> filter(fn(in) { in.hovered }) {
+      [] -> Error(Nil)
+      [input] -> Ok(#(node, input))
+      _ -> Error(Nil)
+    }
+  })
+  |> fn(nodes) {
+    case nodes {
+      [node_and_input] -> Ok(node_and_input)
+      [] -> Error(NodeNotFound)
+      _ -> Error(NodeNotFound)
+    }
+  }
 }

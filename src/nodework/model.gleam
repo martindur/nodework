@@ -5,6 +5,7 @@ import nodework/decoder.{type MouseEvent}
 import nodework/draw/viewbox.{type ViewBox}
 import nodework/lib.{type LibraryMenu, type NodeLibrary}
 import nodework/math.{type Vector}
+import nodework/conn.{type Conn, type ConnID}
 import nodework/node.{
   type UINode, type UINodeID, type UINodeInputID, type UINodeOutputID,
 }
@@ -18,6 +19,7 @@ pub type Model {
   Model(
     lib: NodeLibrary,
     nodes: Dict(UINodeID, UINode),
+    connections: List(Conn),
     nodes_selected: Set(UINodeID),
     menu: LibraryMenu,
     window_resolution: Vector,
@@ -38,9 +40,13 @@ pub type Msg {
   GraphClearSelection
   GraphAddNodeToSelection(UINodeID)
   GraphSetNodeAsSelection(UINodeID)
+  GraphDeleteSelectedNodes
+  GraphChangedConnections
   UserPressedKey(String)
-  UserClickedGraph(MouseEvent)
   UserMovedMouse(Vector)
+  UserScrolled(Float)
+  UserClickedGraph(MouseEvent)
+  UserUnclicked
   UserClickedNode(UINodeID, MouseEvent)
   UserUnclickedNode
   UserClickedNodeOutput(UINodeID, Vector)
@@ -48,4 +54,5 @@ pub type Msg {
   UserUnhoverNodeOutputs
   UserHoverNodeInput(UINodeInputID)
   UserUnhoverNodeInputs
+  UserClickedConn(ConnID, MouseEvent)
 }

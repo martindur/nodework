@@ -4,10 +4,10 @@ import gleam/result
 import gleam/set
 import lustre/effect.{type Effect}
 import nodework/draw/viewbox
-import nodework/handler.{none_effect_wrapper}
+import nodework/handler.{none_effect_wrapper, simple_effect}
 import nodework/lib.{LibraryMenu}
 import nodework/math.{type Vector}
-import nodework/model.{type Model, Model}
+import nodework/model.{type Model, type Msg, Model, GraphCloseMenu}
 import nodework/node.{type UINode, type UINodeID}
 
 pub fn resize_view_box(
@@ -37,7 +37,7 @@ pub fn close_menu(model: Model) -> #(Model, Effect(msg)) {
   |> none_effect_wrapper
 }
 
-pub fn spawn_node(model: Model, keypair: String) -> #(Model, Effect(msg)) {
+pub fn spawn_node(model: Model, keypair: String) -> #(Model, Effect(Msg)) {
   let position = viewbox.transform(model.viewbox, model.menu.position)
 
   case lib.split_keypair(keypair) {
@@ -55,9 +55,8 @@ pub fn spawn_node(model: Model, keypair: String) -> #(Model, Effect(msg)) {
     _ -> set.new()
   }
   |> node.new_ui_node(keypair, _, position)
-  |> io.debug
   |> fn(n: UINode) { Model(..model, nodes: dict.insert(model.nodes, n.id, n)) }
-  |> none_effect_wrapper
+  |> fn(m) { #(m, simple_effect(GraphCloseMenu)) }
 }
 
 pub fn add_node_to_selection(
@@ -78,5 +77,15 @@ pub fn add_node_as_selection(
 
 pub fn clear_selection(model: Model) -> #(Model, Effect(msg)) {
   Model(..model, nodes_selected: set.new())
+  |> none_effect_wrapper
+}
+
+pub fn delete_selected_ui_nodes(model: Model) -> #(Model, Effect(msg)) {
+  model
+  |> draw.delete_selected_nodes
+  |> draw.delete_orphaned_connections
+  // |> calc.sync_verts
+  // |> calc.sync_edges
+  // |> calc.recalc_graph
   |> none_effect_wrapper
 }
