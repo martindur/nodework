@@ -16,12 +16,12 @@ import lustre/event
 
 import nodework/conn.{type Conn, Conn}
 import nodework/decoder.{mouse_event_decoder}
-import nodework/views/util.{translate}
+import nodework/views/util.{translate, output_to_element}
 import nodework/draw/viewbox.{type ViewBox, ViewBox}
 import nodework/lib.{type LibraryMenu}
 import nodework/math.{type Vector, Vector}
 import nodework/model.{
-  type Msg, GraphSetMode, NormalMode,
+  type Msg, type Model, GraphSetMode, NormalMode,
   UserClickedGraph, UserClickedNode, UserUnclickedNode, UserHoverNodeInput, UserUnhoverNodeInputs, UserClickedNodeOutput, UserHoverNodeOutput, UserUnhoverNodeOutputs, UserMovedMouse, UserClickedConn
 }
 import nodework/node.{type UINode, type UINodeID, type UINodeInput, type UINodeOutput, UINode}
@@ -324,4 +324,16 @@ pub fn view_connection(c: Conn) -> element.Element(Msg) {
     event.on("mousedown", mousedown),
     ..conn.to_attributes(c)
   ])
+}
+
+pub fn view_output_canvas(model: Model) -> element.Element(Msg) {
+  html.div(
+    [
+      attribute.class(
+        "w-80 h-80 absolute bottom-2 right-2 rounded border border-gray-300 bg-white flex items-center justify-center",
+      ),
+      output_to_element(model.output),
+    ],
+    [],
+  )
 }

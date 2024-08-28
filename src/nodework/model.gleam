@@ -1,5 +1,6 @@
 import gleam/dict.{type Dict}
 import gleam/set.{type Set}
+import gleam/dynamic.{type Dynamic}
 
 import nodework/decoder.{type MouseEvent}
 import nodework/draw/viewbox.{type ViewBox}
@@ -27,7 +28,8 @@ pub type Model {
     cursor: Vector,
     last_clicked_point: Vector,
     mouse_down: Bool,
-    mode: GraphMode
+    mode: GraphMode,
+    output: Dynamic
   )
 }
 

@@ -1,8 +1,5 @@
 import gleam/dict
 import gleam/dynamic.{type DecodeError}
-import gleam/int
-import gleam/io
-import gleam/list
 import gleam/result
 import gleam/set
 import gleam/string
@@ -14,9 +11,8 @@ import lustre/element
 import lustre/element/html
 import lustre/event
 
-import nodework/decoder.{type MouseEvent}
+import nodework/decoder
 import nodework/views
-import nodework/draw
 import nodework/draw/viewbox.{ViewBox}
 import nodework/handler.{none_effect_wrapper, simple_effect}
 import nodework/handler/graph
@@ -97,6 +93,7 @@ fn init(node_lib: NodeLibrary) -> #(Model, Effect(Msg)) {
       last_clicked_point: Vector(0, 0),
       mouse_down: False,
       mode: NormalMode,
+      output: dynamic.from("")
     ),
     effect.none(),
   )
@@ -168,5 +165,6 @@ fn view(model: Model) -> element.Element(Msg) {
       model.connections,
     ),
     views.view_menu(model.menu, spawn),
+    views.view_output_canvas(model)
   ])
 }

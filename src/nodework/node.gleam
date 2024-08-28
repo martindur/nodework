@@ -4,6 +4,7 @@ import gleam/list.{filter, filter_map, index_map, map}
 import gleam/pair
 import gleam/set.{type Set}
 import gleam/string.{capitalise, split}
+import gleam/io
 
 import nodework/math.{type Vector, Vector}
 import nodework/util/random.{generate_random_id}
@@ -23,6 +24,18 @@ pub type StringNode {
     output: fn(Dict(String, String)) -> String,
   )
 }
+
+// pub opaque type OutputNode {
+//   OutputNode(
+//     key: String,
+//     inputs: Set(String),
+//     output: fn(Dict(String, String)) -> String
+//   )
+// }
+
+// pub fn make_output(func: fn(Dict(String, String)) -> String) -> OutputNode {
+//   OutputNode("output", set.from_list(["output"]), func)
+// }
 
 pub type NodeError {
   NodeNotFound
@@ -68,7 +81,10 @@ pub fn new_ui_node(key: String, inputs: Set(String), position: Vector) -> UINode
     _ -> key
   }
 
-  let id = generate_random_id("node")
+  let id = case label {
+    "output" -> "node.output"
+    _ -> generate_random_id("node")
+  }
 
   let ui_inputs =
     inputs

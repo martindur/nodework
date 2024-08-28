@@ -106,4 +106,6 @@ pub fn delete_selected_ui_nodes(model: Model) -> #(Model, Effect(msg)) {
 pub fn changed_connections(model: Model) -> #(Model, Effect(msg)) {
   model
   |> none_effect_wrapper
+  // model.connections
+  // |> recalc?
 }
