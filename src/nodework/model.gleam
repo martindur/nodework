@@ -10,6 +10,7 @@ import nodework/conn.{type Conn, type ConnID}
 import nodework/node.{
   type UINode, type UINodeID, type UINodeInputID, type UINodeOutputID,
 }
+import nodework/dag.{type Graph}
 
 pub type GraphMode {
   DragMode
@@ -29,7 +30,8 @@ pub type Model {
     last_clicked_point: Vector,
     mouse_down: Bool,
     mode: GraphMode,
-    output: Dynamic
+    output: Dynamic,
+    graph: Graph
   )
 }
 

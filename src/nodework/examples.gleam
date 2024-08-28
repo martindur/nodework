@@ -32,6 +32,10 @@ fn capitalise(inputs: Dict(String, String)) -> String {
   }
 }
 
+fn ten(_inputs: Dict(String, Int)) -> Int {
+  10
+}
+
 fn output(inputs: Dict(String, String)) -> String {
   case dict.get(inputs, "out") {
     Ok(out) -> out
@@ -43,10 +47,11 @@ pub fn example_nodes() -> NodeLibrary {
   let int_nodes = [
     IntNode("add", set.from_list(["a", "b"]), add),
     IntNode("double", set.from_list(["a"]), double),
+    IntNode("ten", set.from_list([]), ten)
   ]
   let string_nodes = [
     StringNode("capitalise", set.from_list(["text"]), capitalise),
-    StringNode("output", set.from_list(["out"]), output)
+    StringNode("output", set.from_list(["out"]), output),
   ]
 
   lib.new()

@@ -1,4 +1,6 @@
+import gleam/io
 import gleam/dict.{type Dict}
+import gleam/dynamic.{type Dynamic}
 import gleam/string
 import gleam/list.{map}
 import gleam/pair.{swap}
@@ -59,11 +61,24 @@ pub fn generate_lib_menu(lib: NodeLibrary) -> LibraryMenu {
 }
 
 pub fn get_int_node(lib: NodeLibrary, key: String) -> Result(IntNode, Nil) {
+  io.debug(key)
   lib.ints
   |> dict.get(key)
 }
 
 pub fn get_string_node(lib: NodeLibrary, key: String) -> Result(StringNode, Nil) {
+  io.debug(key)
   lib.strings
   |> dict.get(key)
+}
+
+pub fn get_node(lib: NodeLibrary, keypair: String) -> Result(Dynamic, Nil) {
+  case split_keypair(keypair) {
+    Ok(#("int", key)) -> get_int_node(lib, key) |> dynamic.from |> Ok
+      // |> result.map(fn(n) { n.inputs })
+      // |> result.unwrap(set.new())
+    Ok(#("string", key)) -> get_string_node(lib, key) |> dynamic.from |> Ok
+    Error(Nil) -> Error(Nil)
+    _ -> Error(Nil)
+  }
 }

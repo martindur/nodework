@@ -10,6 +10,7 @@ import nodework/math.{type Vector}
 import nodework/model.{type Model, type Msg, GraphCloseMenu, Model}
 import nodework/conn
 import nodework/node.{type UINode, type UINodeID}
+import nodework/dag_process as dp
 
 pub fn resize_view_box(
   model: Model,
@@ -97,9 +98,9 @@ pub fn delete_selected_ui_nodes(model: Model) -> #(Model, Effect(msg)) {
   model
   |> delete_selected_nodes
   |> delete_orphaned_connections
-  // |> calc.sync_verts
-  // |> calc.sync_edges
-  // |> calc.recalc_graph
+  |> dp.sync_verts
+  |> dp.sync_edges
+  |> dp.recalc_graph
   |> none_effect_wrapper
 }
 

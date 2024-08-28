@@ -60,8 +60,8 @@ pub fn unclicked(model: Model) -> #(Model, Effect(Msg)) {
   |> list.filter(fn(c) { c.target_node_id != "" && c.dragged != True })
   |> conn.unique
   |> fn(c) { Model(..model, connections: c) }
-  // |> calc.sync_edges
-  // |> calc.recalc_graph
+  |> calc.sync_edges
+  |> calc.recalc_graph
   |> none_effect_wrapper
 }
 
