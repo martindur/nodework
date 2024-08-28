@@ -177,11 +177,16 @@ pub fn clicked_conn(
     }
   })
   |> fn(conns) { Model(..model, connections: conns) }
+  |> draw.dragged_connection
   |> none_effect_wrapper
 }
 
-pub fn scrolled(model: Model, amount: Float) -> #(Model, Effect(Msg)) {
-  todo
+pub fn scrolled(model: Model, delta_y: Float) -> #(Model, Effect(Msg)) {
+  model.viewbox
+  |> viewbox.update_zoom_level(delta_y)
+  |> viewbox.update_resolution(model.window_resolution)
+  |> fn(vb) { Model(..model, viewbox: vb) }
+  |> none_effect_wrapper
 }
 
 fn update_last_clicked_point(model: Model, event: MouseEvent) -> Model {

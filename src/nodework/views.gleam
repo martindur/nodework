@@ -22,7 +22,7 @@ import nodework/lib.{type LibraryMenu}
 import nodework/math.{type Vector, Vector}
 import nodework/model.{
   type Msg, type Model, GraphSetMode, NormalMode,
-  UserClickedGraph, UserClickedNode, UserUnclickedNode, UserHoverNodeInput, UserUnhoverNodeInputs, UserClickedNodeOutput, UserHoverNodeOutput, UserUnhoverNodeOutputs, UserMovedMouse, UserClickedConn
+  UserClickedGraph, UserClickedNode, UserUnclickedNode, UserHoverNodeInput, UserUnhoverNodeInputs, UserClickedNodeOutput, UserHoverNodeOutput, UserUnhoverNodeOutputs, UserMovedMouse, UserClickedConn, UserScrolled
 }
 import nodework/node.{type UINode, type UINodeID, type UINodeInput, type UINodeOutput, UINode}
 
@@ -143,7 +143,7 @@ fn attr_viewbox(offset: Vector, resolution: Vector) -> Attribute(msg) {
   }
 }
 
-pub fn view_canvas(
+pub fn view_graph(
   viewbox: ViewBox,
   nodes: Dict(UINodeID, UINode),
   selection: Set(UINodeID),
@@ -161,6 +161,12 @@ pub fn view_canvas(
     })
   }
 
+  let wheel = fn(e) -> Result(Msg, List(DecodeError)) {
+    use delta_y <- result.try(dynamic.field("deltaY", dynamic.float)(e))
+
+    Ok(UserScrolled(delta_y))
+  }
+
   svg.svg(
     [
       attribute.id("graph"),
@@ -169,6 +175,7 @@ pub fn view_canvas(
       event.on("mousedown", mousedown),
       event.on("mousemove", mousemove),
       event.on_mouse_up(GraphSetMode(NormalMode)),
+      event.on("wheel", wheel)
     ],
     [
       view_grid(),

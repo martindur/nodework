@@ -114,7 +114,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     GraphChangedConnections -> graph.changed_connections(model)
     GraphDeleteSelectedUINodes -> graph.delete_selected_ui_nodes(model)
     UserPressedKey(key) -> user.pressed_key(model, key, key_lib)
-    UserScrolled(amount) -> user.scrolled(model, amount)
+    UserScrolled(delta_y) -> user.scrolled(model, delta_y)
     UserClickedGraph(event) -> user.clicked_graph(model, event)
     UserUnclicked -> user.unclicked(model)
     UserMovedMouse(position) -> user.moved_mouse(model, position)
@@ -158,7 +158,7 @@ fn view(model: Model) -> element.Element(Msg) {
   }
 
   html.div([attr("tabindex", "0"), event.on("keydown", keydown)], [
-    views.view_canvas(
+    views.view_graph(
       model.viewbox,
       model.nodes,
       model.nodes_selected,
