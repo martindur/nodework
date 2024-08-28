@@ -40,7 +40,7 @@ pub type Msg {
   GraphClearSelection
   GraphAddNodeToSelection(UINodeID)
   GraphSetNodeAsSelection(UINodeID)
-  GraphDeleteSelectedNodes
+  GraphDeleteSelectedUINodes
   GraphChangedConnections
   UserPressedKey(String)
   UserMovedMouse(Vector)

@@ -2,15 +2,21 @@ import gleam/list.{map}
 
 import lustre/effect.{type Effect}
 
+import nodework/conn.{type Conn, type ConnID, Conn}
 import nodework/decoder.{type MouseEvent}
-import nodework/util/random
 import nodework/draw
 import nodework/draw/viewbox
 import nodework/handler.{none_effect_wrapper, shift_key_check, simple_effect}
 import nodework/math.{type Vector, Vector}
-import nodework/model.{type Model, type Msg, Model, GraphCloseMenu, GraphAddNodeToSelection, GraphSetNodeAsSelection}
-import nodework/conn.{type Conn, Conn, type ConnID}
-import nodework/node.{type UINodeID, type UINodeOutputID, type UINodeInputID, NodeInput, NodeOutput, NodeNotFound}
+import nodework/model.{
+  type Model, type Msg, GraphAddNodeToSelection, GraphCloseMenu,
+  GraphSetNodeAsSelection, Model,
+}
+import nodework/node.{
+  type UINodeID, type UINodeInputID, type UINodeOutputID, NodeInput,
+  NodeNotFound, NodeOutput,
+}
+import nodework/util/random
 
 const graph_limit = 500
 
@@ -65,19 +71,20 @@ pub fn clicked_node(
   event: MouseEvent,
 ) -> #(Model, Effect(Msg)) {
   model
-  |> fn(m) { 
+  |> fn(m) {
     Model(
       ..m,
       mouse_down: True,
-      nodes: m.nodes |> node.update_all_node_offsets(m.cursor)
-    )}
+      nodes: m.nodes |> node.update_all_node_offsets(m.cursor),
+    )
+  }
   |> fn(m) {
     #(
       m,
       effect.batch([
         update_selected_nodes(event, node_id),
-        simple_effect(GraphCloseMenu)
-      ])
+        simple_effect(GraphCloseMenu),
+      ]),
     )
   }
 }
@@ -123,7 +130,10 @@ pub fn unhover_node_outputs(model: Model) -> #(Model, Effect(Msg)) {
   |> none_effect_wrapper
 }
 
-pub fn hover_node_input(model: Model, input_id: UINodeInputID) -> #(Model, Effect(Msg)) {
+pub fn hover_node_input(
+  model: Model,
+  input_id: UINodeInputID,
+) -> #(Model, Effect(Msg)) {
   model.nodes
   |> node.set_hover(NodeInput(input_id), True)
   |> fn(nodes) { Model(..model, nodes: nodes) }
@@ -141,13 +151,17 @@ pub fn moved_mouse(model: Model, position: Vector) -> #(Model, Effect(Msg)) {
   model
   |> draw.cursor(position)
   |> draw.viewbox_offset(graph_limit)
-  |> draw.node_positions
+  |> draw.nodes
   |> draw.dragged_connection
   |> draw.connections
   |> none_effect_wrapper
 }
 
-pub fn clicked_conn(model: Model, clicked_id: ConnID, event: MouseEvent) -> #(Model, Effect(Msg)) {
+pub fn clicked_conn(
+  model: Model,
+  clicked_id: ConnID,
+  event: MouseEvent,
+) -> #(Model, Effect(Msg)) {
   model.connections
   |> list.map(fn(c) {
     case c.id == clicked_id {
@@ -158,12 +172,16 @@ pub fn clicked_conn(model: Model, clicked_id: ConnID, event: MouseEvent) -> #(Mo
           p1: event.position,
           target_node_id: "",
           target_input_id: "",
-          dragged: True
+          dragged: True,
         )
     }
   })
   |> fn(conns) { Model(..model, connections: conns) }
   |> none_effect_wrapper
+}
+
+pub fn scrolled(model: Model, amount: Float) -> #(Model, Effect(Msg)) {
+  todo
 }
 
 fn update_last_clicked_point(model: Model, event: MouseEvent) -> Model {

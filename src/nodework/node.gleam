@@ -209,3 +209,11 @@ pub fn get_node_from_input_hovered(
     }
   }
 }
+
+pub fn exclude_by_ids(
+  nodes: Dict(UINodeID, UINode),
+  ids: Set(UINodeID),
+) -> Dict(UINodeID, UINode) {
+  nodes
+  |> dict.drop(set.to_list(ids))
+}

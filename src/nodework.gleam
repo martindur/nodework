@@ -1,10 +1,10 @@
 import gleam/dict
-import gleam/set
 import gleam/dynamic.{type DecodeError}
 import gleam/int
 import gleam/io
 import gleam/list
 import gleam/result
+import gleam/set
 import gleam/string
 
 import lustre
@@ -15,19 +15,21 @@ import lustre/element/html
 import lustre/event
 
 import nodework/decoder.{type MouseEvent}
+import nodework/views
 import nodework/draw
 import nodework/draw/viewbox.{ViewBox}
-import nodework/handler.{simple_effect, none_effect_wrapper}
+import nodework/handler.{none_effect_wrapper, simple_effect}
 import nodework/handler/graph
 import nodework/handler/user
 import nodework/lib.{type NodeLibrary}
 import nodework/math.{type Vector, Vector}
 import nodework/model.{
-  type Model, type Msg, GraphClearSelection, GraphCloseMenu, GraphOpenMenu,
-  GraphResizeViewBox, GraphSetMode, GraphSpawnNode, GraphAddNodeToSelection, GraphSetNodeAsSelection, Model, UserClickedGraph,
-  UserClickedNode, UserClickedNodeOutput, UserHoverNodeInput,
-  UserHoverNodeOutput, UserMovedMouse, UserPressedKey, UserUnclickedNode, UserClickedConn,
-  UserUnhoverNodeInputs, UserUnhoverNodeOutputs, UserUnclicked, NormalMode
+  type Model, type Msg, GraphAddNodeToSelection, GraphClearSelection,
+  GraphCloseMenu, GraphOpenMenu, GraphResizeViewBox, GraphSetMode,
+  GraphSetNodeAsSelection, GraphSpawnNode, GraphChangedConnections, GraphDeleteSelectedUINodes, Model, NormalMode, UserClickedConn,
+  UserClickedGraph, UserClickedNode, UserClickedNodeOutput, UserHoverNodeInput,
+  UserHoverNodeOutput, UserMovedMouse, UserPressedKey, UserUnclicked,
+  UserUnclickedNode, UserUnhoverNodeInputs, UserUnhoverNodeOutputs, UserScrolled
 }
 
 import nodework/examples.{example_nodes}
@@ -94,7 +96,7 @@ fn init(node_lib: NodeLibrary) -> #(Model, Effect(Msg)) {
       cursor: Vector(0, 0),
       last_clicked_point: Vector(0, 0),
       mouse_down: False,
-      mode: NormalMode
+      mode: NormalMode,
     ),
     effect.none(),
   )
@@ -108,9 +110,14 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     GraphSpawnNode(identifier) -> graph.spawn_node(model, identifier)
     GraphSetMode(mode) -> Model(..model, mode: mode) |> none_effect_wrapper
     GraphClearSelection -> graph.clear_selection(model)
-    GraphAddNodeToSelection(node_id) -> graph.add_node_to_selection(model, node_id)
-    GraphSetNodeAsSelection(node_id) -> graph.add_node_as_selection(model, node_id)
+    GraphAddNodeToSelection(node_id) ->
+      graph.add_node_to_selection(model, node_id)
+    GraphSetNodeAsSelection(node_id) ->
+      graph.add_node_as_selection(model, node_id)
+    GraphChangedConnections -> graph.changed_connections(model)
+    GraphDeleteSelectedUINodes -> graph.delete_selected_ui_nodes(model)
     UserPressedKey(key) -> user.pressed_key(model, key, key_lib)
+    UserScrolled(amount) -> user.scrolled(model, amount)
     UserClickedGraph(event) -> user.clicked_graph(model, event)
     UserUnclicked -> user.unclicked(model)
     UserMovedMouse(position) -> user.moved_mouse(model, position)
@@ -130,6 +137,8 @@ fn key_lib(key: String) -> Effect(Msg) {
   case string.lowercase(key) {
     // Spawn library menu
     "a" -> simple_effect(GraphOpenMenu)
+    "backspace" -> simple_effect(GraphDeleteSelectedUINodes)
+    "delete" -> simple_effect(GraphDeleteSelectedUINodes)
     _ -> effect.none()
   }
 }
@@ -152,7 +161,12 @@ fn view(model: Model) -> element.Element(Msg) {
   }
 
   html.div([attr("tabindex", "0"), event.on("keydown", keydown)], [
-    draw.view_canvas(model.viewbox, model.nodes, model.nodes_selected, model.connections),
-    draw.view_menu(model.menu, spawn),
+    views.view_canvas(
+      model.viewbox,
+      model.nodes,
+      model.nodes_selected,
+      model.connections,
+    ),
+    views.view_menu(model.menu, spawn),
   ])
 }

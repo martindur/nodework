@@ -7,7 +7,8 @@ import nodework/draw/viewbox
 import nodework/handler.{none_effect_wrapper, simple_effect}
 import nodework/lib.{LibraryMenu}
 import nodework/math.{type Vector}
-import nodework/model.{type Model, type Msg, Model, GraphCloseMenu}
+import nodework/model.{type Model, type Msg, GraphCloseMenu, Model}
+import nodework/conn
 import nodework/node.{type UINode, type UINodeID}
 
 pub fn resize_view_box(
@@ -80,12 +81,29 @@ pub fn clear_selection(model: Model) -> #(Model, Effect(msg)) {
   |> none_effect_wrapper
 }
 
+fn delete_selected_nodes(m: Model) -> Model {
+  m.nodes
+  |> node.exclude_by_ids(m.nodes_selected)
+  |> fn(nodes) { Model(..m, nodes: nodes) }
+}
+
+fn delete_orphaned_connections(m: Model) -> Model {
+  m.connections
+  |> conn.exclude_by_node_ids(m.nodes_selected)
+  |> fn(conns) { Model(..m, connections: conns) }
+}
+
 pub fn delete_selected_ui_nodes(model: Model) -> #(Model, Effect(msg)) {
   model
-  |> draw.delete_selected_nodes
-  |> draw.delete_orphaned_connections
+  |> delete_selected_nodes
+  |> delete_orphaned_connections
   // |> calc.sync_verts
   // |> calc.sync_edges
   // |> calc.recalc_graph
+  |> none_effect_wrapper
+}
+
+pub fn changed_connections(model: Model) -> #(Model, Effect(msg)) {
+  model
   |> none_effect_wrapper
 }

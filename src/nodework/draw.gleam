@@ -1,30 +1,15 @@
-import gleam/dict.{type Dict}
-import gleam/dynamic.{type DecodeError, type Dynamic}
-import gleam/float
-import gleam/int
-import gleam/list.{map, reduce, filter}
+import gleam/dict
+import gleam/list.{filter, map}
 import gleam/pair
-import gleam/result
-import gleam/set.{type Set}
-import gleam/string
+import gleam/set
 
-import lustre/attribute.{type Attribute, attribute as attr}
-import lustre/element
-import lustre/element/html
-import lustre/element/svg
-import lustre/event
-
-import nodework/decoder.{mouse_event_decoder}
-import nodework/draw/content
+import nodework/conn.{type Conn, Conn}
 import nodework/draw/viewbox.{type ViewBox, ViewBox}
-import nodework/lib.{type LibraryMenu}
 import nodework/math.{type Vector, Vector}
 import nodework/model.{
-  type Model, type Msg, DragMode, Model, NormalMode, UserClickedGraph,
-  UserMovedMouse, GraphSetMode
+  type Model, DragMode, Model, NormalMode,
 }
-import nodework/conn.{type Conn, Conn}
-import nodework/node.{type UINode, UINode, type UINodeInput, type UINodeID}
+import nodework/node.{type UINode, type UINodeInput, UINode}
 
 pub fn cursor(m: Model, p: Vector) -> Model {
   p
@@ -45,7 +30,7 @@ pub fn viewbox_offset(m: Model, limit: Int) -> Model {
   |> fn(vb) { Model(..m, viewbox: vb) }
 }
 
-pub fn node_positions(m: Model) -> Model {
+pub fn nodes(m: Model) -> Model {
   m.nodes_selected
   |> set.to_list
   |> dict.take(m.nodes, _)
@@ -53,10 +38,7 @@ pub fn node_positions(m: Model) -> Model {
     case m.mouse_down {
       False -> node
       True ->
-        UINode(
-          ..node,
-          position: math.vector_subtract(node.offset, m.cursor)
-        )
+        UINode(..node, position: math.vector_subtract(node.offset, m.cursor))
     }
   })
   |> dict.merge(m.nodes, _)
@@ -119,8 +101,9 @@ pub fn connections(m: Model) -> Model {
 }
 
 pub fn delete_selected_nodes(model: Model) -> Model {
+  todo
 }
 
 pub fn delete_orphaned_connections(model: Model) -> Model {
+  todo
 }
-
