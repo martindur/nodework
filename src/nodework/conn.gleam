@@ -4,16 +4,17 @@ import gleam/set.{type Set}
 
 import lustre/attribute.{type Attribute, attribute as attr}
 import nodework/math.{type Vector}
+import nodework/node.{type UINodeID, type UINodeInputID, type UINodeOutputID}
 
 pub type Conn {
   Conn(
     id: ConnID,
     p0: Vector,
     p1: Vector,
-    source_node_id: String,
-    target_node_id: String,
-    target_input_id: String,
-    target_input_value: String,
+    from: UINodeOutputID,
+    to: UINodeInputID,
+    // target_node_id: String,
+    value: String,
     dragged: Bool,
   )
 }
@@ -31,7 +32,7 @@ pub fn to_attributes(conn: Conn) -> List(Attribute(a)) {
 
 fn conn_duplicate(a: Conn, b: Conn) -> Bool {
   // an input can only hold a single connection
-  a.target_input_id == b.target_input_id
+  a.to == b.to
 }
 
 fn deduplicate_helper(remaining: List(Conn), seen: List(Conn)) -> List(Conn) {
@@ -63,7 +64,8 @@ pub fn map_dragged(conns: List(Conn), f: fn(Conn) -> Conn) {
 pub fn exclude_by_node_ids(conns: List(Conn), ids: Set(String)) -> List(Conn) {
   conns
   |> filter(fn(c) {
-    set.from_list([c.source_node_id, c.target_node_id])
+    node.extract_node_ids([c.from, c.to])
+    |> set.from_list
     |> set.intersection(ids)
     |> set.to_list
     |> fn(x) {

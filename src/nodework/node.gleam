@@ -9,33 +9,27 @@ import gleam/io
 import nodework/math.{type Vector, Vector}
 import nodework/util/random.{generate_random_id}
 
-pub type IntNode {
-  IntNode(
-    key: String,
-    inputs: Set(String),
-    output: fn(Dict(String, Int)) -> Int,
-  )
-}
-
-pub type StringNode {
-  StringNode(
-    key: String,
-    inputs: Set(String),
-    output: fn(Dict(String, String)) -> String,
-  )
-}
-
-// pub opaque type OutputNode {
-//   OutputNode(
+// pub type IntNode {
+//   IntNode(
 //     key: String,
 //     inputs: Set(String),
-//     output: fn(Dict(String, String)) -> String
+//     output: fn(Dict(String, Int)) -> Int,
 //   )
 // }
 
-// pub fn make_output(func: fn(Dict(String, String)) -> String) -> OutputNode {
-//   OutputNode("output", set.from_list(["output"]), func)
+// pub type StringNode {
+//   StringNode(
+//     key: String,
+//     inputs: Set(String),
+//     output: fn(Dict(String, String)) -> String,
+//   )
 // }
+
+pub type Node {
+  IntNode(key: String, label: String, inputs: Set(String), func: fn(Dict(String, Int)) -> Int)
+  StringNode(key: String, label: String, inputs: Set(String), func: fn(Dict(String, String)) -> String)
+}
+
 
 pub type NodeError {
   NodeNotFound
@@ -82,7 +76,7 @@ pub fn new_ui_node(key: String, inputs: Set(String), position: Vector) -> UINode
   }
 
   let id = case label {
-    "output" -> "node.output"
+    "output" -> "node-output"
     _ -> generate_random_id("node")
   }
 
@@ -182,7 +176,7 @@ pub fn set_hover(
   }
 }
 
-pub fn get_node(
+pub fn get_ui_node(
   nodes: Dict(UINodeID, UINode),
   id: UINodeID,
 ) -> Result(UINode, Nil) {
@@ -232,4 +226,22 @@ pub fn exclude_by_ids(
 ) -> Dict(UINodeID, UINode) {
   nodes
   |> dict.drop(set.to_list(ids))
+}
+
+pub fn extract_node_id(some id: String) -> UINodeID {
+  id
+  |> string.split(".")
+  |> list.first
+  |> fn(res) {
+    case res {
+      Ok(node_id) -> node_id
+      Error(Nil) -> ""
+    }
+  }
+}
+
+pub fn extract_node_ids(some ids: List(String)) -> List(UINodeID) {
+  ids
+  |> map(extract_node_id)
+  |> filter(fn(node_id) { node_id != "" })
 }

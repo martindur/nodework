@@ -2,6 +2,7 @@ import gleam/dict.{type Dict}
 import gleam/dynamic.{type DecodeError, type Dynamic}
 import gleam/float
 import gleam/int
+import gleam/io
 import gleam/list.{map, reduce}
 import gleam/pair
 import gleam/result
@@ -16,29 +17,32 @@ import lustre/event
 
 import nodework/conn.{type Conn, Conn}
 import nodework/decoder.{mouse_event_decoder}
-import nodework/views/util.{translate, output_to_element}
 import nodework/draw/viewbox.{type ViewBox, ViewBox}
 import nodework/lib.{type LibraryMenu}
 import nodework/math.{type Vector, Vector}
 import nodework/model.{
-  type Msg, type Model, GraphSetMode, NormalMode,
-  UserClickedGraph, UserClickedNode, UserUnclickedNode, UserHoverNodeInput, UserUnhoverNodeInputs, UserClickedNodeOutput, UserHoverNodeOutput, UserUnhoverNodeOutputs, UserMovedMouse, UserClickedConn, UserScrolled
+  type Model, type Msg, GraphSetMode, NormalMode, UserClickedConn,
+  UserClickedGraph, UserClickedNode, UserClickedNodeOutput, UserHoverNodeInput,
+  UserHoverNodeOutput, UserMovedMouse, UserScrolled, UserUnclickedNode,
+  UserUnhoverNodeInputs, UserUnhoverNodeOutputs,
 }
-import nodework/node.{type UINode, type UINodeID, type UINodeInput, type UINodeOutput, UINode}
+import nodework/node.{
+  type UINode, type UINodeID, type UINodeInput, type UINodeOutput, UINode,
+}
+import nodework/views/util.{output_to_element, translate}
 
 fn view_menu_item(
   item: #(String, String),
   spawn_func: fn(Dynamic) -> Result(msg, List(DecodeError)),
 ) -> element.Element(msg) {
-  let #(category, key) = item
-  let text = string.capitalise(key)
+  let #(label, key) = item
   html.button(
     [
-      attr("data-identifier", category <> "." <> key),
+      attr("data-identifier", key),
       attribute.class("hover:bg-gray-300"),
       event.on("click", spawn_func),
     ],
-    [element.text(text)],
+    [element.text(label)],
   )
 }
 
@@ -175,7 +179,7 @@ pub fn view_graph(
       event.on("mousedown", mousedown),
       event.on("mousemove", mousemove),
       event.on_mouse_up(GraphSetMode(NormalMode)),
-      event.on("wheel", wheel)
+      event.on("wheel", wheel),
     ],
     [
       view_grid(),

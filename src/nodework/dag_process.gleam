@@ -1,5 +1,5 @@
-import gleam/dict
-import gleam/dynamic
+import gleam/dict.{type Dict}
+import gleam/dynamic.{type Dynamic}
 import gleam/io
 import gleam/list.{contains, filter, map, zip}
 import gleam/pair
@@ -10,9 +10,9 @@ import nodework/conn.{type Conn}
 import nodework/dag.{
   type Edge, type Graph, type Vertex, type VertexId, Edge, Graph, Vertex,
 }
-import nodework/lib.{get_node}
+import nodework/lib
 import nodework/model.{type Model, Model}
-import nodework/node.{type UINode}
+import nodework/node.{type UINode, IntNode, StringNode}
 
 fn nodes_to_vertices(nodes: List(UINode)) -> List(#(VertexId, Vertex)) {
   nodes
@@ -22,7 +22,8 @@ fn nodes_to_vertices(nodes: List(UINode)) -> List(#(VertexId, Vertex)) {
 fn conns_to_edges(conns: List(Conn)) -> List(Edge) {
   conns
   |> map(fn(c) {
-    Edge(c.source_node_id, c.target_node_id, c.target_input_value)
+    let assert [source_node_id, target_node_id] = node.extract_node_ids([c.from, c.to])
+    Edge(source_node_id, target_node_id, c.value)
   })
 }
 
@@ -30,7 +31,7 @@ fn filter_conns_by_edges(conns: List(Conn), edges: List(Edge)) -> List(Conn) {
   let edge_source_ids = map(edges, fn(e) { e.from })
 
   conns
-  |> filter(fn(c) { contains(edge_source_ids, c.source_node_id) })
+  |> filter(fn(c) { contains(edge_source_ids, node.extract_node_id(c.from)) })
 }
 
 pub fn sync_verts(model: Model) -> Model {
@@ -58,39 +59,53 @@ pub fn sync_edges(model: Model) -> Model {
   }
 }
 
+fn node_eval_to_values(inputs: Dict(String, String), lookup: Dict(String, Dynamic)) -> Dict(String, Dynamic) {
+  inputs
+  |> dict.to_list
+  |> map(fn(input_data) {
+    let #(key, node_id) = input_data
+
+    case dict.get(lookup, node_id) {
+      Ok(value) -> #(key, value)
+      Error(Nil) -> #(key, dynamic.from(0))
+    }
+  })
+  dict.from_list
+}
+
 fn eval_graph(verts: List(Vertex), model: Model) -> Model {
   verts
-  |> list.fold(dict.new(), fn(evaluated, vert) {
-    case get_node(model.lib, vert.value) {
-      Error(Nil) -> dict.insert(evaluated, vert.id, dynamic.from(0))
-      Ok(node) -> {
-        let inputs =
-          vert.inputs
-          |> dict.to_list
-          |> map(fn(keypair) {
-            let #(ref, key) = keypair
-            case dict.get(evaluated, key) {
-              Error(Nil) -> #(ref, dynamic.from(0))
-              Ok(val) -> #(ref, val)
-            }
-          })
-          |> dict.from_list
+  // for each vert
+  // 1. fetch the node associated with its value
+  // 2. convert any vertex inputs into values from previous vertices (This is a guaranteed order after topological sort)
+  // 3. run the associated output func from the fetched node, feeding it the inputs as a dict
+  // 4. finally, lookup the "output" key in the derived dict to get the result of the output node, and add it to model
+  |> io.debug
+  |> list.fold(dict.new(), fn(lookup_evaluated, vertex) {
+    let inputs =
+      vertex.inputs
+      |> dict.to_list
+      |> map(fn(input_data) {
+        let #(key, node_id) = input_data
 
-        inputs
-        |> nodefunc.output
-        |> fn(val) { dict.insert(evaluated, vert.id, val) }
+        case dict.get(lookup_evaluated, node_id) {
+          Ok(value) -> #(key, value)
+          Error(Nil) -> #(key, dynamic.from(0))
+        }
+      })
+      |> dict.from_list
+
+    case dict.get(model.lib.nodes, vertex.id) {
+      Error(Nil) -> dict.insert(lookup_evaluated, vertex.id, dynamic.from(0))
+      Ok(IntNode(_, _, _, func)) -> {
+        dict.insert(lookup_evaluated, vertex.id, dynamic.from(func(inputs)))
       }
     }
   })
-  |> dict.get("node.output")
-  |> fn(res) {
-    case res {
-      Ok(output) -> output
-      Error(Nil) -> dynamic.from(0)
-    }
-  }
-  |> fn(output) { Model(..model, output: output) }
+
+  model
 }
+
 
 pub fn recalc_graph(model: Model) -> Model {
   model.graph
@@ -100,6 +115,7 @@ pub fn recalc_graph(model: Model) -> Model {
     case res {
       Ok(verts) -> verts
       Error(msg) -> {
+        io.debug(msg)
         []
       }
     }

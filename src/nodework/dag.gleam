@@ -43,12 +43,12 @@ pub fn test_data() -> Graph {
 
 pub fn sync_vertex_inputs(graph: Graph) -> Graph {
   graph.verts
-  |> dict.map_values(fn(id, v) {
+  |> dict.map_values(fn(id, vertex) {
     graph.edges
     |> filter(fn(edge) { id == edge.to })
     |> map(fn(edge) { #(edge.input, edge.from) })
     |> dict.from_list
-    |> fn(inputs) { Vertex(..v, inputs: inputs) }
+    |> fn(inputs) { Vertex(..vertex, inputs: inputs) }
   })
   |> fn(verts) { Graph(..graph, verts: verts) }
 }

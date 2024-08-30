@@ -1,4 +1,5 @@
 import gleam/dict
+import gleam/io
 import gleam/list.{filter, map}
 import gleam/pair
 import gleam/set
@@ -6,9 +7,7 @@ import gleam/set
 import nodework/conn.{type Conn, Conn}
 import nodework/draw/viewbox.{type ViewBox, ViewBox}
 import nodework/math.{type Vector, Vector}
-import nodework/model.{
-  type Model, DragMode, Model, NormalMode,
-}
+import nodework/model.{type Model, DragMode, Model, NormalMode}
 import nodework/node.{type UINode, type UINodeInput, UINode}
 
 pub fn cursor(m: Model, p: Vector) -> Model {
@@ -61,8 +60,8 @@ pub fn dragged_connection(m: Model) -> Model {
 fn order_connection_nodes(nodes: List(UINode), c: Conn) -> List(UINode) {
   case list.first(nodes) {
     Error(Nil) -> []
-    Ok(node) ->
-      case node.id == c.source_node_id {
+    Ok(n) ->
+      case n.id == node.extract_node_id(c.from) {
         True -> nodes
         False -> list.reverse(nodes)
       }
@@ -72,7 +71,7 @@ fn order_connection_nodes(nodes: List(UINode), c: Conn) -> List(UINode) {
 pub fn connections(m: Model) -> Model {
   m.connections
   |> map(fn(c) {
-    dict.take(m.nodes, [c.source_node_id, c.target_node_id])
+    dict.take(m.nodes, node.extract_node_ids([c.from, c.to]))
     |> dict.to_list
     |> map(pair.second)
     |> order_connection_nodes(c)
@@ -85,7 +84,7 @@ pub fn connections(m: Model) -> Model {
             ..c,
             p0: math.vector_add(a.position, a.output.position),
             p1: b.inputs
-              |> filter(fn(in) { in.id == c.target_input_id })
+              |> filter(fn(in) { in.id == c.to })
               |> fn(nodes) {
                 let assert [x] = nodes
                 x

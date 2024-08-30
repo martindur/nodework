@@ -17,6 +17,7 @@ import nodework/node.{
   NodeNotFound, NodeOutput,
 }
 import nodework/util/random
+import nodework/dag_process as dp
 
 const graph_limit = 500
 
@@ -40,28 +41,27 @@ pub fn clicked_graph(model: Model, event: MouseEvent) -> #(Model, Effect(Msg)) {
 pub fn unclicked(model: Model) -> #(Model, Effect(Msg)) {
   case node.get_node_from_input_hovered(model.nodes) {
     Error(NodeNotFound) -> model.connections
-    Ok(#(node, input)) -> {
+    Ok(#(n, input)) -> {
       model.connections
       |> conn.map_dragged(fn(c) {
-        case c.source_node_id != node.id {
+        case node.extract_node_id(c.from) != n.id {
           False -> c
           True ->
             Conn(
               ..c,
-              target_node_id: node.id,
-              target_input_id: input.id,
-              target_input_value: input.label,
+              to: input.id,
+              value: input.label,
               dragged: False,
             )
         }
       })
     }
   }
-  |> list.filter(fn(c) { c.target_node_id != "" && c.dragged != True })
+  |> list.filter(fn(c) { node.extract_node_id(c.to) != "" && c.dragged != True })
   |> conn.unique
   |> fn(c) { Model(..model, connections: c) }
-  |> calc.sync_edges
-  |> calc.recalc_graph
+  |> dp.sync_edges
+  |> dp.recalc_graph
   |> none_effect_wrapper
 }
 
@@ -99,13 +99,13 @@ pub fn clicked_node_output(
   node_id: UINodeID,
   offset: Vector,
 ) -> #(Model, Effect(Msg)) {
-  let p1 = case node.get_node(model.nodes, node_id) {
-    Ok(node) -> node.position |> math.vector_add(offset)
-    Error(Nil) -> Vector(0, 0)
+  let #(p1, output_id) = case node.get_ui_node(model.nodes, node_id) {
+    Ok(node) -> #(node.position |> math.vector_add(offset), node.output.id)
+    Error(Nil) -> #(Vector(0, 0), "")
   }
   let p2 = model.viewbox |> viewbox.translate(model.cursor)
   let id = random.generate_random_id("conn")
-  let new_conn = Conn(id, p1, p2, node_id, "", "", "", True)
+  let new_conn = Conn(id, p1, p2, output_id, "", "", True)
 
   model.connections
   |> list.prepend(new_conn)
@@ -170,8 +170,7 @@ pub fn clicked_conn(
         Conn(
           ..c,
           p1: event.position,
-          target_node_id: "",
-          target_input_id: "",
+          to: "",
           dragged: True,
         )
     }

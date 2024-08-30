@@ -44,17 +44,25 @@ fn output(inputs: Dict(String, String)) -> String {
 }
 
 pub fn example_nodes() -> NodeLibrary {
-  let int_nodes = [
-    IntNode("add", set.from_list(["a", "b"]), add),
-    IntNode("double", set.from_list(["a"]), double),
-    IntNode("ten", set.from_list([]), ten)
-  ]
-  let string_nodes = [
-    StringNode("capitalise", set.from_list(["text"]), capitalise),
-    StringNode("output", set.from_list(["out"]), output),
+  // let int_nodes = [
+  //   IntNode("add", set.from_list(["a", "b"]), add),
+  //   IntNode("double", set.from_list(["a"]), double),
+  //   IntNode("ten", set.from_list([]), ten)
+  // ]
+  // let string_nodes = [
+  //   StringNode("capitalise", set.from_list(["text"]), capitalise),
+  //   StringNode("output", set.from_list(["out"]), output),
+  // ]
+
+  let nodes = [
+    IntNode("add", "Add", set.from_list(["a", "b"]), add),
+    IntNode("double", "Double", set.from_list(["a"]), double),
+    IntNode("ten", "Ten", set.from_list([]), ten),
+    StringNode("capitalise", "Capitalise", set.from_list(["text"]), capitalise),
+    StringNode("output", "Output", set.from_list(["out"]), output),
   ]
 
-  lib.new()
-  |> lib.register_ints(int_nodes)
-  |> lib.register_strings(string_nodes)
+  lib.register_nodes(nodes)
+  // |> lib.register_ints(int_nodes)
+  // |> lib.register_strings(string_nodes)
 }

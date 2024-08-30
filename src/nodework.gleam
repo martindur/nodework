@@ -11,8 +11,8 @@ import lustre/element
 import lustre/element/html
 import lustre/event
 
+import nodework/dag
 import nodework/decoder
-import nodework/views
 import nodework/draw/viewbox.{ViewBox}
 import nodework/handler.{none_effect_wrapper, simple_effect}
 import nodework/handler/graph
@@ -20,13 +20,15 @@ import nodework/handler/user
 import nodework/lib.{type NodeLibrary}
 import nodework/math.{type Vector, Vector}
 import nodework/model.{
-  type Model, type Msg, GraphAddNodeToSelection, GraphClearSelection,
-  GraphCloseMenu, GraphOpenMenu, GraphResizeViewBox, GraphSetMode,
-  GraphSetNodeAsSelection, GraphSpawnNode, GraphChangedConnections, GraphDeleteSelectedUINodes, Model, NormalMode, UserClickedConn,
-  UserClickedGraph, UserClickedNode, UserClickedNodeOutput, UserHoverNodeInput,
-  UserHoverNodeOutput, UserMovedMouse, UserPressedKey, UserUnclicked,
-  UserUnclickedNode, UserUnhoverNodeInputs, UserUnhoverNodeOutputs, UserScrolled
+  type Model, type Msg, GraphAddNodeToSelection, GraphChangedConnections,
+  GraphClearSelection, GraphCloseMenu, GraphDeleteSelectedUINodes, GraphOpenMenu,
+  GraphResizeViewBox, GraphSetMode, GraphSetNodeAsSelection, GraphSpawnNode,
+  Model, NormalMode, UserClickedConn, UserClickedGraph, UserClickedNode,
+  UserClickedNodeOutput, UserHoverNodeInput, UserHoverNodeOutput, UserMovedMouse,
+  UserPressedKey, UserScrolled, UserUnclicked, UserUnclickedNode,
+  UserUnhoverNodeInputs, UserUnhoverNodeOutputs,
 }
+import nodework/views
 
 import nodework/examples.{example_nodes}
 
@@ -93,7 +95,8 @@ fn init(node_lib: NodeLibrary) -> #(Model, Effect(Msg)) {
       last_clicked_point: Vector(0, 0),
       mouse_down: False,
       mode: NormalMode,
-      output: dynamic.from("")
+      output: dynamic.from(""),
+      graph: dag.new(),
     ),
     effect.none(),
   )
@@ -165,6 +168,6 @@ fn view(model: Model) -> element.Element(Msg) {
       model.connections,
     ),
     views.view_menu(model.menu, spawn),
-    views.view_output_canvas(model)
+    views.view_output_canvas(model),
   ])
 }

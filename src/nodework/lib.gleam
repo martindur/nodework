@@ -1,14 +1,15 @@
-import gleam/io
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
-import gleam/string
+import gleam/io
 import gleam/list.{map}
 import gleam/pair.{swap}
+import gleam/string
 import nodework/math.{type Vector, Vector}
-import nodework/node.{type IntNode, type StringNode}
+import nodework/node.{type Node, IntNode, StringNode}
+
 
 pub type NodeLibrary {
-  NodeLibrary(ints: Dict(String, IntNode), strings: Dict(String, StringNode))
+  NodeLibrary(nodes: Dict(String, Node))
 }
 
 pub type LibraryMenu {
@@ -16,33 +17,19 @@ pub type LibraryMenu {
 }
 
 pub fn new() -> NodeLibrary {
-  NodeLibrary(dict.new(), dict.new())
+  NodeLibrary(dict.new())
 }
 
-pub fn register_ints(lib: NodeLibrary, ints: List(IntNode)) -> NodeLibrary {
-  ints
-  |> map(fn(n: IntNode) { #(n.key, n) })
+pub fn register_nodes(nodes: List(Node)) -> NodeLibrary {
+  nodes
+  |> map(fn(n: Node) { 
+    case n {
+      IntNode(key, ..) -> #("int." <> key, n)
+      StringNode(key, ..) -> #("string." <> key, n)
+    }
+  })
   |> dict.from_list
-  |> fn(nodes) { NodeLibrary(..lib, ints: nodes) }
-}
-
-pub fn register_strings(
-  lib: NodeLibrary,
-  strings: List(StringNode),
-) -> NodeLibrary {
-  strings
-  |> map(fn(n: StringNode) { #(n.key, n) })
-  |> dict.from_list
-  |> fn(nodes) { NodeLibrary(..lib, strings: nodes) }
-}
-
-fn keys(lib: NodeLibrary) -> List(#(String, String)) {
-  let ints = dict.map_values(lib.ints, fn(_, _) { "int" }) |> dict.to_list
-  let strings = dict.map_values(lib.strings, fn(_, _) { "string" }) |> dict.to_list
-
-  ints
-  |> list.append(strings)
-  |> map(swap)
+  |> fn(nodes) { NodeLibrary(nodes: nodes) }
 }
 
 pub fn split_keypair(keypair: String) -> Result(#(String, String), Nil) {
@@ -53,32 +40,11 @@ pub fn split_keypair(keypair: String) -> Result(#(String, String), Nil) {
 }
 
 pub fn generate_lib_menu(lib: NodeLibrary) -> LibraryMenu {
-  lib
-  |> keys
+  lib.nodes
+  |> dict.map_values(fn(_, node) { node.label })
+  |> dict.to_list
+  |> map(swap)
   |> fn(nodes) {
     LibraryMenu(nodes: nodes, position: Vector(0, 0), visible: False)
-  }
-}
-
-pub fn get_int_node(lib: NodeLibrary, key: String) -> Result(IntNode, Nil) {
-  io.debug(key)
-  lib.ints
-  |> dict.get(key)
-}
-
-pub fn get_string_node(lib: NodeLibrary, key: String) -> Result(StringNode, Nil) {
-  io.debug(key)
-  lib.strings
-  |> dict.get(key)
-}
-
-pub fn get_node(lib: NodeLibrary, keypair: String) -> Result(Dynamic, Nil) {
-  case split_keypair(keypair) {
-    Ok(#("int", key)) -> get_int_node(lib, key) |> dynamic.from |> Ok
-      // |> result.map(fn(n) { n.inputs })
-      // |> result.unwrap(set.new())
-    Ok(#("string", key)) -> get_string_node(lib, key) |> dynamic.from |> Ok
-    Error(Nil) -> Error(Nil)
-    _ -> Error(Nil)
   }
 }

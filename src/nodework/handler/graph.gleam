@@ -3,14 +3,14 @@ import gleam/io
 import gleam/result
 import gleam/set
 import lustre/effect.{type Effect}
+import nodework/conn
+import nodework/dag_process as dp
 import nodework/draw/viewbox
 import nodework/handler.{none_effect_wrapper, simple_effect}
 import nodework/lib.{LibraryMenu}
 import nodework/math.{type Vector}
 import nodework/model.{type Model, type Msg, GraphCloseMenu, Model}
-import nodework/conn
 import nodework/node.{type UINode, type UINodeID}
-import nodework/dag_process as dp
 
 pub fn resize_view_box(
   model: Model,
@@ -39,25 +39,17 @@ pub fn close_menu(model: Model) -> #(Model, Effect(msg)) {
   |> none_effect_wrapper
 }
 
-pub fn spawn_node(model: Model, keypair: String) -> #(Model, Effect(Msg)) {
+pub fn spawn_node(model: Model, key: String) -> #(Model, Effect(Msg)) {
   let position = viewbox.transform(model.viewbox, model.menu.position)
 
-  case lib.split_keypair(keypair) {
-    Ok(#("int", key)) -> {
-      lib.get_int_node(model.lib, key)
-      |> result.map(fn(n) { n.inputs })
-      |> result.unwrap(set.new())
-    }
-    Ok(#("string", key)) -> {
-      lib.get_string_node(model.lib, key)
-      |> result.map(fn(n) { n.inputs })
-      |> result.unwrap(set.new())
-    }
+  case dict.get(model.lib.nodes, key) {
+    Ok(n) -> n.inputs
     Error(Nil) -> set.new()
-    _ -> set.new()
   }
-  |> node.new_ui_node(keypair, _, position)
+  |> node.new_ui_node(key, _, position)
   |> fn(n: UINode) { Model(..model, nodes: dict.insert(model.nodes, n.id, n)) }
+  |> dp.sync_verts
+  |> dp.recalc_graph
   |> fn(m) { #(m, simple_effect(GraphCloseMenu)) }
 }
 
