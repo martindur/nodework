@@ -9,21 +9,6 @@ import gleam/io
 import nodework/math.{type Vector, Vector}
 import nodework/util/random.{generate_random_id}
 
-// pub type IntNode {
-//   IntNode(
-//     key: String,
-//     inputs: Set(String),
-//     output: fn(Dict(String, Int)) -> Int,
-//   )
-// }
-
-// pub type StringNode {
-//   StringNode(
-//     key: String,
-//     inputs: Set(String),
-//     output: fn(Dict(String, String)) -> String,
-//   )
-// }
 
 pub type Node {
   IntNode(key: String, label: String, inputs: Set(String), func: fn(Dict(String, Int)) -> Int)

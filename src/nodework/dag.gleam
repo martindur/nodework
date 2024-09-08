@@ -8,6 +8,10 @@ import gleam/result
 pub type VertexId =
   String
 
+/// A Vertex is similar to a 'node', but the internal type used to do topological sort
+/// id: Should be the same as its Node cousin
+/// value: holds an identifier to the type of node, e.g. 'int.add' or 'string.capitalise'
+/// inputs: a dict of input keys to node ids (to figure out which node's output is connected to which input)
 pub type Vertex {
   Vertex(id: VertexId, value: String, inputs: Dict(String, String))
 }

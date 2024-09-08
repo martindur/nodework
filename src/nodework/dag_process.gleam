@@ -59,51 +59,61 @@ pub fn sync_edges(model: Model) -> Model {
   }
 }
 
-fn node_eval_to_values(inputs: Dict(String, String), lookup: Dict(String, Dynamic)) -> Dict(String, Dynamic) {
+fn eval_vertex_inputs(inputs: Dict(String, String), lookup: Dict(String, Dynamic)) -> List(#(String, Dynamic)) {
   inputs
   |> dict.to_list
   |> map(fn(input_data) {
-    let #(key, node_id) = input_data
+    let #(input_name, node_id) = input_data
 
+    // find the output value of the given node (this should generally always be present, due to topological sort)
     case dict.get(lookup, node_id) {
-      Ok(value) -> #(key, value)
-      Error(Nil) -> #(key, dynamic.from(0))
+      Ok(value) -> #(input_name, value)
+      Error(Nil) -> #(input_name, dynamic.from(""))
     }
   })
-  dict.from_list
+}
+
+fn typed_inputs(inputs: List(#(String, Dynamic)), decoder: fn(Dynamic) -> a) -> List(#(String, a)) {
+  inputs
+  |> map(pair.map_second(_, decoder))
 }
 
 fn eval_graph(verts: List(Vertex), model: Model) -> Model {
+  let int_decoder = fn(x) { result.unwrap(dynamic.int(x), 0) }
+  let string_decoder = fn(x) { result.unwrap(dynamic.string(x), "") }
+
   verts
   // for each vert
   // 1. fetch the node associated with its value
   // 2. convert any vertex inputs into values from previous vertices (This is a guaranteed order after topological sort)
   // 3. run the associated output func from the fetched node, feeding it the inputs as a dict
   // 4. finally, lookup the "output" key in the derived dict to get the result of the output node, and add it to model
-  |> io.debug
   |> list.fold(dict.new(), fn(lookup_evaluated, vertex) {
-    let inputs =
-      vertex.inputs
-      |> dict.to_list
-      |> map(fn(input_data) {
-        let #(key, node_id) = input_data
+    let inputs = eval_vertex_inputs(vertex.inputs, lookup_evaluated)
 
-        case dict.get(lookup_evaluated, node_id) {
-          Ok(value) -> #(key, value)
-          Error(Nil) -> #(key, dynamic.from(0))
-        }
-      })
-      |> dict.from_list
 
-    case dict.get(model.lib.nodes, vertex.id) {
-      Error(Nil) -> dict.insert(lookup_evaluated, vertex.id, dynamic.from(0))
+    case dict.get(model.lib.nodes, vertex.value) {
       Ok(IntNode(_, _, _, func)) -> {
-        dict.insert(lookup_evaluated, vertex.id, dynamic.from(func(inputs)))
+        inputs
+        |> typed_inputs(int_decoder)
+        |> dict.from_list
+        |> func
+        |> dynamic.from
       }
+      Ok(StringNode(_, _, _, func)) -> {
+        inputs
+        |> typed_inputs(string_decoder)
+        |> dict.from_list
+        |> func
+        |> dynamic.from
+      }
+      Error(Nil) -> dynamic.from("") |> io.debug
     }
-  })
+    |> dict.insert(lookup_evaluated, vertex.id, _)
 
-  model
+  })
+  |> fn(lookup_evaluated) { dict.get(lookup_evaluated, "node-output") |> result.unwrap(dynamic.from("No output")) }
+  |> fn(output) { Model(..model, output: output) }
 }
 
 

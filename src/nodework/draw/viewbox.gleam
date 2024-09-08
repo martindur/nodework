@@ -1,8 +1,10 @@
 import gleam/float
 import nodework/math.{type Vector}
 
-const scroll_factor = 0.1
+const scroll_factor = 0.01
+
 const limit_zoom_in = 0.5
+
 const limit_zoom_out = 3.0
 
 pub type ViewBox {

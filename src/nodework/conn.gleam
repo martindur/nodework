@@ -13,7 +13,6 @@ pub type Conn {
     p1: Vector,
     from: UINodeOutputID,
     to: UINodeInputID,
-    // target_node_id: String,
     value: String,
     dragged: Bool,
   )
