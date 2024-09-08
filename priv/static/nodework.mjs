@@ -92,12 +92,12 @@ var BitArray = class _BitArray {
     return this.buffer[index2];
   }
   // @internal
-  floatAt(index2) {
-    return byteArrayToFloat(this.buffer.slice(index2, index2 + 8));
+  floatFromSlice(start4, end, isBigEndian) {
+    return byteArrayToFloat(this.buffer, start4, end, isBigEndian);
   }
   // @internal
-  intFromSlice(start4, end) {
-    return byteArrayToInt(this.buffer.slice(start4, end));
+  intFromSlice(start4, end, isBigEndian, isSigned) {
+    return byteArrayToInt(this.buffer, start4, end, isBigEndian, isSigned);
   }
   // @internal
   binaryFromSlice(start4, end) {
@@ -108,16 +108,42 @@ var BitArray = class _BitArray {
     return new _BitArray(this.buffer.slice(index2));
   }
 };
-function byteArrayToInt(byteArray) {
-  byteArray = byteArray.reverse();
+var UtfCodepoint = class {
+  constructor(value) {
+    this.value = value;
+  }
+};
+function byteArrayToInt(byteArray, start4, end, isBigEndian, isSigned) {
   let value = 0;
-  for (let i = byteArray.length - 1; i >= 0; i--) {
-    value = value * 256 + byteArray[i];
+  if (isBigEndian) {
+    for (let i = start4; i < end; i++) {
+      value = value * 256 + byteArray[i];
+    }
+  } else {
+    for (let i = end - 1; i >= start4; i--) {
+      value = value * 256 + byteArray[i];
+    }
+  }
+  if (isSigned) {
+    const byteSize = end - start4;
+    const highBit = 2 ** (byteSize * 8 - 1);
+    if (value >= highBit) {
+      value -= highBit * 2;
+    }
   }
   return value;
 }
-function byteArrayToFloat(byteArray) {
-  return new Float64Array(byteArray.reverse().buffer)[0];
+function byteArrayToFloat(byteArray, start4, end, isBigEndian) {
+  const view2 = new DataView(byteArray.buffer);
+  const byteSize = end - start4;
+  if (byteSize === 8) {
+    return view2.getFloat64(start4, !isBigEndian);
+  } else if (byteSize === 4) {
+    return view2.getFloat32(start4, !isBigEndian);
+  } else {
+    const msg = `Sized floats must be 32-bit or 64-bit on JavaScript, got size of ${byteSize * 8} bits`;
+    throw new globalThis.Error(msg);
+  }
 }
 var Result = class _Result extends CustomType {
   // @internal
@@ -259,9 +285,6 @@ var Gt = class extends CustomType {
 };
 
 // build/dev/javascript/gleam_stdlib/gleam/float.mjs
-function to_string(x) {
-  return float_to_string(x);
-}
 function compare(a, b) {
   let $ = a === b;
   if ($) {
@@ -310,8 +333,8 @@ function add(a, b) {
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/int.mjs
-function to_string3(x) {
-  return to_string2(x);
+function to_string2(x) {
+  return to_string(x);
 }
 function to_float(x) {
   return identity(x);
@@ -337,6 +360,16 @@ function max2(a, b) {
 function second(pair) {
   let a = pair[1];
   return a;
+}
+function swap(pair) {
+  let a = pair[0];
+  let b = pair[1];
+  return [b, a];
+}
+function map_second(pair, fun) {
+  let a = pair[0];
+  let b = pair[1];
+  return [a, fun(b)];
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/list.mjs
@@ -1063,8 +1096,11 @@ function from_string(string3) {
 function append2(builder, second2) {
   return append_builder(builder, from_string(second2));
 }
-function to_string4(builder) {
+function to_string3(builder) {
   return identity(builder);
+}
+function split2(iodata, pattern2) {
+  return split(iodata, pattern2);
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/string.mjs
@@ -1078,13 +1114,23 @@ function append4(first3, second2) {
   let _pipe = first3;
   let _pipe$1 = from_string(_pipe);
   let _pipe$2 = append2(_pipe$1, second2);
-  return to_string4(_pipe$2);
+  return to_string3(_pipe$2);
 }
 function join2(strings, separator) {
   return join(strings, separator);
 }
 function pop_grapheme2(string3) {
   return pop_grapheme(string3);
+}
+function split3(x, substring) {
+  if (substring === "") {
+    return graphemes(x);
+  } else {
+    let _pipe = x;
+    let _pipe$1 = from_string(_pipe);
+    let _pipe$2 = split2(_pipe$1, substring);
+    return map(_pipe$2, to_string3);
+  }
 }
 function capitalise(s) {
   let $ = pop_grapheme2(s);
@@ -1095,6 +1141,10 @@ function capitalise(s) {
   } else {
     return "";
   }
+}
+function inspect2(term) {
+  let _pipe = inspect(term);
+  return to_string3(_pipe);
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/dynamic.mjs
@@ -1147,7 +1197,7 @@ function push_path(error, name) {
   let name$1 = from(name);
   let decoder = any2(
     toList([string, (x) => {
-      return map2(int(x), to_string3);
+      return map2(int(x), to_string2);
     }])
   );
   let name$2 = (() => {
@@ -1158,7 +1208,7 @@ function push_path(error, name) {
     } else {
       let _pipe = toList(["<", classify(name$1), ">"]);
       let _pipe$1 = from_strings(_pipe);
-      return to_string4(_pipe$1);
+      return to_string3(_pipe$1);
     }
   })();
   return error.withFields({ path: prepend(name$2, error.path) });
@@ -1490,22 +1540,22 @@ function assocIndex(root2, shift, hash, key, val, addedLeaf) {
   } else {
     const n = root2.array.length;
     if (n >= MAX_INDEX_NODE) {
-      const nodes = new Array(32);
+      const nodes2 = new Array(32);
       const jdx = mask(hash, shift);
-      nodes[jdx] = assocIndex(EMPTY, shift + SHIFT, hash, key, val, addedLeaf);
+      nodes2[jdx] = assocIndex(EMPTY, shift + SHIFT, hash, key, val, addedLeaf);
       let j = 0;
       let bitmap = root2.bitmap;
       for (let i = 0; i < 32; i++) {
         if ((bitmap & 1) !== 0) {
           const node = root2.array[j++];
-          nodes[i] = node;
+          nodes2[i] = node;
         }
         bitmap = bitmap >>> 1;
       }
       return {
         type: ARRAY_NODE,
         size: n + 1,
-        array: nodes
+        array: nodes2
       };
     } else {
       const newArray = spliceIn(root2.array, idx, {
@@ -1897,15 +1947,15 @@ var NOT_FOUND = {};
 function identity(x) {
   return x;
 }
-function to_string2(term) {
+function to_string(term) {
   return term.toString();
 }
-function float_to_string(float3) {
-  const string3 = float3.toString();
-  if (string3.indexOf(".") >= 0) {
-    return string3;
+function graphemes(string3) {
+  const iterator = graphemes_iterator(string3);
+  if (iterator) {
+    return List.fromArray(Array.from(iterator).map((item) => item.segment));
   } else {
-    return string3 + ".0";
+    return List.fromArray(string3.match(/./gsu));
   }
 }
 function graphemes_iterator(string3) {
@@ -1935,6 +1985,9 @@ function uppercase(string3) {
 }
 function add2(a, b) {
   return a + b;
+}
+function split(xs, pattern2) {
+  return List.fromArray(xs.split(pattern2));
 }
 function join(xs, separator) {
   const iterator = xs[Symbol.iterator]();
@@ -1975,6 +2028,15 @@ var unicode_whitespaces = [
 ].join();
 var left_trim_regex = new RegExp(`^([${unicode_whitespaces}]*)`, "g");
 var right_trim_regex = new RegExp(`([${unicode_whitespaces}]*)$`, "g");
+function print_debug(string3) {
+  if (typeof process === "object" && process.stderr?.write) {
+    process.stderr.write(string3 + "\n");
+  } else if (typeof Deno === "object") {
+    Deno.stderr.writeSync(new TextEncoder().encode(string3 + "\n"));
+  } else {
+    console.log(string3);
+  }
+}
 function round(float3) {
   return Math.round(float3);
 }
@@ -2074,6 +2136,117 @@ function try_get_field(value, field2, or_else) {
   } catch {
     return or_else();
   }
+}
+function inspect(v) {
+  const t = typeof v;
+  if (v === true)
+    return "True";
+  if (v === false)
+    return "False";
+  if (v === null)
+    return "//js(null)";
+  if (v === void 0)
+    return "Nil";
+  if (t === "string")
+    return inspectString(v);
+  if (t === "bigint" || t === "number")
+    return v.toString();
+  if (Array.isArray(v))
+    return `#(${v.map(inspect).join(", ")})`;
+  if (v instanceof List)
+    return inspectList(v);
+  if (v instanceof UtfCodepoint)
+    return inspectUtfCodepoint(v);
+  if (v instanceof BitArray)
+    return inspectBitArray(v);
+  if (v instanceof CustomType)
+    return inspectCustomType(v);
+  if (v instanceof Dict)
+    return inspectDict(v);
+  if (v instanceof Set)
+    return `//js(Set(${[...v].map(inspect).join(", ")}))`;
+  if (v instanceof RegExp)
+    return `//js(${v})`;
+  if (v instanceof Date)
+    return `//js(Date("${v.toISOString()}"))`;
+  if (v instanceof Function) {
+    const args = [];
+    for (const i of Array(v.length).keys())
+      args.push(String.fromCharCode(i + 97));
+    return `//fn(${args.join(", ")}) { ... }`;
+  }
+  return inspectObject(v);
+}
+function inspectString(str) {
+  let new_str = '"';
+  for (let i = 0; i < str.length; i++) {
+    let char = str[i];
+    switch (char) {
+      case "\n":
+        new_str += "\\n";
+        break;
+      case "\r":
+        new_str += "\\r";
+        break;
+      case "	":
+        new_str += "\\t";
+        break;
+      case "\f":
+        new_str += "\\f";
+        break;
+      case "\\":
+        new_str += "\\\\";
+        break;
+      case '"':
+        new_str += '\\"';
+        break;
+      default:
+        if (char < " " || char > "~" && char < "\xA0") {
+          new_str += "\\u{" + char.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0") + "}";
+        } else {
+          new_str += char;
+        }
+    }
+  }
+  new_str += '"';
+  return new_str;
+}
+function inspectDict(map4) {
+  let body = "dict.from_list([";
+  let first3 = true;
+  map4.forEach((value, key) => {
+    if (!first3)
+      body = body + ", ";
+    body = body + "#(" + inspect(key) + ", " + inspect(value) + ")";
+    first3 = false;
+  });
+  return body + "])";
+}
+function inspectObject(v) {
+  const name = Object.getPrototypeOf(v)?.constructor?.name || "Object";
+  const props = [];
+  for (const k of Object.keys(v)) {
+    props.push(`${inspect(k)}: ${inspect(v[k])}`);
+  }
+  const body = props.length ? " " + props.join(", ") + " " : "";
+  const head = name === "Object" ? "" : name + " ";
+  return `//js(${head}{${body}})`;
+}
+function inspectCustomType(record) {
+  const props = Object.keys(record).map((label) => {
+    const value = inspect(record[label]);
+    return isNaN(parseInt(label)) ? `${label}: ${value}` : value;
+  }).join(", ");
+  return props ? `${record.constructor.name}(${props})` : record.constructor.name;
+}
+function inspectList(list) {
+  return `[${list.toArray().map(inspect).join(", ")}]`;
+}
+function inspectBitArray(bits) {
+  return `<<${Array.from(bits.buffer).join(", ")}>>`;
+}
+function inspectUtfCodepoint(codepoint2) {
+  return `//utfcodepoint(${String.fromCodePoint(codepoint2.value)})`;
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/dict.mjs
@@ -2903,41 +3076,8 @@ function start3(app, selector, flags) {
 function div(attrs, children) {
   return element("div", attrs, children);
 }
-function p(attrs, children) {
-  return element("p", attrs, children);
-}
 function button(attrs, children) {
   return element("button", attrs, children);
-}
-
-// build/dev/javascript/lustre/lustre/element/svg.mjs
-var namespace = "http://www.w3.org/2000/svg";
-function circle(attrs) {
-  return namespaced(namespace, "circle", attrs, toList([]));
-}
-function line(attrs) {
-  return namespaced(namespace, "line", attrs, toList([]));
-}
-function rect(attrs) {
-  return namespaced(namespace, "rect", attrs, toList([]));
-}
-function defs(attrs, children) {
-  return namespaced(namespace, "defs", attrs, children);
-}
-function g(attrs, children) {
-  return namespaced(namespace, "g", attrs, children);
-}
-function pattern(attrs, children) {
-  return namespaced(namespace, "pattern", attrs, children);
-}
-function svg(attrs, children) {
-  return namespaced(namespace, "svg", attrs, children);
-}
-function path(attrs) {
-  return namespaced(namespace, "path", attrs, toList([]));
-}
-function text2(attrs, content) {
-  return namespaced(namespace, "text", attrs, toList([text(content)]));
 }
 
 // build/dev/javascript/lustre/lustre/event.mjs
@@ -2989,487 +3129,12 @@ function windowSize() {
   return [window.innerWidth, window.innerHeight];
 }
 
-// build/dev/javascript/nodework/nodework/vector.mjs
-var Vector = class extends CustomType {
-  constructor(x, y) {
-    super();
-    this.x = x;
-    this.y = y;
-  }
-};
-var Translate = class extends CustomType {
-};
-var Scale = class extends CustomType {
-};
-function subtract(a, b) {
-  return new Vector(b.x - a.x, b.y - a.y);
-}
-function add3(a, b) {
-  return new Vector(a.x + b.x, a.y + b.y);
-}
-function map_vector(vec, f) {
-  return new Vector(f(vec.x), f(vec.y));
-}
-function scalar(vec, b) {
-  let _pipe = vec;
-  return map_vector(
-    _pipe,
-    (val) => {
-      let _pipe$1 = val;
-      let _pipe$2 = to_float(_pipe$1);
-      let _pipe$3 = ((x) => {
-        return x * b;
-      })(_pipe$2);
-      return round2(_pipe$3);
-    }
-  );
-}
-function divide(vec, b) {
-  let _pipe = vec;
-  return map_vector(
-    _pipe,
-    (val) => {
-      let _pipe$1 = val;
-      let _pipe$2 = to_float(_pipe$1);
-      let _pipe$3 = ((x) => {
-        return divideFloat(x, b);
-      })(_pipe$2);
-      return round2(_pipe$3);
-    }
-  );
-}
-function bounded_vector(vec, bound) {
-  let _pipe = vec;
-  return map_vector(
-    _pipe,
-    (val) => {
-      let _pipe$1 = min2(val, bound);
-      return max2(_pipe$1, bound * -1);
-    }
-  );
-}
-function inverse(p2) {
-  return new Vector(p2.x * -1, p2.y * -1);
-}
-function to_html(vec, t) {
-  let _pipe = (() => {
-    if (t instanceof Translate) {
-      return "translate(";
-    } else if (t instanceof Scale) {
-      return "scale(";
-    } else {
-      return "rotate(";
-    }
-  })();
-  return ((t2) => {
-    return t2 + to_string3(vec.x) + "," + to_string3(vec.y) + ")";
-  })(_pipe);
-}
-
-// build/dev/javascript/nodework/nodework/conn.mjs
-var Conn = class extends CustomType {
-  constructor(id2, p0, p1, source_node_id, target_node_id, target_input_id, target_input_value, active) {
-    super();
-    this.id = id2;
-    this.p0 = p0;
-    this.p1 = p1;
-    this.source_node_id = source_node_id;
-    this.target_node_id = target_node_id;
-    this.target_input_id = target_input_id;
-    this.target_input_value = target_input_value;
-    this.active = active;
-  }
-};
-function to_attributes(conn) {
-  return toList([
-    attribute("x1", to_string3(conn.p0.x)),
-    attribute("y1", to_string3(conn.p0.y)),
-    attribute("x2", to_string3(conn.p1.x)),
-    attribute("y2", to_string3(conn.p1.y))
-  ]);
-}
-function conn_duplicate(a, b) {
-  return a.target_input_id === b.target_input_id;
-}
-function deduplicate_helper(loop$remaining, loop$seen) {
-  while (true) {
-    let remaining = loop$remaining;
-    let seen = loop$seen;
-    if (remaining.hasLength(0)) {
-      return seen;
-    } else {
-      let head = remaining.head;
-      let tail = remaining.tail;
-      let $ = any(seen, (x) => {
-        return conn_duplicate(x, head);
-      });
-      if ($) {
-        loop$remaining = tail;
-        loop$seen = seen;
-      } else {
-        loop$remaining = tail;
-        loop$seen = prepend(head, seen);
-      }
-    }
-  }
-}
-function unique(conns) {
-  return deduplicate_helper(conns, toList([]));
-}
-function map_active(conns, f) {
-  let _pipe = conns;
-  return map(
-    _pipe,
-    (c) => {
-      let $ = c.active;
-      if (!$) {
-        return c;
-      } else {
-        return f(c);
-      }
-    }
-  );
-}
-function exclude_by_node_ids(conns, ids) {
-  let _pipe = conns;
-  return filter(
-    _pipe,
-    (c) => {
-      let _pipe$1 = from_list2(toList([c.source_node_id, c.target_node_id]));
-      let _pipe$2 = intersection(_pipe$1, ids);
-      let _pipe$3 = to_list2(_pipe$2);
-      return ((x) => {
-        if (x.hasLength(0)) {
-          return true;
-        } else {
-          return false;
-        }
-      })(_pipe$3);
-    }
-  );
-}
-
-// build/dev/javascript/nodework/nodework/navigator.mjs
-var Navigator = class extends CustomType {
-  constructor(cursor_point2, mouse_down) {
-    super();
-    this.cursor_point = cursor_point2;
-    this.mouse_down = mouse_down;
-  }
-};
-function set_navigator_mouse_down(nav) {
-  return nav.withFields({ mouse_down: true });
-}
-
-// build/dev/javascript/nodework/util/random.mjs
-var lib = /* @__PURE__ */ toList([
-  "a",
-  "b",
-  "c",
-  "d",
-  "e",
-  "f",
-  "g",
-  "h",
-  "i",
-  "j",
-  "k",
-  "l",
-  "m",
-  "n",
-  "o",
-  "p",
-  "q",
-  "r",
-  "s",
-  "t",
-  "u",
-  "v",
-  "w",
-  "x",
-  "y",
-  "z",
-  "0",
-  "1",
-  "2",
-  "3",
-  "4",
-  "5",
-  "6",
-  "7",
-  "8",
-  "9"
-]);
-function generate_random_id(prefix) {
-  let _pipe = lib;
-  let _pipe$1 = shuffle(_pipe);
-  let _pipe$2 = take(_pipe$1, 12);
-  let _pipe$3 = join2(_pipe$2, "");
-  return ((id2) => {
-    return prefix + "." + id2;
-  })(_pipe$3);
-}
-
-// build/dev/javascript/nodework/nodework/node.mjs
-var Node2 = class extends CustomType {
-  constructor(position, offset, id2, inputs, output2, name) {
-    super();
-    this.position = position;
-    this.offset = offset;
-    this.id = id2;
-    this.inputs = inputs;
-    this.output = output2;
-    this.name = name;
-  }
-};
-var NodeFunction = class extends CustomType {
-  constructor(label, inputs, output2) {
-    super();
-    this.label = label;
-    this.inputs = inputs;
-    this.output = output2;
-  }
-};
-var NotFound = class extends CustomType {
-};
-var NodeInput = class extends CustomType {
-  constructor(id2, position, label, hovered) {
-    super();
-    this.id = id2;
-    this.position = position;
-    this.label = label;
-    this.hovered = hovered;
-  }
-};
-var NodeOutput = class extends CustomType {
-  constructor(id2, position, hovered) {
-    super();
-    this.id = id2;
-    this.position = position;
-    this.hovered = hovered;
-  }
-};
-function input_position_from_index(index2) {
-  return new Vector(0, 50 + index2 * 30);
-}
-function new_input(id2, index2, label) {
-  let _pipe = id2 + "-" + to_string3(index2);
-  return ((input_id2) => {
-    return new NodeInput(
-      input_id2,
-      input_position_from_index(index2),
-      label,
-      false
-    );
-  })(_pipe);
-}
-function input_id(in$) {
-  return in$.id;
-}
-function input_label(in$) {
-  return in$.label;
-}
-function input_hovered(in$) {
-  return in$.hovered;
-}
-function input_position(in$) {
-  return in$.position;
-}
-function set_input_hover(ins, id2) {
-  let _pipe = ins;
-  return map_values(
-    _pipe,
-    (_, node) => {
-      let _pipe$1 = node.inputs;
-      let _pipe$2 = map(
-        _pipe$1,
-        (input) => {
-          let _pipe$22 = input.id === id2;
-          return ((hovered) => {
-            return input.withFields({ hovered });
-          })(
-            _pipe$22
-          );
-        }
-      );
-      return ((inputs) => {
-        return node.withFields({ inputs });
-      })(
-        _pipe$2
-      );
-    }
-  );
-}
-function reset_input_hover(ins) {
-  let _pipe = ins;
-  return map_values(
-    _pipe,
-    (_, node) => {
-      let _pipe$1 = node.inputs;
-      let _pipe$2 = map(
-        _pipe$1,
-        (input) => {
-          return input.withFields({ hovered: false });
-        }
-      );
-      return ((inputs) => {
-        return node.withFields({ inputs });
-      })(
-        _pipe$2
-      );
-    }
-  );
-}
-function set_output_hover(ins, id2) {
-  let _pipe = ins;
-  return map_values(
-    _pipe,
-    (_, node) => {
-      let _pipe$1 = (() => {
-        let $ = node.output.id === id2;
-        if ($) {
-          return node.output.withFields({ hovered: true });
-        } else {
-          return node.output;
-        }
-      })();
-      return ((output2) => {
-        return node.withFields({ output: output2 });
-      })(
-        _pipe$1
-      );
-    }
-  );
-}
-function reset_output_hover(ins) {
-  let _pipe = ins;
-  return map_values(
-    _pipe,
-    (_, node) => {
-      let _pipe$1 = node.output.withFields({ hovered: false });
-      return ((output2) => {
-        return node.withFields({ output: output2 });
-      })(
-        _pipe$1
-      );
-    }
-  );
-}
-function get_node_from_input_hovered(ins) {
-  let _pipe = ins;
-  let _pipe$1 = map_to_list(_pipe);
-  let _pipe$2 = map(_pipe$1, second);
-  let _pipe$3 = filter_map(
-    _pipe$2,
-    (node) => {
-      let $ = (() => {
-        let _pipe$32 = node.inputs;
-        return filter(_pipe$32, (in$) => {
-          return in$.hovered;
-        });
-      })();
-      if ($.hasLength(0)) {
-        return new Error(void 0);
-      } else if ($.hasLength(1)) {
-        let input = $.head;
-        return new Ok([node, input]);
-      } else {
-        return new Error(void 0);
-      }
-    }
-  );
-  return ((nodes) => {
-    if (nodes.hasLength(1)) {
-      let node_and_input = nodes.head;
-      return new Ok(node_and_input);
-    } else if (nodes.hasLength(0)) {
-      return new Error(new NotFound());
-    } else {
-      return new Error(new NotFound());
-    }
-  })(_pipe$3);
-}
-function new_output(id2) {
-  return new NodeOutput("out-" + id2, new Vector(200, 50), false);
-}
-function output_position(out) {
-  return out.position;
-}
-function output_id(out) {
-  return out.id;
-}
-function output_hovered(out) {
-  return out.hovered;
-}
-function get_position(nodes, id2) {
-  let _pipe = nodes;
-  let _pipe$1 = get(_pipe, id2);
-  return ((r) => {
-    if (r.isOk()) {
-      let n = r[0];
-      return n.position;
-    } else {
-      return new Vector(0, 0);
-    }
-  })(_pipe$1);
-}
-function update_offset(node, point) {
-  let _pipe = node.position;
-  let _pipe$1 = subtract(_pipe, point);
-  return ((p2) => {
-    return node.withFields({ offset: p2 });
-  })(_pipe$1);
-}
-function update_all_node_offsets(nodes, point) {
-  let _pipe = nodes;
-  return map_values(
-    _pipe,
-    (_, node) => {
-      return update_offset(node, point);
-    }
-  );
-}
-function exclude_by_ids(nodes, ids) {
-  let _pipe = nodes;
-  return drop2(_pipe, to_list2(ids));
-}
-function new_node(library, identifier, position) {
-  let _pipe = library;
-  let _pipe$1 = get(_pipe, identifier);
-  return ((res) => {
-    if (!res.isOk() && !res[0]) {
-      return new Error(void 0);
-    } else {
-      let node_function = res[0];
-      let id2 = (() => {
-        let $ = lowercase2(node_function.label) === "output";
-        if ($) {
-          return "node.output";
-        } else {
-          return generate_random_id("node");
-        }
-      })();
-      return new Ok(
-        new Node2(
-          position,
-          new Vector(0, 0),
-          id2,
-          (() => {
-            let _pipe$2 = node_function.inputs;
-            let _pipe$3 = to_list2(_pipe$2);
-            return index_map(
-              _pipe$3,
-              (label, i) => {
-                return new_input(id2, i, label);
-              }
-            );
-          })(),
-          new_output(id2),
-          capitalise(node_function.label)
-        )
-      );
-    }
-  })(_pipe$1);
+// build/dev/javascript/gleam_stdlib/gleam/io.mjs
+function debug(term) {
+  let _pipe = term;
+  let _pipe$1 = inspect2(_pipe);
+  print_debug(_pipe$1);
+  return term;
 }
 
 // build/dev/javascript/nodework/nodework/dag.mjs
@@ -3503,7 +3168,7 @@ function sync_vertex_inputs(graph) {
   let _pipe = graph.verts;
   let _pipe$1 = map_values(
     _pipe,
-    (id2, v) => {
+    (id2, vertex) => {
       let _pipe$12 = graph.edges;
       let _pipe$2 = filter(_pipe$12, (edge) => {
         return id2 === edge.to;
@@ -3513,8 +3178,10 @@ function sync_vertex_inputs(graph) {
       });
       let _pipe$4 = from_list(_pipe$3);
       return ((inputs) => {
-        return v.withFields({ inputs });
-      })(_pipe$4);
+        return vertex.withFields({ inputs });
+      })(
+        _pipe$4
+      );
     }
   );
   return ((verts) => {
@@ -3591,81 +3258,120 @@ function topological_sort(graph) {
   );
 }
 
-// build/dev/javascript/nodework/nodework/menu.mjs
-var Menu = class extends CustomType {
-  constructor(pos, active, nodes) {
+// build/dev/javascript/nodework/nodework/math.mjs
+var Vector = class extends CustomType {
+  constructor(x, y) {
     super();
-    this.pos = pos;
-    this.active = active;
-    this.nodes = nodes;
+    this.x = x;
+    this.y = y;
   }
 };
-function view_menu_item(item, spawn_func) {
-  let text3 = item[0];
-  let id2 = item[1];
-  return button(
-    toList([
-      id(id2),
-      class$("hover:bg-gray-300"),
-      on2("click", spawn_func)
-    ]),
-    toList([text(text3)])
-  );
+var Translate = class extends CustomType {
+};
+var Scale = class extends CustomType {
+};
+function vector_add(a, b) {
+  return new Vector(a.x + b.x, a.y + b.y);
 }
-function view_menu(menu, spawn_func) {
-  let pos = "translate(" + to_string3(menu.pos.x) + "px, " + to_string3(
-    menu.pos.y
-  ) + "px)";
-  return div(
-    (() => {
-      let $ = menu.active;
-      if ($) {
-        return toList([
-          class$(
-            "absolute top-0 left-0 w-[100px] h-[300px] bg-gray-200 rounded shadow"
-          ),
-          style(toList([["transform", pos]]))
-        ]);
-      } else {
-        return toList([class$("hidden")]);
-      }
-    })(),
-    toList([
-      div(
-        toList([class$("flex flex-col p-2 gap-1")]),
-        (() => {
-          let _pipe = menu.nodes;
-          return map(
-            _pipe,
-            (item) => {
-              return view_menu_item(item, spawn_func);
-            }
-          );
-        })()
-      )
-    ])
-  );
+function vector_subtract(a, b) {
+  return new Vector(b.x - a.x, b.y - a.y);
 }
-function new$5(nodes) {
-  let _pipe = nodes;
-  let _pipe$1 = map(
+function map_vector(vec, func) {
+  return new Vector(func(vec.x), func(vec.y));
+}
+function vector_scalar(vec, scalar) {
+  let _pipe = vec;
+  return map_vector(
     _pipe,
-    (node) => {
-      return [capitalise(node.label), lowercase2(node.label)];
+    (val) => {
+      let _pipe$1 = val;
+      let _pipe$2 = to_float(_pipe$1);
+      let _pipe$3 = ((component) => {
+        return component * scalar;
+      })(_pipe$2);
+      return round2(_pipe$3);
     }
   );
-  return ((nodes2) => {
-    return new Menu(new Vector(0, 0), false, nodes2);
-  })(
-    _pipe$1
+}
+function vector_divide(vec, divisor) {
+  let _pipe = vec;
+  return map_vector(
+    _pipe,
+    (val) => {
+      let _pipe$1 = val;
+      let _pipe$2 = to_float(_pipe$1);
+      let _pipe$3 = ((x) => {
+        return divideFloat(x, divisor);
+      })(_pipe$2);
+      return round2(_pipe$3);
+    }
+  );
+}
+function vector_inverse(vec) {
+  return new Vector(vec.x * -1, vec.y * -1);
+}
+function bounded_vector(vec, bound) {
+  let _pipe = vec;
+  return map_vector(
+    _pipe,
+    (val) => {
+      let _pipe$1 = min2(val, bound);
+      return max2(_pipe$1, bound * -1);
+    }
+  );
+}
+function vec_to_html(vec, t) {
+  let _pipe = (() => {
+    if (t instanceof Translate) {
+      return "translate(";
+    } else if (t instanceof Scale) {
+      return "scale(";
+    } else {
+      return "rotate(";
+    }
+  })();
+  return ((t2) => {
+    return t2 + to_string2(vec.x) + "," + to_string2(vec.y) + ")";
+  })(_pipe);
+}
+
+// build/dev/javascript/nodework/nodework/decoder.mjs
+var MouseEvent = class extends CustomType {
+  constructor(position, shift_key_active) {
+    super();
+    this.position = position;
+    this.shift_key_active = shift_key_active;
+  }
+};
+function mouse_event_decoder(e) {
+  stop_propagation(e);
+  return try$(
+    field("shiftKey", bool)(e),
+    (shift_key) => {
+      return try$(
+        mouse_position(e),
+        (position) => {
+          return new Ok(
+            new MouseEvent(
+              new Vector(round2(position[0]), round2(position[1])),
+              shift_key
+            )
+          );
+        }
+      );
+    }
+  );
+}
+function keydown_event_decoder(e) {
+  return try$(
+    field("key", string)(e),
+    (key) => {
+      return new Ok(key);
+    }
   );
 }
 
-// build/dev/javascript/nodework/nodework/viewbox.mjs
-var Normal = class extends CustomType {
-};
-var Drag = class extends CustomType {
-};
+// build/dev/javascript/nodework/nodework/draw/viewbox.mjs
 var ViewBox = class extends CustomType {
   constructor(offset, resolution, zoom_level) {
     super();
@@ -3674,35 +3380,33 @@ var ViewBox = class extends CustomType {
     this.zoom_level = zoom_level;
   }
 };
-function to_viewbox_scale(vb, p2) {
-  let _pipe = p2;
-  return scalar(_pipe, vb.zoom_level);
-}
-function to_viewbox_translate(vb, p2) {
-  let _pipe = p2;
-  return add3(_pipe, vb.offset);
-}
-function to_viewbox_space(vb, p2) {
-  let _pipe = p2;
-  let _pipe$1 = scalar(_pipe, vb.zoom_level);
-  return add3(_pipe$1, vb.offset);
-}
-function from_viewbox_scale(vb, p2) {
-  let _pipe = p2;
-  return divide(_pipe, vb.zoom_level);
-}
 function update_resolution(vb, resolution) {
   let _pipe = vb.zoom_level;
   let _pipe$1 = ((_capture) => {
-    return scalar(resolution, _capture);
-  })(
-    _pipe
-  );
+    return vector_scalar(resolution, _capture);
+  })(_pipe);
   return ((res) => {
     return vb.withFields({ resolution: res });
   })(_pipe$1);
 }
-var scroll_factor = 0.1;
+function unscale(vb, vec) {
+  let _pipe = vec;
+  return vector_divide(_pipe, vb.zoom_level);
+}
+function scale(vb, vec) {
+  let _pipe = vec;
+  return vector_scalar(_pipe, vb.zoom_level);
+}
+function translate(vb, vec) {
+  let _pipe = vec;
+  return vector_add(_pipe, vb.offset);
+}
+function transform(vb, vec) {
+  let _pipe = vec;
+  let _pipe$1 = vector_scalar(_pipe, vb.zoom_level);
+  return vector_add(_pipe$1, vb.offset);
+}
+var scroll_factor = 0.01;
 var limit_zoom_in = 0.5;
 var limit_zoom_out = 3;
 function update_zoom_level(vb, delta_y) {
@@ -3723,32 +3427,704 @@ function update_zoom_level(vb, delta_y) {
   })(_pipe$4);
 }
 
-// build/dev/javascript/nodework/nodework/model.mjs
-var Model = class extends CustomType {
-  constructor(nodes, connections2, nodes_selected, window_resolution, viewbox, navigator, mode, last_clicked_point, menu, library, graph, output2) {
+// build/dev/javascript/nodework/nodework/util/random.mjs
+var lib = /* @__PURE__ */ toList([
+  "a",
+  "b",
+  "c",
+  "d",
+  "e",
+  "f",
+  "g",
+  "h",
+  "i",
+  "j",
+  "k",
+  "l",
+  "m",
+  "n",
+  "o",
+  "p",
+  "q",
+  "r",
+  "s",
+  "t",
+  "u",
+  "v",
+  "w",
+  "x",
+  "y",
+  "z",
+  "0",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9"
+]);
+function generate_random_id(prefix) {
+  let _pipe = lib;
+  let _pipe$1 = shuffle(_pipe);
+  let _pipe$2 = take(_pipe$1, 12);
+  let _pipe$3 = join2(_pipe$2, "");
+  return ((id2) => {
+    return prefix + "-" + id2;
+  })(_pipe$3);
+}
+
+// build/dev/javascript/nodework/nodework/node.mjs
+var IntNode = class extends CustomType {
+  constructor(key, label, inputs, func) {
     super();
-    this.nodes = nodes;
+    this.key = key;
+    this.label = label;
+    this.inputs = inputs;
+    this.func = func;
+  }
+};
+var StringNode = class extends CustomType {
+  constructor(key, label, inputs, func) {
+    super();
+    this.key = key;
+    this.label = label;
+    this.inputs = inputs;
+    this.func = func;
+  }
+};
+var NodeNotFound = class extends CustomType {
+};
+var UINodeInput = class extends CustomType {
+  constructor(id2, position, label, hovered) {
+    super();
+    this.id = id2;
+    this.position = position;
+    this.label = label;
+    this.hovered = hovered;
+  }
+};
+var UINodeOutput = class extends CustomType {
+  constructor(id2, position, hovered) {
+    super();
+    this.id = id2;
+    this.position = position;
+    this.hovered = hovered;
+  }
+};
+var NodeOutput = class extends CustomType {
+  constructor(id2) {
+    super();
+    this.id = id2;
+  }
+};
+var NodeInput = class extends CustomType {
+  constructor(id2) {
+    super();
+    this.id = id2;
+  }
+};
+var UINode = class extends CustomType {
+  constructor(label, key, id2, inputs, output2, position, offset) {
+    super();
+    this.label = label;
+    this.key = key;
+    this.id = id2;
+    this.inputs = inputs;
+    this.output = output2;
+    this.position = position;
+    this.offset = offset;
+  }
+};
+function input_position_from_index(index2) {
+  return new Vector(0, 50 + index2 * 30);
+}
+function new_ui_node_input(id2, index2, label) {
+  let _pipe = toList([id2, "in", to_string2(index2)]);
+  let _pipe$1 = join2(_pipe, ".");
+  return ((input_id) => {
+    return new UINodeInput(
+      input_id,
+      input_position_from_index(index2),
+      label,
+      false
+    );
+  })(_pipe$1);
+}
+function new_ui_node_output(id2) {
+  return new UINodeOutput(id2 + ".out", new Vector(200, 50), false);
+}
+function new_ui_node(key, inputs, position) {
+  let label = (() => {
+    let $ = split3(key, ".");
+    if ($.hasLength(2)) {
+      let text3 = $.tail.head;
+      return text3;
+    } else {
+      return key;
+    }
+  })();
+  let id2 = (() => {
+    if (label === "output") {
+      return "node-output";
+    } else {
+      return generate_random_id("node");
+    }
+  })();
+  let ui_inputs = (() => {
+    let _pipe = inputs;
+    let _pipe$1 = to_list2(_pipe);
+    return index_map(
+      _pipe$1,
+      (label2, index2) => {
+        return new_ui_node_input(id2, index2, label2);
+      }
+    );
+  })();
+  return new UINode(
+    capitalise(label),
+    key,
+    id2,
+    ui_inputs,
+    new_ui_node_output(id2),
+    position,
+    new Vector(0, 0)
+  );
+}
+function set_output_hover(ins, id2) {
+  let _pipe = ins;
+  return map_values(
+    _pipe,
+    (_, node) => {
+      let _pipe$1 = (() => {
+        let $ = node.output.id === id2;
+        if ($) {
+          return node.output.withFields({ hovered: true });
+        } else {
+          return node.output;
+        }
+      })();
+      return ((output2) => {
+        return node.withFields({ output: output2 });
+      })(
+        _pipe$1
+      );
+    }
+  );
+}
+function reset_output_hover(ins) {
+  let _pipe = ins;
+  return map_values(
+    _pipe,
+    (_, node) => {
+      let _pipe$1 = node.output.withFields({ hovered: false });
+      return ((output2) => {
+        return node.withFields({ output: output2 });
+      })(
+        _pipe$1
+      );
+    }
+  );
+}
+function set_input_hover(ins, id2) {
+  let _pipe = ins;
+  return map_values(
+    _pipe,
+    (_, node) => {
+      let _pipe$1 = node.inputs;
+      let _pipe$2 = map(
+        _pipe$1,
+        (input) => {
+          let _pipe$22 = input.id === id2;
+          return ((hovered) => {
+            return input.withFields({ hovered });
+          })(
+            _pipe$22
+          );
+        }
+      );
+      return ((inputs) => {
+        return node.withFields({ inputs });
+      })(
+        _pipe$2
+      );
+    }
+  );
+}
+function reset_input_hover(ins) {
+  let _pipe = ins;
+  return map_values(
+    _pipe,
+    (_, node) => {
+      let _pipe$1 = node.inputs;
+      let _pipe$2 = map(
+        _pipe$1,
+        (input) => {
+          return input.withFields({ hovered: false });
+        }
+      );
+      return ((inputs) => {
+        return node.withFields({ inputs });
+      })(
+        _pipe$2
+      );
+    }
+  );
+}
+function set_hover(ins, kind, hover) {
+  if (kind instanceof NodeInput && hover) {
+    let id2 = kind.id;
+    return set_input_hover(ins, id2);
+  } else if (kind instanceof NodeInput && !hover) {
+    return reset_input_hover(ins);
+  } else if (kind instanceof NodeOutput && hover) {
+    let id2 = kind.id;
+    return set_output_hover(ins, id2);
+  } else {
+    return reset_output_hover(ins);
+  }
+}
+function get_ui_node(nodes2, id2) {
+  let _pipe = nodes2;
+  return get(_pipe, id2);
+}
+function update_offset(n, point) {
+  let _pipe = n.position;
+  let _pipe$1 = vector_subtract(_pipe, point);
+  return ((p) => {
+    return n.withFields({ offset: p });
+  })(_pipe$1);
+}
+function update_all_node_offsets(nodes2, point) {
+  let _pipe = nodes2;
+  return map_values(_pipe, (_, n) => {
+    return update_offset(n, point);
+  });
+}
+function get_node_from_input_hovered(ins) {
+  let _pipe = ins;
+  let _pipe$1 = map_to_list(_pipe);
+  let _pipe$2 = map(_pipe$1, second);
+  let _pipe$3 = filter_map(
+    _pipe$2,
+    (node) => {
+      let $ = (() => {
+        let _pipe$32 = node.inputs;
+        return filter(_pipe$32, (in$) => {
+          return in$.hovered;
+        });
+      })();
+      if ($.hasLength(0)) {
+        return new Error(void 0);
+      } else if ($.hasLength(1)) {
+        let input = $.head;
+        return new Ok([node, input]);
+      } else {
+        return new Error(void 0);
+      }
+    }
+  );
+  return ((nodes2) => {
+    if (nodes2.hasLength(1)) {
+      let node_and_input = nodes2.head;
+      return new Ok(node_and_input);
+    } else if (nodes2.hasLength(0)) {
+      return new Error(new NodeNotFound());
+    } else {
+      return new Error(new NodeNotFound());
+    }
+  })(_pipe$3);
+}
+function exclude_by_ids(nodes2, ids) {
+  let _pipe = nodes2;
+  return drop2(_pipe, to_list2(ids));
+}
+function extract_node_id(id2) {
+  let _pipe = id2;
+  let _pipe$1 = split3(_pipe, ".");
+  let _pipe$2 = first(_pipe$1);
+  return ((res) => {
+    if (res.isOk()) {
+      let node_id = res[0];
+      return node_id;
+    } else {
+      return "";
+    }
+  })(_pipe$2);
+}
+function extract_node_ids(ids) {
+  let _pipe = ids;
+  let _pipe$1 = map(_pipe, extract_node_id);
+  return filter(_pipe$1, (node_id) => {
+    return node_id !== "";
+  });
+}
+
+// build/dev/javascript/nodework/nodework/lib.mjs
+var NodeLibrary = class extends CustomType {
+  constructor(nodes2) {
+    super();
+    this.nodes = nodes2;
+  }
+};
+var LibraryMenu = class extends CustomType {
+  constructor(nodes2, position, visible) {
+    super();
+    this.nodes = nodes2;
+    this.position = position;
+    this.visible = visible;
+  }
+};
+function register_nodes(nodes2) {
+  let _pipe = nodes2;
+  let _pipe$1 = map(
+    _pipe,
+    (n) => {
+      if (n instanceof IntNode) {
+        let key = n.key;
+        return ["int." + key, n];
+      } else {
+        let key = n.key;
+        return ["string." + key, n];
+      }
+    }
+  );
+  let _pipe$2 = from_list(_pipe$1);
+  return ((nodes3) => {
+    return new NodeLibrary(nodes3);
+  })(_pipe$2);
+}
+function generate_lib_menu(lib2) {
+  let _pipe = lib2.nodes;
+  let _pipe$1 = map_values(_pipe, (_, node) => {
+    return node.label;
+  });
+  let _pipe$2 = map_to_list(_pipe$1);
+  let _pipe$3 = map(_pipe$2, swap);
+  return ((nodes2) => {
+    return new LibraryMenu(nodes2, new Vector(0, 0), false);
+  })(
+    _pipe$3
+  );
+}
+
+// build/dev/javascript/nodework/nodework/examples.mjs
+function add3(inputs) {
+  let $ = get(inputs, "a");
+  let $1 = get(inputs, "b");
+  if ($.isOk() && $1.isOk()) {
+    let a = $[0];
+    let b = $1[0];
+    return a + b;
+  } else if ($.isOk() && !$1.isOk()) {
+    let a = $[0];
+    return a;
+  } else if (!$.isOk() && $1.isOk()) {
+    let b = $1[0];
+    return b;
+  } else {
+    return 0;
+  }
+}
+function double(inputs) {
+  let $ = get(inputs, "a");
+  if ($.isOk()) {
+    let a = $[0];
+    return a * 2;
+  } else {
+    return 0;
+  }
+}
+function capitalise2(inputs) {
+  let $ = get(inputs, "text");
+  if ($.isOk()) {
+    let text3 = $[0];
+    return capitalise(text3);
+  } else {
+    return "";
+  }
+}
+function ten(_) {
+  return 10;
+}
+function bob(_) {
+  return "bob";
+}
+function output(inputs) {
+  let $ = get(inputs, "out");
+  if ($.isOk()) {
+    let out = $[0];
+    return out;
+  } else {
+    return "";
+  }
+}
+function example_nodes() {
+  let nodes2 = toList([
+    new IntNode("add", "Add", from_list2(toList(["a", "b"])), add3),
+    new IntNode("double", "Double", from_list2(toList(["a"])), double),
+    new IntNode("ten", "Ten", from_list2(toList([])), ten),
+    new StringNode(
+      "capitalise",
+      "Capitalise",
+      from_list2(toList(["text"])),
+      capitalise2
+    ),
+    new StringNode("bob", "Bob", from_list2(toList([])), bob),
+    new StringNode("output", "Output", from_list2(toList(["out"])), output)
+  ]);
+  return register_nodes(nodes2);
+}
+
+// build/dev/javascript/nodework/nodework/conn.mjs
+var Conn = class extends CustomType {
+  constructor(id2, p0, p1, from3, to, value, dragged) {
+    super();
+    this.id = id2;
+    this.p0 = p0;
+    this.p1 = p1;
+    this.from = from3;
+    this.to = to;
+    this.value = value;
+    this.dragged = dragged;
+  }
+};
+function to_attributes(conn) {
+  return toList([
+    attribute("x1", to_string2(conn.p0.x)),
+    attribute("y1", to_string2(conn.p0.y)),
+    attribute("x2", to_string2(conn.p1.x)),
+    attribute("y2", to_string2(conn.p1.y))
+  ]);
+}
+function conn_duplicate(a, b) {
+  return a.to === b.to;
+}
+function deduplicate_helper(loop$remaining, loop$seen) {
+  while (true) {
+    let remaining = loop$remaining;
+    let seen = loop$seen;
+    if (remaining.hasLength(0)) {
+      return seen;
+    } else {
+      let head = remaining.head;
+      let tail = remaining.tail;
+      let $ = any(seen, (x) => {
+        return conn_duplicate(x, head);
+      });
+      if ($) {
+        loop$remaining = tail;
+        loop$seen = seen;
+      } else {
+        loop$remaining = tail;
+        loop$seen = prepend(head, seen);
+      }
+    }
+  }
+}
+function unique(conns) {
+  return deduplicate_helper(conns, toList([]));
+}
+function map_dragged(conns, f) {
+  let _pipe = conns;
+  return map(
+    _pipe,
+    (c) => {
+      let $ = c.dragged;
+      if (!$) {
+        return c;
+      } else {
+        return f(c);
+      }
+    }
+  );
+}
+function exclude_by_node_ids(conns, ids) {
+  let _pipe = conns;
+  return filter(
+    _pipe,
+    (c) => {
+      let _pipe$1 = extract_node_ids(toList([c.from, c.to]));
+      let _pipe$2 = from_list2(_pipe$1);
+      let _pipe$3 = intersection(_pipe$2, ids);
+      let _pipe$4 = to_list2(_pipe$3);
+      return ((x) => {
+        if (x.hasLength(0)) {
+          return true;
+        } else {
+          return false;
+        }
+      })(_pipe$4);
+    }
+  );
+}
+
+// build/dev/javascript/nodework/nodework/model.mjs
+var DragMode = class extends CustomType {
+};
+var NormalMode = class extends CustomType {
+};
+var Model = class extends CustomType {
+  constructor(lib2, nodes2, connections2, nodes_selected, menu, window_resolution, viewbox, cursor2, last_clicked_point, mouse_down, mode, output2, graph) {
+    super();
+    this.lib = lib2;
+    this.nodes = nodes2;
     this.connections = connections2;
     this.nodes_selected = nodes_selected;
+    this.menu = menu;
     this.window_resolution = window_resolution;
     this.viewbox = viewbox;
-    this.navigator = navigator;
-    this.mode = mode;
+    this.cursor = cursor2;
     this.last_clicked_point = last_clicked_point;
-    this.menu = menu;
-    this.library = library;
-    this.graph = graph;
+    this.mouse_down = mouse_down;
+    this.mode = mode;
     this.output = output2;
+    this.graph = graph;
+  }
+};
+var GraphResizeViewBox = class extends CustomType {
+  constructor(x0) {
+    super();
+    this[0] = x0;
+  }
+};
+var GraphOpenMenu = class extends CustomType {
+};
+var GraphCloseMenu = class extends CustomType {
+};
+var GraphSpawnNode = class extends CustomType {
+  constructor(x0) {
+    super();
+    this[0] = x0;
+  }
+};
+var GraphSetMode = class extends CustomType {
+  constructor(x0) {
+    super();
+    this[0] = x0;
+  }
+};
+var GraphClearSelection = class extends CustomType {
+};
+var GraphAddNodeToSelection = class extends CustomType {
+  constructor(x0) {
+    super();
+    this[0] = x0;
+  }
+};
+var GraphSetNodeAsSelection = class extends CustomType {
+  constructor(x0) {
+    super();
+    this[0] = x0;
+  }
+};
+var GraphDeleteSelectedUINodes = class extends CustomType {
+};
+var GraphChangedConnections = class extends CustomType {
+};
+var UserPressedKey = class extends CustomType {
+  constructor(x0) {
+    super();
+    this[0] = x0;
+  }
+};
+var UserMovedMouse = class extends CustomType {
+  constructor(x0) {
+    super();
+    this[0] = x0;
+  }
+};
+var UserScrolled = class extends CustomType {
+  constructor(x0) {
+    super();
+    this[0] = x0;
+  }
+};
+var UserClickedGraph = class extends CustomType {
+  constructor(x0) {
+    super();
+    this[0] = x0;
+  }
+};
+var UserUnclicked = class extends CustomType {
+};
+var UserClickedNode = class extends CustomType {
+  constructor(x0, x1) {
+    super();
+    this[0] = x0;
+    this[1] = x1;
+  }
+};
+var UserUnclickedNode = class extends CustomType {
+};
+var UserClickedNodeOutput = class extends CustomType {
+  constructor(x0, x1) {
+    super();
+    this[0] = x0;
+    this[1] = x1;
+  }
+};
+var UserHoverNodeOutput = class extends CustomType {
+  constructor(x0) {
+    super();
+    this[0] = x0;
+  }
+};
+var UserUnhoverNodeOutputs = class extends CustomType {
+};
+var UserHoverNodeInput = class extends CustomType {
+  constructor(x0) {
+    super();
+    this[0] = x0;
+  }
+};
+var UserUnhoverNodeInputs = class extends CustomType {
+};
+var UserClickedConn = class extends CustomType {
+  constructor(x0, x1) {
+    super();
+    this[0] = x0;
+    this[1] = x1;
   }
 };
 
-// build/dev/javascript/nodework/nodework/calc.mjs
-function nodes_to_vertices(nodes) {
-  let _pipe = nodes;
+// build/dev/javascript/nodework/nodework/handler.mjs
+function none_effect_wrapper(model) {
+  return [model, none()];
+}
+function simple_effect(msg) {
+  return from2(
+    (dispatch2) => {
+      let _pipe = msg;
+      return dispatch2(_pipe);
+    }
+  );
+}
+function shift_key_check(event2) {
+  return from2(
+    (dispatch2) => {
+      let _pipe = (() => {
+        let $ = event2.shift_key_active;
+        if ($) {
+          return new GraphSetMode(new DragMode());
+        } else {
+          return new GraphClearSelection();
+        }
+      })();
+      return dispatch2(_pipe);
+    }
+  );
+}
+
+// build/dev/javascript/nodework/nodework/dag_process.mjs
+function nodes_to_vertices(nodes2) {
+  let _pipe = nodes2;
   return map(
     _pipe,
     (n) => {
-      return [n.id, new Vertex(n.id, lowercase2(n.name), new$())];
+      return [n.id, new Vertex(n.id, lowercase2(n.key), new$())];
     }
   );
 }
@@ -3757,7 +4133,20 @@ function conns_to_edges(conns) {
   return map(
     _pipe,
     (c) => {
-      return new Edge(c.source_node_id, c.target_node_id, c.target_input_value);
+      let $ = extract_node_ids(toList([c.from, c.to]));
+      if (!$.hasLength(2)) {
+        throw makeError(
+          "assignment_no_match",
+          "nodework/dag_process",
+          25,
+          "",
+          "Assignment pattern did not match",
+          { value: $ }
+        );
+      }
+      let source_node_id = $.head;
+      let target_node_id = $.tail.head;
+      return new Edge(source_node_id, target_node_id, c.value);
     }
   );
 }
@@ -3769,7 +4158,7 @@ function filter_conns_by_edges(conns, edges) {
   return filter(
     _pipe,
     (c) => {
-      return contains(edge_source_ids, c.source_node_id);
+      return contains(edge_source_ids, extract_node_id(c.from));
     }
   );
 }
@@ -3808,58 +4197,79 @@ function sync_edges(model) {
     }
   })(_pipe$2);
 }
+function eval_vertex_inputs(inputs, lookup) {
+  let _pipe = inputs;
+  let _pipe$1 = map_to_list(_pipe);
+  return map(
+    _pipe$1,
+    (input_data) => {
+      let input_name = input_data[0];
+      let node_id = input_data[1];
+      let $ = get(lookup, node_id);
+      if ($.isOk()) {
+        let value = $[0];
+        return [input_name, value];
+      } else {
+        return [input_name, from("")];
+      }
+    }
+  );
+}
+function typed_inputs(inputs, decoder) {
+  let _pipe = inputs;
+  return map(
+    _pipe,
+    (_capture) => {
+      return map_second(_capture, decoder);
+    }
+  );
+}
 function eval_graph(verts, model) {
+  let int_decoder = (x) => {
+    return unwrap(int(x), 0);
+  };
+  let string_decoder = (x) => {
+    return unwrap(string(x), "");
+  };
   let _pipe = verts;
   let _pipe$1 = fold(
     _pipe,
     new$(),
-    (evaluated, vert) => {
-      let $ = get(model.library, vert.value);
-      if (!$.isOk() && !$[0]) {
-        return insert(evaluated, vert.id, from(0));
-      } else {
-        let nodefunc = $[0];
-        let inputs = (() => {
-          let _pipe$13 = vert.inputs;
-          let _pipe$23 = map_to_list(_pipe$13);
-          let _pipe$32 = map(
-            _pipe$23,
-            (keypair) => {
-              let ref = keypair[0];
-              let key = keypair[1];
-              let $1 = get(evaluated, key);
-              if (!$1.isOk() && !$1[0]) {
-                return [ref, from(0)];
-              } else {
-                let val = $1[0];
-                return [ref, val];
-              }
-            }
-          );
-          return from_list(_pipe$32);
-        })();
-        let _pipe$12 = inputs;
-        let _pipe$22 = nodefunc.output(_pipe$12);
-        return ((val) => {
-          return insert(evaluated, vert.id, val);
-        })(
-          _pipe$22
-        );
-      }
+    (lookup_evaluated, vertex) => {
+      let inputs = eval_vertex_inputs(vertex.inputs, lookup_evaluated);
+      let _pipe$12 = (() => {
+        let $ = get(model.lib.nodes, vertex.value);
+        if ($.isOk() && $[0] instanceof IntNode) {
+          let func = $[0].func;
+          let _pipe$13 = inputs;
+          let _pipe$22 = typed_inputs(_pipe$13, int_decoder);
+          let _pipe$3 = from_list(_pipe$22);
+          let _pipe$4 = func(_pipe$3);
+          return from(_pipe$4);
+        } else if ($.isOk() && $[0] instanceof StringNode) {
+          let func = $[0].func;
+          let _pipe$13 = inputs;
+          let _pipe$22 = typed_inputs(_pipe$13, string_decoder);
+          let _pipe$3 = from_list(_pipe$22);
+          let _pipe$4 = func(_pipe$3);
+          return from(_pipe$4);
+        } else {
+          let _pipe$13 = from("");
+          return debug(_pipe$13);
+        }
+      })();
+      return ((_capture) => {
+        return insert(lookup_evaluated, vertex.id, _capture);
+      })(_pipe$12);
     }
   );
-  let _pipe$2 = get(_pipe$1, "node.output");
-  let _pipe$3 = ((res) => {
-    if (res.isOk()) {
-      let output2 = res[0];
-      return output2;
-    } else {
-      return from(0);
-    }
-  })(_pipe$2);
+  let _pipe$2 = ((lookup_evaluated) => {
+    let _pipe$22 = get(lookup_evaluated, "node-output");
+    return unwrap(_pipe$22, from("No output"));
+  })(_pipe$1);
   return ((output2) => {
     return model.withFields({ output: output2 });
-  })(_pipe$3);
+  })(_pipe$2);
 }
 function recalc_graph(model) {
   let _pipe = model.graph;
@@ -3871,38 +4281,139 @@ function recalc_graph(model) {
       return verts;
     } else {
       let msg = res[0];
+      debug(msg);
       return toList([]);
     }
   })(_pipe$2);
   return eval_graph(_pipe$3, model);
 }
 
-// build/dev/javascript/nodework/nodework/draw.mjs
-function cursor_point(m, p2) {
-  let _pipe = p2;
+// build/dev/javascript/nodework/nodework/handler/graph.mjs
+function resize_view_box(model, resolution) {
+  let _pipe = model.withFields({
+    window_resolution: resolution,
+    viewbox: update_resolution(model.viewbox, resolution)
+  });
+  return none_effect_wrapper(_pipe);
+}
+function open_menu(model) {
+  let _pipe = model.cursor;
   let _pipe$1 = ((_capture) => {
-    return to_viewbox_scale(m.viewbox, _capture);
+    return unscale(model.viewbox, _capture);
   })(_pipe);
-  let _pipe$2 = ((p3) => {
-    return m.navigator.withFields({ cursor_point: p3 });
+  let _pipe$2 = ((cursor2) => {
+    return model.menu.withFields({ position: cursor2, visible: true });
+  })(_pipe$1);
+  let _pipe$3 = ((menu) => {
+    return model.withFields({ menu });
   })(
-    _pipe$1
+    _pipe$2
   );
-  return ((nav) => {
-    return m.withFields({ navigator: nav });
-  })(_pipe$2);
+  return none_effect_wrapper(_pipe$3);
+}
+function close_menu(model) {
+  let _pipe = model.menu.withFields({ visible: false });
+  let _pipe$1 = ((menu) => {
+    return model.withFields({ menu });
+  })(_pipe);
+  return none_effect_wrapper(_pipe$1);
+}
+function spawn_node(model, key) {
+  let position = transform(model.viewbox, model.menu.position);
+  let _pipe = (() => {
+    let $ = get(model.lib.nodes, key);
+    if ($.isOk()) {
+      let n = $[0];
+      return n.inputs;
+    } else {
+      return new$2();
+    }
+  })();
+  let _pipe$1 = ((_capture) => {
+    return new_ui_node(key, _capture, position);
+  })(_pipe);
+  let _pipe$2 = ((n) => {
+    return model.withFields({ nodes: insert(model.nodes, n.id, n) });
+  })(_pipe$1);
+  let _pipe$3 = sync_verts(_pipe$2);
+  let _pipe$4 = recalc_graph(_pipe$3);
+  return ((m) => {
+    return [m, simple_effect(new GraphCloseMenu())];
+  })(_pipe$4);
+}
+function add_node_to_selection(model, id2) {
+  let _pipe = model.withFields({
+    nodes_selected: (() => {
+      let _pipe2 = model.nodes_selected;
+      return insert2(_pipe2, id2);
+    })()
+  });
+  return none_effect_wrapper(_pipe);
+}
+function add_node_as_selection(model, id2) {
+  let _pipe = model.withFields({
+    nodes_selected: (() => {
+      let _pipe2 = new$2();
+      return insert2(_pipe2, id2);
+    })()
+  });
+  return none_effect_wrapper(_pipe);
+}
+function clear_selection(model) {
+  let _pipe = model.withFields({ nodes_selected: new$2() });
+  return none_effect_wrapper(_pipe);
+}
+function delete_selected_nodes(m) {
+  let _pipe = m.nodes;
+  let _pipe$1 = exclude_by_ids(_pipe, m.nodes_selected);
+  return ((nodes2) => {
+    return m.withFields({ nodes: nodes2 });
+  })(_pipe$1);
+}
+function delete_orphaned_connections(m) {
+  let _pipe = m.connections;
+  let _pipe$1 = exclude_by_node_ids(_pipe, m.nodes_selected);
+  return ((conns) => {
+    return m.withFields({ connections: conns });
+  })(_pipe$1);
+}
+function delete_selected_ui_nodes(model) {
+  let _pipe = model;
+  let _pipe$1 = delete_selected_nodes(_pipe);
+  let _pipe$2 = delete_orphaned_connections(_pipe$1);
+  let _pipe$3 = sync_verts(_pipe$2);
+  let _pipe$4 = sync_edges(_pipe$3);
+  let _pipe$5 = recalc_graph(_pipe$4);
+  return none_effect_wrapper(_pipe$5);
+}
+function changed_connections(model) {
+  let _pipe = model;
+  return none_effect_wrapper(_pipe);
+}
+
+// build/dev/javascript/nodework/nodework/draw.mjs
+function cursor(m, p) {
+  let _pipe = p;
+  let _pipe$1 = ((_capture) => {
+    return scale(m.viewbox, _capture);
+  })(
+    _pipe
+  );
+  return ((cursor2) => {
+    return m.withFields({ cursor: cursor2 });
+  })(_pipe$1);
 }
 function viewbox_offset(m, limit) {
   let _pipe = (() => {
     let $ = m.mode;
-    if ($ instanceof Normal) {
+    if ($ instanceof NormalMode) {
       return m.viewbox.offset;
     } else {
-      let _pipe2 = m.navigator.cursor_point;
+      let _pipe2 = m.cursor;
       let _pipe$12 = ((_capture) => {
-        return subtract(m.last_clicked_point, _capture);
+        return vector_subtract(m.last_clicked_point, _capture);
       })(_pipe2);
-      let _pipe$2 = inverse(_pipe$12);
+      let _pipe$2 = vector_inverse(_pipe$12);
       return bounded_vector(_pipe$2, limit);
     }
   })();
@@ -3915,7 +4426,7 @@ function viewbox_offset(m, limit) {
     return m.withFields({ viewbox: vb });
   })(_pipe$1);
 }
-function node_positions(m) {
+function nodes(m) {
   let _pipe = m.nodes_selected;
   let _pipe$1 = to_list2(_pipe);
   let _pipe$2 = ((_capture) => {
@@ -3926,12 +4437,12 @@ function node_positions(m) {
   let _pipe$3 = map_values(
     _pipe$2,
     (_, node) => {
-      let $ = m.navigator.mouse_down;
+      let $ = m.mouse_down;
       if (!$) {
         return node;
       } else {
         return node.withFields({
-          position: subtract(node.offset, m.navigator.cursor_point)
+          position: vector_subtract(node.offset, m.cursor)
         });
       }
     }
@@ -3941,21 +4452,21 @@ function node_positions(m) {
   })(
     _pipe$3
   );
-  return ((nodes) => {
-    return m.withFields({ nodes });
+  return ((nodes2) => {
+    return m.withFields({ nodes: nodes2 });
   })(_pipe$4);
 }
 function dragged_connection(m) {
-  let point = (p2) => {
-    return to_viewbox_translate(m.viewbox, p2);
+  let point = (p) => {
+    return translate(m.viewbox, p);
   };
   let _pipe = m.connections;
   let _pipe$1 = map(
     _pipe,
     (c) => {
-      let $ = c.active;
+      let $ = c.dragged;
       if ($) {
-        return c.withFields({ p1: point(m.navigator.cursor_point) });
+        return c.withFields({ p1: point(m.cursor) });
       } else {
         return c;
       }
@@ -3965,33 +4476,19 @@ function dragged_connection(m) {
     return m.withFields({ connections: conns });
   })(_pipe$1);
 }
-function order_connection_nodes(nodes, c) {
-  let $ = first(nodes);
+function order_connection_nodes(nodes2, c) {
+  let $ = first(nodes2);
   if (!$.isOk() && !$[0]) {
     return toList([]);
   } else {
-    let node = $[0];
-    let $1 = node.id === c.source_node_id;
+    let n = $[0];
+    let $1 = n.id === extract_node_id(c.from);
     if ($1) {
-      return nodes;
+      return nodes2;
     } else {
-      return reverse(nodes);
+      return reverse(nodes2);
     }
   }
-}
-function delete_selected_nodes(m) {
-  let _pipe = m.nodes;
-  let _pipe$1 = exclude_by_ids(_pipe, m.nodes_selected);
-  return ((nodes) => {
-    return m.withFields({ nodes });
-  })(_pipe$1);
-}
-function delete_orphaned_connections(m) {
-  let _pipe = m.connections;
-  let _pipe$1 = exclude_by_node_ids(_pipe, m.nodes_selected);
-  return ((conns) => {
-    return m.withFields({ connections: conns });
-  })(_pipe$1);
 }
 function connections(m) {
   let _pipe = m.connections;
@@ -4000,53 +4497,49 @@ function connections(m) {
     (c) => {
       let _pipe$12 = take3(
         m.nodes,
-        toList([c.source_node_id, c.target_node_id])
+        extract_node_ids(toList([c.from, c.to]))
       );
       let _pipe$2 = map_to_list(_pipe$12);
       let _pipe$3 = map(_pipe$2, second);
       let _pipe$4 = order_connection_nodes(_pipe$3, c);
-      return ((nodes) => {
-        if (nodes.hasLength(0)) {
+      return ((nodes2) => {
+        if (nodes2.hasLength(0)) {
           return c;
-        } else if (nodes.hasLength(1)) {
+        } else if (nodes2.hasLength(1)) {
           return c;
-        } else if (nodes.hasLength(2)) {
-          let a = nodes.head;
-          let b = nodes.tail.head;
+        } else if (nodes2.hasLength(2)) {
+          let a = nodes2.head;
+          let b = nodes2.tail.head;
           return c.withFields({
-            p0: add3(a.position, output_position(a.output)),
+            p0: vector_add(a.position, a.output.position),
             p1: (() => {
               let _pipe$5 = b.inputs;
               let _pipe$6 = filter(
                 _pipe$5,
                 (in$) => {
-                  return input_id(in$) === c.target_input_id;
+                  return in$.id === c.to;
                 }
               );
-              let _pipe$7 = ((nodes2) => {
-                if (!nodes2.hasLength(1)) {
+              let _pipe$7 = ((nodes3) => {
+                if (!nodes3.hasLength(1)) {
                   throw makeError(
                     "assignment_no_match",
                     "nodework/draw",
-                    104,
+                    89,
                     "",
                     "Assignment pattern did not match",
-                    { value: nodes2 }
+                    { value: nodes3 }
                   );
                 }
-                let x = nodes2.head;
+                let x = nodes3.head;
                 return x;
               })(_pipe$6);
               let _pipe$8 = ((x) => {
-                return input_position(x);
-              })(
-                _pipe$7
-              );
+                return x.position;
+              })(_pipe$7);
               return ((_capture) => {
-                return add3(b.position, _capture);
-              })(
-                _pipe$8
-              );
+                return vector_add(b.position, _capture);
+              })(_pipe$8);
             })()
           });
         } else {
@@ -4060,304 +4553,33 @@ function connections(m) {
   })(_pipe$1);
 }
 
-// build/dev/javascript/nodework/nodework/examples.mjs
-function output(inputs) {
-  let $ = get(inputs, "eval");
-  if ($.isOk()) {
-    let eval$ = $[0];
-    return eval$;
-  } else {
-    return from(0);
-  }
-}
-function return_ten(inputs) {
-  return from(10);
-}
-function return_one(inputs) {
-  return from(1);
-}
-function add4(inputs) {
-  let $ = get(inputs, "a");
-  let $1 = get(inputs, "b");
-  if ($.isOk() && $1.isOk()) {
-    let a = $[0];
-    let b = $1[0];
-    let a$1 = unwrap(int(a), 0);
-    let b$1 = unwrap(int(b), 0);
-    return from(a$1 + b$1);
-  } else if ($.isOk() && !$1.isOk()) {
-    let a = $[0];
-    let a$1 = unwrap(int(a), 0);
-    let b = 0;
-    return from(a$1 + b);
-  } else if (!$.isOk() && $1.isOk()) {
-    let b = $1[0];
-    let a = 0;
-    let b$1 = unwrap(int(b), 0);
-    return from(a + b$1);
-  } else {
-    return from(0);
-  }
-}
-function double(inputs) {
-  let $ = get(inputs, "x");
-  if ($.isOk()) {
-    let x = $[0];
-    let x$1 = unwrap(int(x), 0);
-    return from(x$1 * 2);
-  } else {
-    return from(0);
-  }
-}
-function math_nodes() {
-  return toList([
-    new NodeFunction("add", from_list2(toList(["a", "b"])), add4),
-    new NodeFunction("double", from_list2(toList(["x"])), double),
-    new NodeFunction("ten", from_list2(toList([])), return_ten),
-    new NodeFunction("one", from_list2(toList([])), return_one),
-    new NodeFunction("output", from_list2(toList(["eval"])), output)
-  ]);
-}
-
-// build/dev/javascript/nodework/nodework.mjs
-var MouseEvent = class extends CustomType {
-  constructor(position, shift_key_active) {
-    super();
-    this.position = position;
-    this.shift_key_active = shift_key_active;
-  }
-};
-var UserAddedNode = class extends CustomType {
-  constructor(x0) {
-    super();
-    this[0] = x0;
-  }
-};
-var UserMovedMouse = class extends CustomType {
-  constructor(x0) {
-    super();
-    this[0] = x0;
-  }
-};
-var UserClickedNode = class extends CustomType {
-  constructor(x0, x1) {
-    super();
-    this[0] = x0;
-    this[1] = x1;
-  }
-};
-var UserUnclickedNode = class extends CustomType {
-  constructor(x0) {
-    super();
-    this[0] = x0;
-  }
-};
-var UserClickedNodeOutput = class extends CustomType {
-  constructor(x0, x1) {
-    super();
-    this[0] = x0;
-    this[1] = x1;
-  }
-};
-var UserUnclicked = class extends CustomType {
-};
-var UserClickedConn = class extends CustomType {
-  constructor(x0, x1) {
-    super();
-    this[0] = x0;
-    this[1] = x1;
-  }
-};
-var UserClickedGraph = class extends CustomType {
-  constructor(x0) {
-    super();
-    this[0] = x0;
-  }
-};
-var UserScrolled = class extends CustomType {
-  constructor(x0) {
-    super();
-    this[0] = x0;
-  }
-};
-var UserHoverNodeInput = class extends CustomType {
-  constructor(x0) {
-    super();
-    this[0] = x0;
-  }
-};
-var UserUnhoverNodeInput = class extends CustomType {
-};
-var UserHoverNodeOutput = class extends CustomType {
-  constructor(x0) {
-    super();
-    this[0] = x0;
-  }
-};
-var UserUnhoverNodeOutput = class extends CustomType {
-};
-var UserPressedKey = class extends CustomType {
-  constructor(x0) {
-    super();
-    this[0] = x0;
-  }
-};
-var GraphClearSelection = class extends CustomType {
-};
-var GraphSetDragMode = class extends CustomType {
-};
-var GraphSetNormalMode = class extends CustomType {
-};
-var GraphAddNodeToSelection = class extends CustomType {
-  constructor(x0) {
-    super();
-    this[0] = x0;
-  }
-};
-var GraphSetNodeAsSelection = class extends CustomType {
-  constructor(x0) {
-    super();
-    this[0] = x0;
-  }
-};
-var GraphResizeViewBox = class extends CustomType {
-  constructor(x0) {
-    super();
-    this[0] = x0;
-  }
-};
-var GraphOpenMenu = class extends CustomType {
-};
-var GraphCloseMenu = class extends CustomType {
-};
-var GraphSpawnNode = class extends CustomType {
-  constructor(x0) {
-    super();
-    this[0] = x0;
-  }
-};
-var GraphDeleteSelectedNodes = class extends CustomType {
-};
-function get_window_size() {
-  let _pipe = windowSize();
-  return ((z) => {
-    let x = z[0];
-    let y = z[1];
-    return new Vector(x, y);
+// build/dev/javascript/nodework/nodework/handler/user.mjs
+function pressed_key(model, key, func) {
+  let _pipe = model;
+  return ((m) => {
+    return [m, func(key)];
   })(_pipe);
 }
-function setup(runtime_call) {
-  documentResizeEventListener(
-    (_) => {
-      let _pipe = get_window_size();
-      let _pipe$1 = new GraphResizeViewBox(_pipe);
-      let _pipe$2 = dispatch(_pipe$1);
-      return runtime_call(_pipe$2);
-    }
-  );
-  return mouseUpEventListener(
-    (_) => {
-      let _pipe = new UserUnclicked();
-      let _pipe$1 = dispatch(_pipe);
-      return runtime_call(_pipe$1);
-    }
-  );
-}
-function init2(node_functions) {
-  return [
-    new Model(
-      from_list(toList([])),
-      toList([]),
-      new$2(),
-      get_window_size(),
-      new ViewBox(new Vector(0, 0), get_window_size(), 1),
-      new Navigator(new Vector(0, 0), false),
-      new Normal(),
-      new Vector(0, 0),
-      new$5(node_functions),
-      (() => {
-        let _pipe = node_functions;
-        let _pipe$1 = map(
-          _pipe,
-          (nf) => {
-            return [lowercase2(nf.label), nf];
-          }
-        );
-        return from_list(_pipe$1);
-      })(),
-      new$4(),
-      from(0)
-    ),
-    none()
-  ];
-}
-function none_effect_wrapper(model) {
-  return [model, none()];
-}
-function simple_effect(msg) {
-  return from2(
-    (dispatch2) => {
-      let _pipe = msg;
-      return dispatch2(_pipe);
-    }
-  );
-}
-function user_added_node(model, node) {
-  let _pipe = model.withFields({
-    nodes: (() => {
-      let _pipe2 = model.nodes;
-      return insert(_pipe2, node.id, node);
-    })()
-  });
-  return none_effect_wrapper(_pipe);
-}
-function user_unclicked_node(model) {
-  let _pipe = model.withFields({
-    navigator: model.navigator.withFields({ mouse_down: false })
-  });
-  return none_effect_wrapper(_pipe);
-}
-function user_clicked_node_output(model, node_id, offset) {
-  let p1 = (() => {
-    let _pipe2 = get_position(model.nodes, node_id);
-    return add3(_pipe2, offset);
-  })();
-  let p2 = (() => {
-    let _pipe2 = model.viewbox;
-    return to_viewbox_translate(_pipe2, model.navigator.cursor_point);
-  })();
-  let id2 = generate_random_id("conn");
-  let new_conn = new Conn(id2, p1, p2, node_id, "", "", "", true);
-  let _pipe = model.connections;
-  let _pipe$1 = prepend2(_pipe, new_conn);
-  let _pipe$2 = ((c) => {
-    return model.withFields({ connections: c });
-  })(
-    _pipe$1
-  );
-  return none_effect_wrapper(_pipe$2);
-}
-function user_unclicked(model) {
+function unclicked(model) {
   let _pipe = (() => {
     let $ = get_node_from_input_hovered(model.nodes);
-    if (!$.isOk() && $[0] instanceof NotFound) {
+    if (!$.isOk() && $[0] instanceof NodeNotFound) {
       return model.connections;
     } else {
-      let node = $[0][0];
+      let n = $[0][0];
       let input = $[0][1];
       let _pipe2 = model.connections;
-      return map_active(
+      return map_dragged(
         _pipe2,
         (c) => {
-          let $1 = c.source_node_id !== node.id;
+          let $1 = extract_node_id(c.from) !== n.id;
           if (!$1) {
             return c;
           } else {
             return c.withFields({
-              target_node_id: node.id,
-              target_input_id: input_id(input),
-              target_input_value: input_label(input),
-              active: false
+              to: input.id,
+              value: input.label,
+              dragged: false
             });
           }
         }
@@ -4367,7 +4589,7 @@ function user_unclicked(model) {
   let _pipe$1 = filter(
     _pipe,
     (c) => {
-      return c.target_node_id !== "" && c.active !== true;
+      return extract_node_id(c.to) !== "" && c.dragged !== true;
     }
   );
   let _pipe$2 = unique(_pipe$1);
@@ -4380,21 +4602,93 @@ function user_unclicked(model) {
   let _pipe$5 = recalc_graph(_pipe$4);
   return none_effect_wrapper(_pipe$5);
 }
-function user_clicked_conn(model, conn_id, event2) {
+function unclicked_node(model) {
+  let _pipe = model.withFields({ mouse_down: false });
+  return none_effect_wrapper(_pipe);
+}
+function clicked_node_output(model, node_id, offset) {
+  let $ = (() => {
+    let $1 = get_ui_node(model.nodes, node_id);
+    if ($1.isOk()) {
+      let node = $1[0];
+      return [
+        (() => {
+          let _pipe2 = node.position;
+          return vector_add(_pipe2, offset);
+        })(),
+        node.output.id
+      ];
+    } else {
+      return [new Vector(0, 0), ""];
+    }
+  })();
+  let p1 = $[0];
+  let output_id = $[1];
+  let p2 = (() => {
+    let _pipe2 = model.viewbox;
+    return translate(_pipe2, model.cursor);
+  })();
+  let id2 = generate_random_id("conn");
+  let new_conn = new Conn(id2, p1, p2, output_id, "", "", true);
+  let _pipe = model.connections;
+  let _pipe$1 = prepend2(_pipe, new_conn);
+  let _pipe$2 = ((c) => {
+    return model.withFields({ connections: c });
+  })(
+    _pipe$1
+  );
+  return none_effect_wrapper(_pipe$2);
+}
+function hover_node_output(model, output_id) {
+  let _pipe = model.nodes;
+  let _pipe$1 = set_hover(_pipe, new NodeOutput(output_id), true);
+  let _pipe$2 = ((nodes2) => {
+    return model.withFields({ nodes: nodes2 });
+  })(
+    _pipe$1
+  );
+  return none_effect_wrapper(_pipe$2);
+}
+function unhover_node_outputs(model) {
+  let _pipe = model.nodes;
+  let _pipe$1 = set_hover(_pipe, new NodeOutput(""), false);
+  let _pipe$2 = ((nodes2) => {
+    return model.withFields({ nodes: nodes2 });
+  })(
+    _pipe$1
+  );
+  return none_effect_wrapper(_pipe$2);
+}
+function hover_node_input(model, input_id) {
+  let _pipe = model.nodes;
+  let _pipe$1 = set_hover(_pipe, new NodeInput(input_id), true);
+  let _pipe$2 = ((nodes2) => {
+    return model.withFields({ nodes: nodes2 });
+  })(
+    _pipe$1
+  );
+  return none_effect_wrapper(_pipe$2);
+}
+function unhover_node_inputs(model) {
+  let _pipe = model.nodes;
+  let _pipe$1 = set_hover(_pipe, new NodeInput(""), false);
+  let _pipe$2 = ((nodes2) => {
+    return model.withFields({ nodes: nodes2 });
+  })(
+    _pipe$1
+  );
+  return none_effect_wrapper(_pipe$2);
+}
+function clicked_conn(model, clicked_id, event2) {
   let _pipe = model.connections;
   let _pipe$1 = map(
     _pipe,
     (c) => {
-      let $ = c.id === conn_id;
+      let $ = c.id === clicked_id;
       if (!$) {
         return c;
       } else {
-        return c.withFields({
-          p1: event2.position,
-          target_node_id: "",
-          target_input_id: "",
-          active: true
-        });
+        return c.withFields({ p1: event2.position, to: "", dragged: true });
       }
     }
   );
@@ -4403,9 +4697,10 @@ function user_clicked_conn(model, conn_id, event2) {
   })(
     _pipe$1
   );
-  return none_effect_wrapper(_pipe$2);
+  let _pipe$3 = dragged_connection(_pipe$2);
+  return none_effect_wrapper(_pipe$3);
 }
-function user_scrolled(model, delta_y) {
+function scrolled(model, delta_y) {
   let _pipe = model.viewbox;
   let _pipe$1 = update_zoom_level(_pipe, delta_y);
   let _pipe$2 = update_resolution(_pipe$1, model.window_resolution);
@@ -4414,138 +4709,28 @@ function user_scrolled(model, delta_y) {
   })(_pipe$2);
   return none_effect_wrapper(_pipe$3);
 }
-function user_hover_node_input(model, input_id2) {
-  let _pipe = model.nodes;
-  let _pipe$1 = set_input_hover(_pipe, input_id2);
-  let _pipe$2 = ((nodes) => {
-    return model.withFields({ nodes });
-  })(
-    _pipe$1
-  );
-  return none_effect_wrapper(_pipe$2);
-}
-function user_unhover_node_input(model) {
-  let _pipe = model.nodes;
-  let _pipe$1 = reset_input_hover(_pipe);
-  let _pipe$2 = ((nodes) => {
-    return model.withFields({ nodes });
-  })(
-    _pipe$1
-  );
-  return none_effect_wrapper(_pipe$2);
-}
-function user_hover_node_output(model, output_id2) {
-  let _pipe = model.nodes;
-  let _pipe$1 = set_output_hover(_pipe, output_id2);
-  let _pipe$2 = ((nodes) => {
-    return model.withFields({ nodes });
-  })(
-    _pipe$1
-  );
-  return none_effect_wrapper(_pipe$2);
-}
-function user_unhover_node_output(model) {
-  let _pipe = model.nodes;
-  let _pipe$1 = reset_output_hover(_pipe);
-  let _pipe$2 = ((nodes) => {
-    return model.withFields({ nodes });
-  })(
-    _pipe$1
-  );
-  return none_effect_wrapper(_pipe$2);
-}
-function graph_clear_selection(model) {
-  let _pipe = model.withFields({ nodes_selected: new$2() });
-  return none_effect_wrapper(_pipe);
-}
-function graph_add_node_to_selection(model, node_id) {
-  let _pipe = model.withFields({
-    nodes_selected: (() => {
-      let _pipe2 = model.nodes_selected;
-      return insert2(_pipe2, node_id);
-    })()
-  });
-  return none_effect_wrapper(_pipe);
-}
-function graph_set_node_as_selection(model, node_id) {
-  let _pipe = model.withFields({
-    nodes_selected: (() => {
-      let _pipe2 = new$2();
-      return insert2(_pipe2, node_id);
-    })()
-  });
-  return none_effect_wrapper(_pipe);
-}
-function graph_resize_view_box(model, resolution) {
-  let _pipe = model.withFields({
-    window_resolution: resolution,
-    viewbox: update_resolution(model.viewbox, resolution)
-  });
-  return none_effect_wrapper(_pipe);
-}
-function graph_open_menu(model) {
-  let _pipe = model.navigator.cursor_point;
-  let _pipe$1 = ((_capture) => {
-    return from_viewbox_scale(model.viewbox, _capture);
-  })(_pipe);
-  let _pipe$2 = ((cursor) => {
-    return model.menu.withFields({ pos: cursor, active: true });
-  })(_pipe$1);
-  let _pipe$3 = ((menu) => {
-    return model.withFields({ menu });
-  })(
-    _pipe$2
-  );
-  return none_effect_wrapper(_pipe$3);
-}
-function graph_close_menu(model) {
-  let _pipe = model.menu.withFields({ active: false });
-  let _pipe$1 = ((menu) => {
-    return model.withFields({ menu });
-  })(_pipe);
-  return none_effect_wrapper(_pipe$1);
-}
-function graph_spawn_node(model, identifier) {
-  let position = to_viewbox_space(model.viewbox, model.menu.pos);
-  let _pipe = model.library;
-  let _pipe$1 = new_node(_pipe, identifier, position);
-  let _pipe$2 = ((res) => {
-    if (res.isOk()) {
-      let node = res[0];
-      return model.withFields({ nodes: insert(model.nodes, node.id, node) });
-    } else {
-      return model;
-    }
-  })(_pipe$1);
-  let _pipe$3 = sync_verts(_pipe$2);
-  let _pipe$4 = recalc_graph(_pipe$3);
-  return ((m) => {
-    return [m, simple_effect(new GraphCloseMenu())];
-  })(_pipe$4);
-}
-function graph_delete_selected_nodes(model) {
-  let _pipe = model;
-  let _pipe$1 = delete_selected_nodes(_pipe);
-  let _pipe$2 = delete_orphaned_connections(_pipe$1);
-  let _pipe$3 = sync_verts(_pipe$2);
-  let _pipe$4 = sync_edges(_pipe$3);
-  let _pipe$5 = recalc_graph(_pipe$4);
-  return none_effect_wrapper(_pipe$5);
-}
-function graph_changed_connections(model) {
-  let _pipe = model;
-  return none_effect_wrapper(_pipe);
-}
 function update_last_clicked_point(model, event2) {
   let _pipe = event2.position;
   let _pipe$1 = ((_capture) => {
-    return to_viewbox_space(model.viewbox, _capture);
+    return transform(model.viewbox, _capture);
   })(_pipe);
-  return ((p2) => {
-    return model.withFields({ last_clicked_point: p2 });
+  return ((p) => {
+    return model.withFields({ last_clicked_point: p });
   })(
     _pipe$1
   );
+}
+function clicked_graph(model, event2) {
+  let _pipe = model;
+  let _pipe$1 = update_last_clicked_point(_pipe, event2);
+  return ((m) => {
+    return [
+      m,
+      batch(
+        toList([shift_key_check(event2), simple_effect(new GraphCloseMenu())])
+      )
+    ];
+  })(_pipe$1);
 }
 function update_selected_nodes(event2, node_id) {
   return from2(
@@ -4562,18 +4747,17 @@ function update_selected_nodes(event2, node_id) {
     }
   );
 }
-function user_clicked_node(model, node_id, event2) {
-  let _pipe = model.navigator;
-  let _pipe$1 = set_navigator_mouse_down(_pipe);
-  let _pipe$2 = ((nav) => {
-    return model.withFields({
-      navigator: nav,
+function clicked_node(model, node_id, event2) {
+  let _pipe = model;
+  let _pipe$1 = ((m) => {
+    return m.withFields({
+      mouse_down: true,
       nodes: (() => {
-        let _pipe$22 = model.nodes;
-        return update_all_node_offsets(_pipe$22, nav.cursor_point);
+        let _pipe$12 = m.nodes;
+        return update_all_node_offsets(_pipe$12, m.cursor);
       })()
     });
-  })(_pipe$1);
+  })(_pipe);
   return ((m) => {
     return [
       m,
@@ -4584,170 +4768,156 @@ function user_clicked_node(model, node_id, event2) {
         ])
       )
     ];
-  })(_pipe$2);
-}
-function shift_key_check(event2) {
-  return from2(
-    (dispatch2) => {
-      let _pipe = (() => {
-        let $ = event2.shift_key_active;
-        if ($) {
-          return new GraphSetDragMode();
-        } else {
-          return new GraphClearSelection();
-        }
-      })();
-      return dispatch2(_pipe);
-    }
-  );
-}
-function user_clicked_graph(model, event2) {
-  let _pipe = model;
-  let _pipe$1 = update_last_clicked_point(_pipe, event2);
-  return ((m) => {
-    return [
-      m,
-      batch(
-        toList([shift_key_check(event2), simple_effect(new GraphCloseMenu())])
-      )
-    ];
   })(_pipe$1);
 }
-function key_pressed(key) {
-  let $ = lowercase2(key);
-  if ($ === "a") {
-    return simple_effect(new GraphOpenMenu());
-  } else if ($ === "backspace") {
-    return simple_effect(new GraphDeleteSelectedNodes());
-  } else if ($ === "delete") {
-    return simple_effect(new GraphDeleteSelectedNodes());
-  } else {
-    return none();
-  }
-}
-function user_pressed_key(model, key) {
+var graph_limit = 500;
+function moved_mouse(model, position) {
   let _pipe = model;
-  return ((m) => {
-    return [m, key_pressed(key)];
-  })(_pipe);
+  let _pipe$1 = cursor(_pipe, position);
+  let _pipe$2 = viewbox_offset(_pipe$1, graph_limit);
+  let _pipe$3 = nodes(_pipe$2);
+  let _pipe$4 = dragged_connection(_pipe$3);
+  let _pipe$5 = connections(_pipe$4);
+  return none_effect_wrapper(_pipe$5);
 }
-function translate(x, y) {
-  let x_string = to_string3(x);
-  let y_string = to_string3(y);
-  return "translate(" + x_string + "," + y_string + ")";
+
+// build/dev/javascript/lustre/lustre/element/svg.mjs
+var namespace = "http://www.w3.org/2000/svg";
+function circle(attrs) {
+  return namespaced(namespace, "circle", attrs, toList([]));
 }
-function attr_viewbox(offset, resolution) {
-  let _pipe = toList([offset.x, offset.y, resolution.x, resolution.y]);
-  let _pipe$1 = map(_pipe, to_string3);
-  let _pipe$2 = reduce(_pipe$1, (a, b) => {
-    return a + " " + b;
-  });
-  return ((result) => {
-    if (result.isOk()) {
-      let res = result[0];
-      return attribute("viewBox", res);
-    } else {
-      return attribute("viewBox", "0 0 100 100");
+function line(attrs) {
+  return namespaced(namespace, "line", attrs, toList([]));
+}
+function rect(attrs) {
+  return namespaced(namespace, "rect", attrs, toList([]));
+}
+function defs(attrs, children) {
+  return namespaced(namespace, "defs", attrs, children);
+}
+function g(attrs, children) {
+  return namespaced(namespace, "g", attrs, children);
+}
+function pattern(attrs, children) {
+  return namespaced(namespace, "pattern", attrs, children);
+}
+function svg(attrs, children) {
+  return namespaced(namespace, "svg", attrs, children);
+}
+function path(attrs) {
+  return namespaced(namespace, "path", attrs, toList([]));
+}
+function text2(attrs, content) {
+  return namespaced(namespace, "text", attrs, toList([text(content)]));
+}
+
+// build/dev/javascript/nodework/nodework/views/util.mjs
+function translate2(x, y) {
+  let _pipe = toList([x, y]);
+  let _pipe$1 = map(_pipe, to_string2);
+  return ((val) => {
+    if (!val.hasLength(2)) {
+      throw makeError(
+        "assignment_no_match",
+        "nodework/views/util",
+        12,
+        "",
+        "Assignment pattern did not match",
+        { value: val }
+      );
     }
-  })(_pipe$2);
+    let a = val.head;
+    let b = val.tail.head;
+    return "translate(" + a + "," + b + ")";
+  })(_pipe$1);
 }
-function view_node_input(input) {
-  let id2 = input_id(input);
-  let label = input_label(input);
-  let hovered = input_hovered(input);
-  return g(
+function output_to_element(output2) {
+  let decoders = any2(
     toList([
-      attribute(
-        "transform",
-        (() => {
-          let _pipe = input_position(input);
-          return to_html(_pipe, new Translate());
-        })()
-      )
+      string,
+      (x) => {
+        return map2(
+          int(x),
+          (o) => {
+            return to_string2(o);
+          }
+        );
+      },
+      (x) => {
+        return map2(string(x), (o) => {
+          return o;
+        });
+      }
+    ])
+  );
+  let _pipe = decoders(from(output2));
+  let _pipe$1 = ((res) => {
+    if (res.isOk()) {
+      let decoded = res[0];
+      return decoded;
+    } else {
+      return "";
+    }
+  })(_pipe);
+  return ((_capture) => {
+    return attribute("dangerous-unescaped-html", _capture);
+  })(
+    _pipe$1
+  );
+}
+
+// build/dev/javascript/nodework/nodework/views.mjs
+function view_menu_item(item, spawn_func) {
+  let label = item[0];
+  let key = item[1];
+  return button(
+    toList([
+      attribute("data-identifier", key),
+      class$("hover:bg-gray-300"),
+      on2("click", spawn_func)
     ]),
+    toList([text(label)])
+  );
+}
+function view_menu(menu, spawn_func) {
+  let pos = "translate(" + to_string2(menu.position.x) + "px, " + to_string2(
+    menu.position.y
+  ) + "px)";
+  return div(
+    (() => {
+      let $ = menu.visible;
+      if ($) {
+        return toList([
+          class$(
+            "absolute top-0 left-0 w-[100px] h-[300px] bg-gray-200 rounded shadow"
+          ),
+          style(toList([["transform", pos]]))
+        ]);
+      } else {
+        return toList([class$("hidden")]);
+      }
+    })(),
     toList([
-      circle(
-        toList([
-          attribute("cx", "0"),
-          attribute("cy", "0"),
-          attribute("r", "10"),
-          attribute("fill", "currentColor"),
-          attribute("stroke", "black"),
-          (() => {
-            if (hovered) {
-              return attribute("stroke-width", "3");
-            } else {
-              return attribute("stroke-width", "0");
+      div(
+        toList([class$("flex flex-col p-2 gap-1")]),
+        (() => {
+          let _pipe = menu.nodes;
+          return map(
+            _pipe,
+            (item) => {
+              return view_menu_item(item, spawn_func);
             }
-          })(),
-          class$("text-gray-500"),
-          id(id2),
-          on_mouse_enter(new UserHoverNodeInput(id2)),
-          on_mouse_leave(new UserUnhoverNodeInput())
-        ])
-      ),
-      text2(
-        toList([
-          attribute("x", "16"),
-          attribute("y", "0"),
-          attribute("font-size", "16"),
-          attribute("dominant-baseline", "middle"),
-          attribute("fill", "currentColor"),
-          class$("text-gray-900")
-        ]),
-        label
+          );
+        })()
       )
     ])
   );
 }
-function view_node_output(node) {
-  let pos = output_position(node.output);
-  let id2 = output_id(node.output);
-  let hovered = output_hovered(node.output);
-  let $ = node.id === "node.output";
-  if (!$) {
-    return g(
-      toList([
-        attribute(
-          "transform",
-          (() => {
-            let _pipe = pos;
-            return to_html(_pipe, new Translate());
-          })()
-        )
-      ]),
-      toList([
-        circle(
-          toList([
-            attribute("cx", "0"),
-            attribute("cy", "0"),
-            attribute("r", "10"),
-            attribute("fill", "currentColor"),
-            attribute("stroke", "black"),
-            (() => {
-              if (hovered) {
-                return attribute("stroke-width", "3");
-              } else {
-                return attribute("stroke-width", "0");
-              }
-            })(),
-            class$("text-gray-500"),
-            on_mouse_down(new UserClickedNodeOutput(node.id, pos)),
-            on_mouse_enter(new UserHoverNodeOutput(id2)),
-            on_mouse_leave(new UserUnhoverNodeOutput())
-          ])
-        )
-      ])
-    );
-  } else {
-    return none2();
-  }
-}
 function view_grid_canvas(width, height) {
-  let w = to_string3(width) + "%";
-  let h = to_string3(height) + "%";
-  let x = "-" + to_string3(divideInt(width, 2)) + "%";
-  let y = "-" + to_string3(divideInt(height, 2)) + "%";
+  let w = to_string2(width) + "%";
+  let h = to_string2(height) + "%";
+  let x = "-" + to_string2(divideInt(width, 2)) + "%";
+  let y = "-" + to_string2(divideInt(height, 2)) + "%";
   return rect(
     toList([
       attribute("x", x),
@@ -4808,28 +4978,114 @@ function view_grid() {
     ])
   );
 }
-function mouse_event_decoder(e) {
-  stop_propagation(e);
-  return try$(
-    field("shiftKey", bool)(e),
-    (shift_key) => {
-      return try$(
-        mouse_position(e),
-        (position) => {
-          return new Ok(
-            new MouseEvent(
-              new Vector(round2(position[0]), round2(position[1])),
-              shift_key
-            )
-          );
-        }
-      );
+function attr_viewbox(offset, resolution) {
+  let _pipe = toList([offset.x, offset.y, resolution.x, resolution.y]);
+  let _pipe$1 = map(_pipe, to_string2);
+  let _pipe$2 = reduce(_pipe$1, (a, b) => {
+    return a + " " + b;
+  });
+  return ((result) => {
+    if (result.isOk()) {
+      let res = result[0];
+      return attribute("viewBox", res);
+    } else {
+      return attribute("viewBox", "0 0 100 100");
     }
+  })(_pipe$2);
+}
+function view_node_input(input) {
+  return g(
+    toList([
+      attribute(
+        "transform",
+        (() => {
+          let _pipe = input.position;
+          return vec_to_html(_pipe, new Translate());
+        })()
+      )
+    ]),
+    toList([
+      circle(
+        toList([
+          attribute("cx", "0"),
+          attribute("cy", "0"),
+          attribute("r", "10"),
+          attribute("fill", "currentColor"),
+          attribute("stroke", "black"),
+          (() => {
+            let $ = input.hovered;
+            if ($) {
+              return attribute("stroke-width", "3");
+            } else {
+              return attribute("stroke-width", "0");
+            }
+          })(),
+          class$("text-gray-500"),
+          id(input.id),
+          on_mouse_enter(new UserHoverNodeInput(input.id)),
+          on_mouse_leave(new UserUnhoverNodeInputs())
+        ])
+      ),
+      text2(
+        toList([
+          attribute("x", "16"),
+          attribute("y", "0"),
+          attribute("font-size", "16"),
+          attribute("dominant-baseline", "middle"),
+          attribute("fill", "currentColor"),
+          class$("text-gray-900")
+        ]),
+        input.label
+      )
+    ])
   );
 }
-function view_node(node, selection) {
+function view_node_output(output2, node_id) {
+  let $ = node_id === "node.output";
+  if (!$) {
+    return g(
+      toList([
+        attribute(
+          "transform",
+          (() => {
+            let _pipe = output2.position;
+            return vec_to_html(_pipe, new Translate());
+          })()
+        )
+      ]),
+      toList([
+        circle(
+          toList([
+            attribute("cx", "0"),
+            attribute("cy", "0"),
+            attribute("r", "10"),
+            attribute("fill", "currentColor"),
+            attribute("stroke", "black"),
+            (() => {
+              let $1 = output2.hovered;
+              if ($1) {
+                return attribute("stroke-width", "3");
+              } else {
+                return attribute("stroke-width", "0");
+              }
+            })(),
+            class$("text-gray-500"),
+            on_mouse_down(
+              new UserClickedNodeOutput(node_id, output2.position)
+            ),
+            on_mouse_enter(new UserHoverNodeOutput(output2.id)),
+            on_mouse_leave(new UserUnhoverNodeOutputs())
+          ])
+        )
+      ])
+    );
+  } else {
+    return none2();
+  }
+}
+function view_node(n, selection) {
   let node_selected_class = (() => {
-    let $ = contains2(selection, node.id);
+    let $ = contains2(selection, n.id);
     if ($) {
       return class$("text-gray-300 stroke-gray-400");
     } else {
@@ -4840,14 +5096,14 @@ function view_node(node, selection) {
     return try$(
       mouse_event_decoder(e),
       (decoded_event) => {
-        return new Ok(new UserClickedNode(node.id, decoded_event));
+        return new Ok(new UserClickedNode(n.id, decoded_event));
       }
     );
   };
   return g(
     toList([
-      id("g-" + node.id),
-      attribute("transform", translate(node.position.x, node.position.y)),
+      id("g-" + n.id),
+      attribute("transform", translate2(n.position.x, n.position.y)),
       class$("select-none")
     ]),
     concat(
@@ -4855,7 +5111,7 @@ function view_node(node, selection) {
         toList([
           rect(
             toList([
-              id(node.id),
+              id(n.id),
               attribute("width", "200"),
               attribute("height", "150"),
               attribute("rx", "25"),
@@ -4865,7 +5121,7 @@ function view_node(node, selection) {
               attribute("stroke-width", "2"),
               node_selected_class,
               on2("mousedown", mousedown),
-              on_mouse_up(new UserUnclickedNode(node.id))
+              on_mouse_up(new UserUnclickedNode())
             ])
           ),
           text2(
@@ -4876,11 +5132,11 @@ function view_node(node, selection) {
               attribute("fill", "currentColor"),
               class$("text-gray-900")
             ]),
-            node.name
+            n.label
           ),
-          view_node_output(node)
+          view_node_output(n.output, n.id)
         ]),
-        map(node.inputs, (input) => {
+        map(n.inputs, (input) => {
           return view_node_input(input);
         })
       ])
@@ -4899,7 +5155,7 @@ function view_connection(c) {
   return line(
     prepend(
       (() => {
-        let $ = c.active;
+        let $ = c.dragged;
         if ($) {
           return class$("text-gray-500");
         } else {
@@ -4925,49 +5181,67 @@ function view_connection(c) {
     )
   );
 }
-function keydown_event_decoder(e) {
-  return try$(
-    field("key", string)(e),
-    (key) => {
-      return new Ok(key);
-    }
-  );
-}
-function output_to_element(output2) {
-  let decoders = any2(
-    toList([
-      string,
-      (x) => {
-        return map2(
-          int(x),
-          (o) => {
-            return to_string3(o);
-          }
-        );
-      },
-      (x) => {
-        return map2(
-          float(x),
-          (o) => {
-            return to_string(o);
-          }
+function view_graph(viewbox, nodes2, selection, connections2) {
+  let mousedown = (e) => {
+    return try$(
+      mouse_event_decoder(e),
+      (event2) => {
+        return new Ok(new UserClickedGraph(event2));
+      }
+    );
+  };
+  let mousemove = (e) => {
+    return try$(
+      mouse_position(e),
+      (pos) => {
+        return new Ok(
+          new UserMovedMouse(
+            new Vector(round2(pos[0]), round2(pos[1]))
+          )
         );
       }
+    );
+  };
+  let wheel = (e) => {
+    return try$(
+      field("deltaY", float)(e),
+      (delta_y) => {
+        return new Ok(new UserScrolled(delta_y));
+      }
+    );
+  };
+  return svg(
+    toList([
+      id("graph"),
+      attribute("contentEditable", "true"),
+      attr_viewbox(viewbox.offset, viewbox.resolution),
+      on2("mousedown", mousedown),
+      on2("mousemove", mousemove),
+      on_mouse_up(new GraphSetMode(new NormalMode())),
+      on2("wheel", wheel)
+    ]),
+    toList([
+      view_grid(),
+      view_grid_canvas(500, 500),
+      g(
+        toList([]),
+        (() => {
+          let _pipe = connections2;
+          return map(_pipe, view_connection);
+        })()
+      ),
+      g(
+        toList([]),
+        (() => {
+          let _pipe = nodes2;
+          let _pipe$1 = map_to_list(_pipe);
+          let _pipe$2 = map(_pipe$1, second);
+          return map(_pipe$2, (node) => {
+            return view_node(node, selection);
+          });
+        })()
+      )
     ])
-  );
-  let _pipe = decoders(from(output2));
-  let _pipe$1 = ((res) => {
-    if (res.isOk()) {
-      let decoded = res[0];
-      return decoded;
-    } else {
-      return "";
-    }
-  })(_pipe);
-  return ((_capture) => {
-    return attribute("dangerous-unescaped-html", _capture);
-  })(
-    _pipe$1
   );
 }
 function view_output_canvas(model) {
@@ -4981,27 +5255,133 @@ function view_output_canvas(model) {
     toList([])
   );
 }
+
+// build/dev/javascript/nodework/nodework.mjs
+function get_window_size() {
+  let _pipe = windowSize();
+  return ((z) => {
+    let x = z[0];
+    let y = z[1];
+    return new Vector(x, y);
+  })(_pipe);
+}
+function setup(runtime_call) {
+  documentResizeEventListener(
+    (_) => {
+      let _pipe = get_window_size();
+      let _pipe$1 = new GraphResizeViewBox(_pipe);
+      let _pipe$2 = dispatch(_pipe$1);
+      return runtime_call(_pipe$2);
+    }
+  );
+  return mouseUpEventListener(
+    (_) => {
+      let _pipe = new UserUnclicked();
+      let _pipe$1 = dispatch(_pipe);
+      return runtime_call(_pipe$1);
+    }
+  );
+}
+function init2(node_lib) {
+  return [
+    new Model(
+      node_lib,
+      new$(),
+      toList([]),
+      new$2(),
+      generate_lib_menu(node_lib),
+      get_window_size(),
+      new ViewBox(new Vector(0, 0), get_window_size(), 1),
+      new Vector(0, 0),
+      new Vector(0, 0),
+      false,
+      new NormalMode(),
+      from(""),
+      new$4()
+    ),
+    none()
+  ];
+}
+function key_lib(key) {
+  let $ = lowercase2(key);
+  if ($ === "a") {
+    return simple_effect(new GraphOpenMenu());
+  } else if ($ === "backspace") {
+    return simple_effect(new GraphDeleteSelectedUINodes());
+  } else if ($ === "delete") {
+    return simple_effect(new GraphDeleteSelectedUINodes());
+  } else {
+    return none();
+  }
+}
+function update(model, msg) {
+  if (msg instanceof GraphResizeViewBox) {
+    let resolution = msg[0];
+    return resize_view_box(model, resolution);
+  } else if (msg instanceof GraphOpenMenu) {
+    return open_menu(model);
+  } else if (msg instanceof GraphCloseMenu) {
+    return close_menu(model);
+  } else if (msg instanceof GraphSpawnNode) {
+    let identifier = msg[0];
+    return spawn_node(model, identifier);
+  } else if (msg instanceof GraphSetMode) {
+    let mode = msg[0];
+    let _pipe = model.withFields({ mode });
+    return none_effect_wrapper(_pipe);
+  } else if (msg instanceof GraphClearSelection) {
+    return clear_selection(model);
+  } else if (msg instanceof GraphAddNodeToSelection) {
+    let node_id = msg[0];
+    return add_node_to_selection(model, node_id);
+  } else if (msg instanceof GraphSetNodeAsSelection) {
+    let node_id = msg[0];
+    return add_node_as_selection(model, node_id);
+  } else if (msg instanceof GraphChangedConnections) {
+    return changed_connections(model);
+  } else if (msg instanceof GraphDeleteSelectedUINodes) {
+    return delete_selected_ui_nodes(model);
+  } else if (msg instanceof UserPressedKey) {
+    let key = msg[0];
+    return pressed_key(model, key, key_lib);
+  } else if (msg instanceof UserScrolled) {
+    let delta_y = msg[0];
+    return scrolled(model, delta_y);
+  } else if (msg instanceof UserClickedGraph) {
+    let event2 = msg[0];
+    return clicked_graph(model, event2);
+  } else if (msg instanceof UserUnclicked) {
+    return unclicked(model);
+  } else if (msg instanceof UserMovedMouse) {
+    let position = msg[0];
+    return moved_mouse(model, position);
+  } else if (msg instanceof UserClickedNode) {
+    let node_id = msg[0];
+    let event2 = msg[1];
+    return clicked_node(model, node_id, event2);
+  } else if (msg instanceof UserUnclickedNode) {
+    return unclicked_node(model);
+  } else if (msg instanceof UserClickedNodeOutput) {
+    let node_id = msg[0];
+    let position = msg[1];
+    return clicked_node_output(model, node_id, position);
+  } else if (msg instanceof UserHoverNodeOutput) {
+    let output_id = msg[0];
+    return hover_node_output(model, output_id);
+  } else if (msg instanceof UserUnhoverNodeOutputs) {
+    return unhover_node_outputs(model);
+  } else if (msg instanceof UserHoverNodeInput) {
+    let input_id = msg[0];
+    return hover_node_input(model, input_id);
+  } else if (msg instanceof UserUnhoverNodeInputs) {
+    return unhover_node_inputs(model);
+  } else {
+    let conn_id = msg[0];
+    let event2 = msg[1];
+    return clicked_conn(model, conn_id, event2);
+  }
+}
 function view(model) {
-  let user_moved_mouse$1 = (e) => {
-    return try$(
-      mouse_position(e),
-      (pos) => {
-        return new Ok(
-          new UserMovedMouse(
-            new Vector(round2(pos[0]), round2(pos[1]))
-          )
-        );
-      }
-    );
-  };
-  let mousedown = (e) => {
-    return try$(
-      mouse_event_decoder(e),
-      (decoded_event) => {
-        return new Ok(new UserClickedGraph(decoded_event));
-      }
-    );
-  };
   let keydown = (e) => {
     return try$(
       keydown_event_decoder(e),
@@ -5010,22 +5390,19 @@ function view(model) {
       }
     );
   };
-  let wheel = (e) => {
-    return try$(
-      field("deltaY", float)(e),
-      (delta_y) => {
-        return new Ok(new UserScrolled(delta_y));
-      }
-    );
-  };
   let spawn = (e) => {
     return try$(
       field("target", dynamic)(e),
       (target) => {
         return try$(
-          field("id", string)(target),
-          (identifier) => {
-            return new Ok(new GraphSpawnNode(identifier));
+          field("dataset", dynamic)(target),
+          (dataset) => {
+            return try$(
+              field("identifier", string)(dataset),
+              (identifier) => {
+                return new Ok(new GraphSpawnNode(identifier));
+              }
+            );
           }
         );
       }
@@ -5034,158 +5411,32 @@ function view(model) {
   return div(
     toList([attribute("tabindex", "0"), on2("keydown", keydown)]),
     toList([
-      p(
-        toList([class$("absolute right-2 top-2 select-none")]),
-        toList([
-          (() => {
-            let $ = model.mode;
-            if ($ instanceof Normal) {
-              return text("NORMAL");
-            } else {
-              return text("DRAG");
-            }
-          })()
-        ])
-      ),
-      svg(
-        toList([
-          id("graph"),
-          attr_viewbox(model.viewbox.offset, model.viewbox.resolution),
-          attribute("contentEditable", "true"),
-          on2("mousemove", user_moved_mouse$1),
-          on2("mousedown", mousedown),
-          on_mouse_up(new GraphSetNormalMode()),
-          on2("wheel", wheel)
-        ]),
-        toList([
-          view_grid(),
-          view_grid_canvas(500, 500),
-          g(
-            toList([]),
-            (() => {
-              let _pipe = model.connections;
-              return map(_pipe, view_connection);
-            })()
-          ),
-          g(
-            toList([]),
-            (() => {
-              let _pipe = model.nodes;
-              let _pipe$1 = map_to_list(_pipe);
-              let _pipe$2 = map(_pipe$1, second);
-              return map(
-                _pipe$2,
-                (node) => {
-                  return view_node(node, model.nodes_selected);
-                }
-              );
-            })()
-          )
-        ])
+      view_graph(
+        model.viewbox,
+        model.nodes,
+        model.nodes_selected,
+        model.connections
       ),
       view_menu(model.menu, spawn),
       view_output_canvas(model)
     ])
   );
 }
-var graph_limit = 500;
-function user_moved_mouse(model, point) {
-  let _pipe = model;
-  let _pipe$1 = cursor_point(_pipe, point);
-  let _pipe$2 = viewbox_offset(_pipe$1, graph_limit);
-  let _pipe$3 = node_positions(_pipe$2);
-  let _pipe$4 = dragged_connection(_pipe$3);
-  let _pipe$5 = connections(_pipe$4);
-  return none_effect_wrapper(_pipe$5);
-}
-function update(model, msg) {
-  if (msg instanceof UserAddedNode) {
-    let node = msg[0];
-    return user_added_node(model, node);
-  } else if (msg instanceof UserMovedMouse) {
-    let point = msg[0];
-    return user_moved_mouse(model, point);
-  } else if (msg instanceof UserClickedNode) {
-    let node_id = msg[0];
-    let mouse_event = msg[1];
-    return user_clicked_node(model, node_id, mouse_event);
-  } else if (msg instanceof UserUnclickedNode) {
-    return user_unclicked_node(model);
-  } else if (msg instanceof UserClickedNodeOutput) {
-    let node_id = msg[0];
-    let offset = msg[1];
-    return user_clicked_node_output(model, node_id, offset);
-  } else if (msg instanceof UserUnclicked) {
-    return user_unclicked(model);
-  } else if (msg instanceof UserClickedConn) {
-    let conn_id = msg[0];
-    let mouse_event = msg[1];
-    return user_clicked_conn(model, conn_id, mouse_event);
-  } else if (msg instanceof UserClickedGraph) {
-    let mouse_event = msg[0];
-    return user_clicked_graph(model, mouse_event);
-  } else if (msg instanceof UserScrolled) {
-    let delta_y = msg[0];
-    return user_scrolled(model, delta_y);
-  } else if (msg instanceof UserHoverNodeInput) {
-    let input_id2 = msg[0];
-    return user_hover_node_input(model, input_id2);
-  } else if (msg instanceof UserUnhoverNodeInput) {
-    return user_unhover_node_input(model);
-  } else if (msg instanceof UserHoverNodeOutput) {
-    let output_id2 = msg[0];
-    return user_hover_node_output(model, output_id2);
-  } else if (msg instanceof UserUnhoverNodeOutput) {
-    return user_unhover_node_output(model);
-  } else if (msg instanceof UserPressedKey) {
-    let key = msg[0];
-    return user_pressed_key(model, key);
-  } else if (msg instanceof GraphClearSelection) {
-    return graph_clear_selection(model);
-  } else if (msg instanceof GraphSetDragMode) {
-    let _pipe = model.withFields({ mode: new Drag() });
-    return none_effect_wrapper(_pipe);
-  } else if (msg instanceof GraphSetNormalMode) {
-    let _pipe = model.withFields({ mode: new Normal() });
-    return none_effect_wrapper(_pipe);
-  } else if (msg instanceof GraphAddNodeToSelection) {
-    let node_id = msg[0];
-    return graph_add_node_to_selection(model, node_id);
-  } else if (msg instanceof GraphSetNodeAsSelection) {
-    let node_id = msg[0];
-    return graph_set_node_as_selection(model, node_id);
-  } else if (msg instanceof GraphResizeViewBox) {
-    let resolution = msg[0];
-    return graph_resize_view_box(model, resolution);
-  } else if (msg instanceof GraphOpenMenu) {
-    return graph_open_menu(model);
-  } else if (msg instanceof GraphCloseMenu) {
-    return graph_close_menu(model);
-  } else if (msg instanceof GraphSpawnNode) {
-    let identifier = msg[0];
-    return graph_spawn_node(model, identifier);
-  } else if (msg instanceof GraphDeleteSelectedNodes) {
-    return graph_delete_selected_nodes(model);
-  } else {
-    return graph_changed_connections(model);
-  }
-}
 function main() {
-  let nodes = math_nodes();
   let app$1 = application(init2, update, view);
-  let $ = start3(app$1, "#app", nodes);
+  let $ = start3(app$1, "#app", example_nodes());
   if (!$.isOk()) {
     throw makeError(
       "assignment_no_match",
       "nodework",
-      93,
+      77,
       "main",
       "Assignment pattern did not match",
       { value: $ }
     );
   }
-  let send_to_runtime = $[0];
-  setup(send_to_runtime);
+  let runtime_call = $[0];
+  setup(runtime_call);
   return void 0;
 }
 
