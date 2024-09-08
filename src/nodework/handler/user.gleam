@@ -3,6 +3,7 @@ import gleam/list.{map}
 import lustre/effect.{type Effect}
 
 import nodework/conn.{type Conn, type ConnID, Conn}
+import nodework/dag_process as dp
 import nodework/decoder.{type MouseEvent}
 import nodework/draw
 import nodework/draw/viewbox
@@ -17,7 +18,6 @@ import nodework/node.{
   NodeNotFound, NodeOutput,
 }
 import nodework/util/random
-import nodework/dag_process as dp
 
 const graph_limit = 500
 
@@ -46,13 +46,7 @@ pub fn unclicked(model: Model) -> #(Model, Effect(Msg)) {
       |> conn.map_dragged(fn(c) {
         case node.extract_node_id(c.from) != n.id {
           False -> c
-          True ->
-            Conn(
-              ..c,
-              to: input.id,
-              value: input.label,
-              dragged: False,
-            )
+          True -> Conn(..c, to: input.id, value: input.label, dragged: False)
         }
       })
     }
@@ -166,13 +160,7 @@ pub fn clicked_conn(
   |> list.map(fn(c) {
     case c.id == clicked_id {
       False -> c
-      True ->
-        Conn(
-          ..c,
-          p1: event.position,
-          to: "",
-          dragged: True,
-        )
+      True -> Conn(..c, p1: event.position, to: "", dragged: True)
     }
   })
   |> fn(conns) { Model(..model, connections: conns) }

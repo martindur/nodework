@@ -1,7 +1,7 @@
 import gleam/dynamic.{type Dynamic}
 import gleam/int
-import gleam/result
 import gleam/list.{map}
+import gleam/result
 
 import lustre/attribute.{type Attribute, attribute as attr}
 

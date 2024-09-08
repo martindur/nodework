@@ -7,7 +7,6 @@ import gleam/string
 import nodework/math.{type Vector, Vector}
 import nodework/node.{type Node, IntNode, StringNode}
 
-
 pub type NodeLibrary {
   NodeLibrary(nodes: Dict(String, Node))
 }
@@ -22,7 +21,7 @@ pub fn new() -> NodeLibrary {
 
 pub fn register_nodes(nodes: List(Node)) -> NodeLibrary {
   nodes
-  |> map(fn(n: Node) { 
+  |> map(fn(n: Node) {
     case n {
       IntNode(key, ..) -> #("int." <> key, n)
       StringNode(key, ..) -> #("string." <> key, n)

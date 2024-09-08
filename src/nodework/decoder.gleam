@@ -1,6 +1,6 @@
+import gleam/dynamic.{type DecodeError}
 import gleam/float
 import gleam/result
-import gleam/dynamic.{type DecodeError}
 
 import lustre/event
 

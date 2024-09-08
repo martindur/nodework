@@ -1,16 +1,16 @@
 import gleam/dict.{type Dict}
-import gleam/set.{type Set}
 import gleam/dynamic.{type Dynamic}
+import gleam/set.{type Set}
 
+import nodework/conn.{type Conn, type ConnID}
+import nodework/dag.{type Graph}
 import nodework/decoder.{type MouseEvent}
 import nodework/draw/viewbox.{type ViewBox}
 import nodework/lib.{type LibraryMenu, type NodeLibrary}
 import nodework/math.{type Vector}
-import nodework/conn.{type Conn, type ConnID}
 import nodework/node.{
   type UINode, type UINodeID, type UINodeInputID, type UINodeOutputID,
 }
-import nodework/dag.{type Graph}
 
 pub type GraphMode {
   DragMode
@@ -31,7 +31,7 @@ pub type Model {
     mouse_down: Bool,
     mode: GraphMode,
     output: Dynamic,
-    graph: Graph
+    graph: Graph,
   )
 }
 

@@ -18,7 +18,8 @@ pub type Conn {
   )
 }
 
-pub type ConnID = String
+pub type ConnID =
+  String
 
 pub fn to_attributes(conn: Conn) -> List(Attribute(a)) {
   [

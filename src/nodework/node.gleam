@@ -1,20 +1,28 @@
 import gleam/dict.{type Dict}
 import gleam/int
+import gleam/io
 import gleam/list.{filter, filter_map, index_map, map}
 import gleam/pair
 import gleam/set.{type Set}
 import gleam/string.{capitalise, split}
-import gleam/io
 
 import nodework/math.{type Vector, Vector}
 import nodework/util/random.{generate_random_id}
 
-
 pub type Node {
-  IntNode(key: String, label: String, inputs: Set(String), func: fn(Dict(String, Int)) -> Int)
-  StringNode(key: String, label: String, inputs: Set(String), func: fn(Dict(String, String)) -> String)
+  IntNode(
+    key: String,
+    label: String,
+    inputs: Set(String),
+    func: fn(Dict(String, Int)) -> Int,
+  )
+  StringNode(
+    key: String,
+    label: String,
+    inputs: Set(String),
+    func: fn(Dict(String, String)) -> String,
+  )
 }
-
 
 pub type NodeError {
   NodeNotFound
