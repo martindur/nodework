@@ -10,7 +10,7 @@ import nodework/dag.{
   type Edge, type Graph, type Vertex, type VertexId, Edge, Graph, Vertex,
 }
 import nodework/model.{type Model, Model}
-import nodework/node.{type UINode, IntNode, StringNode, IntToStringNode}
+import nodework/node.{type UINode, IntNode, IntToStringNode, StringNode}
 
 fn nodes_to_vertices(nodes: List(UINode)) -> List(#(VertexId, Vertex)) {
   nodes

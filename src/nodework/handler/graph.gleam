@@ -41,10 +41,12 @@ pub fn spawn_node(model: Model, key: String) -> #(Model, Effect(Msg)) {
   let position = viewbox.transform(model.viewbox, model.menu.position)
 
   case dict.get(model.lib.nodes, key) {
-    Ok(n) -> 
+    Ok(n) ->
       n
       |> node.new_ui_node(position)
-      |> fn(n: UINode) { Model(..model, nodes: dict.insert(model.nodes, n.id, n)) }
+      |> fn(n: UINode) {
+        Model(..model, nodes: dict.insert(model.nodes, n.id, n))
+      }
     Error(Nil) -> model
   }
   |> dp.sync_verts

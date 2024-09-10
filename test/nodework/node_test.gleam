@@ -2,7 +2,7 @@ import gleam/set
 import gleeunit/should
 
 import nodework/math.{Vector}
-import nodework/node.{UINode, type Node, IntNode}
+import nodework/node.{type Node, IntNode, UINode}
 
 fn simple_node() -> Node {
   IntNode("one", "One", set.from_list([]), fn(_) { 1 })

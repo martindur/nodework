@@ -3,7 +3,7 @@ import gleam/list.{map}
 import gleam/pair.{swap}
 import gleam/string
 import nodework/math.{type Vector, Vector}
-import nodework/node.{type Node, IntNode, StringNode, IntToStringNode}
+import nodework/node.{type Node, IntNode, IntToStringNode, StringNode}
 
 pub type NodeLibrary {
   NodeLibrary(nodes: Dict(String, Node))
