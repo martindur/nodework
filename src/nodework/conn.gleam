@@ -1,23 +1,25 @@
-import gleam/dict
 import gleam/int.{to_string}
 import gleam/list.{any, filter}
 import gleam/set.{type Set}
-import lustre/attribute.{type Attribute, attribute as attr}
 
-import nodework/vector.{type Vector}
+import lustre/attribute.{type Attribute, attribute as attr}
+import nodework/math.{type Vector}
+import nodework/node.{type UINodeInputID, type UINodeOutputID}
 
 pub type Conn {
   Conn(
-    id: String,
+    id: ConnID,
     p0: Vector,
     p1: Vector,
-    source_node_id: String,
-    target_node_id: String,
-    target_input_id: String,
-    target_input_value: String,
-    active: Bool,
+    from: UINodeOutputID,
+    to: UINodeInputID,
+    value: String,
+    dragged: Bool,
   )
 }
+
+pub type ConnID =
+  String
 
 pub fn to_attributes(conn: Conn) -> List(Attribute(a)) {
   [
@@ -30,7 +32,7 @@ pub fn to_attributes(conn: Conn) -> List(Attribute(a)) {
 
 fn conn_duplicate(a: Conn, b: Conn) -> Bool {
   // an input can only hold a single connection
-  a.target_input_id == b.target_input_id
+  a.to == b.to
 }
 
 fn deduplicate_helper(remaining: List(Conn), seen: List(Conn)) -> List(Conn) {
@@ -49,10 +51,10 @@ pub fn unique(conns: List(Conn)) -> List(Conn) {
   deduplicate_helper(conns, [])
 }
 
-pub fn map_active(conns: List(Conn), f: fn(Conn) -> Conn) {
+pub fn map_dragged(conns: List(Conn), f: fn(Conn) -> Conn) {
   conns
   |> list.map(fn(c) {
-    case c.active {
+    case c.dragged {
       False -> c
       True -> f(c)
     }
@@ -62,7 +64,8 @@ pub fn map_active(conns: List(Conn), f: fn(Conn) -> Conn) {
 pub fn exclude_by_node_ids(conns: List(Conn), ids: Set(String)) -> List(Conn) {
   conns
   |> filter(fn(c) {
-    set.from_list([c.source_node_id, c.target_node_id])
+    node.extract_node_ids([c.from, c.to])
+    |> set.from_list
     |> set.intersection(ids)
     |> set.to_list
     |> fn(x) {
@@ -73,26 +76,3 @@ pub fn exclude_by_node_ids(conns: List(Conn), ids: Set(String)) -> List(Conn) {
     }
   })
 }
-// fn calculate_connection(conns: List(Conn), c: Conn) -> List(String) {
-//   conns
-//   |> filter(fn(c2) { c.source_node_id == c2.target_node_id })
-//   |> fn(cns) {
-//     case cns {
-//       [] -> dict.from_list([#(c.target_node_id, c.source_node_id)])
-//       _ ->
-//         list.map(cns, fn(c2) { calculate_connection(conns, c2) })
-//         |> fn(res) { dict.from_list([#(c.target_node_id, res)]) }
-//     }
-//   }
-// }
-
-// pub fn generate_graph(conns: List(Conn)) -> List(String) {
-//   conns
-//   |> filter(fn(c) { c.id == "output-node-0" })
-//   |> fn(cs) {
-//     case cs {
-//       [root] -> calculate_connection(conns, root)
-//       _ -> []
-//     }
-//   }
-// }

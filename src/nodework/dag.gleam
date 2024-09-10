@@ -1,15 +1,14 @@
 import gleam/dict.{type Dict}
-import gleam/io
-import gleam/list.{contains, filter, fold, map, partition}
+import gleam/list.{contains, filter, map, partition}
 import gleam/pair
-import gleam/queue.{type Queue}
-import gleam/result
-
-import util/debug.{labeled_debug}
 
 pub type VertexId =
   String
 
+/// A Vertex is similar to a 'node', but the internal type used to do topological sort
+/// id: Should be the same as its Node cousin
+/// value: holds an identifier to the type of node, e.g. 'int.add' or 'string.capitalise'
+/// inputs: a dict of input keys to node ids (to figure out which node's output is connected to which input)
 pub type Vertex {
   Vertex(id: VertexId, value: String, inputs: Dict(String, String))
 }
@@ -45,12 +44,12 @@ pub fn test_data() -> Graph {
 
 pub fn sync_vertex_inputs(graph: Graph) -> Graph {
   graph.verts
-  |> dict.map_values(fn(id, v) {
+  |> dict.map_values(fn(id, vertex) {
     graph.edges
     |> filter(fn(edge) { id == edge.to })
     |> map(fn(edge) { #(edge.input, edge.from) })
     |> dict.from_list
-    |> fn(inputs) { Vertex(..v, inputs: inputs) }
+    |> fn(inputs) { Vertex(..vertex, inputs: inputs) }
   })
   |> fn(verts) { Graph(..graph, verts: verts) }
 }
@@ -105,11 +104,6 @@ fn outdegree(vert: Vertex, edges: List(Edge)) -> Int {
   |> list.length
 }
 
-fn source_verts(verts: List(Vertex), edges: List(Edge)) -> List(Vertex) {
-  verts
-  |> list.filter(fn(v) { indegree(v, edges) == 0 })
-}
-
 fn partition_source_verts(
   verts: List(Vertex),
   edges: List(Edge),
@@ -118,7 +112,12 @@ fn partition_source_verts(
   |> list.partition(fn(vert) { indegree(vert, edges) == 0 })
 }
 
-fn sink_verts(verts: List(Vertex), edges: List(Edge)) -> List(Vertex) {
+pub fn source_verts(verts: List(Vertex), edges: List(Edge)) -> List(Vertex) {
+  verts
+  |> list.filter(fn(v) { indegree(v, edges) == 0 })
+}
+
+pub fn sink_verts(verts: List(Vertex), edges: List(Edge)) -> List(Vertex) {
   verts
   |> list.filter(fn(v) { outdegree(v, edges) == 0 })
 }

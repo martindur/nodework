@@ -544,6 +544,10 @@ video {
   --tw-backdrop-sepia:  ;
 }
 
+.visible {
+  visibility: visible;
+}
+
 .absolute {
   position: absolute;
 }
@@ -562,10 +566,6 @@ video {
 
 .top-0 {
   top: 0px;
-}
-
-.top-2 {
-  top: 0.5rem;
 }
 
 .block {

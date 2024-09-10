@@ -12,5 +12,5 @@ pub fn generate_random_id(prefix: String) -> String {
   |> shuffle
   |> take(12)
   |> join("")
-  |> fn(id) { prefix <> "." <> id }
+  |> fn(id) { prefix <> "-" <> id }
 }

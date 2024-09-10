@@ -1,70 +1,61 @@
 import gleam/dict.{type Dict}
-import gleam/dynamic.{type Dynamic}
-import gleam/result
 import gleam/set
-import nodework/node.{type NodeFunction, NodeFunction}
+import gleam/string
 
-pub fn math_nodes() -> List(NodeFunction) {
-  [
-    NodeFunction("add", set.from_list(["a", "b"]), add),
-    NodeFunction("double", set.from_list(["x"]), double),
-    NodeFunction("ten", set.from_list([]), return_ten),
-    NodeFunction("one", set.from_list([]), return_one),
-    NodeFunction("output", set.from_list(["eval"]), output),
-  ]
-}
+import nodework/lib.{type NodeLibrary}
+import nodework/node.{IntNode, StringNode}
 
-fn output(inputs: Dict(String, Dynamic)) -> Dynamic {
-  case dict.get(inputs, "eval") {
-    Ok(eval) -> eval
-    Error(_) -> dynamic.from(0)
-  }
-}
-
-fn return_ten(inputs: Dict(String, Dynamic)) -> Dynamic {
-  dynamic.from(10)
-}
-
-fn return_one(inputs: Dict(String, Dynamic)) -> Dynamic {
-  dynamic.from(1)
-}
-
-fn const_number(input: Dynamic) -> Dynamic {
-  let a = result.unwrap(dynamic.int(input), 0)
-  dynamic.from(a)
-}
-
-fn add(inputs: Dict(String, Dynamic)) -> Dynamic {
+fn add(inputs: Dict(String, Int)) -> Int {
   case dict.get(inputs, "a"), dict.get(inputs, "b") {
     Ok(a), Ok(b) -> {
-      let a = result.unwrap(dynamic.int(a), 0)
-      let b = result.unwrap(dynamic.int(b), 0)
-
-      dynamic.from(a + b)
+      a + b
     }
-    Ok(a), Error(_) -> {
-      let a = result.unwrap(dynamic.int(a), 0)
-      let b = 0
-
-      dynamic.from(a + b)
-    }
-    Error(_), Ok(b) -> {
-      let a = 0
-      let b = result.unwrap(dynamic.int(b), 0)
-
-      dynamic.from(a + b)
-    }
-    _, _ -> dynamic.from(0)
+    Ok(a), Error(_) -> a
+    Error(_), Ok(b) -> b
+    _, _ -> 0
   }
 }
 
-fn double(inputs: Dict(String, Dynamic)) -> Dynamic {
-  case dict.get(inputs, "x") {
-    Ok(x) -> {
-      let x = result.unwrap(dynamic.int(x), 0)
-
-      dynamic.from(x * 2)
+fn double(inputs: Dict(String, Int)) -> Int {
+  case dict.get(inputs, "a") {
+    Ok(a) -> {
+      a * 2
     }
-    Error(_) -> dynamic.from(0)
+    _ -> 0
   }
+}
+
+fn capitalise(inputs: Dict(String, String)) -> String {
+  case dict.get(inputs, "text") {
+    Ok(text) -> string.capitalise(text)
+    Error(_) -> ""
+  }
+}
+
+fn ten(_inputs: Dict(String, Int)) -> Int {
+  10
+}
+
+fn bob(_inputs: Dict(String, String)) -> String {
+  "bob"
+}
+
+fn output(inputs: Dict(String, String)) -> String {
+  case dict.get(inputs, "out") {
+    Ok(out) -> out
+    Error(_) -> ""
+  }
+}
+
+pub fn example_nodes() -> NodeLibrary {
+  let nodes = [
+    IntNode("add", "Add", set.from_list(["a", "b"]), add),
+    IntNode("double", "Double", set.from_list(["a"]), double),
+    IntNode("ten", "Ten", set.from_list([]), ten),
+    StringNode("capitalise", "Capitalise", set.from_list(["text"]), capitalise),
+    StringNode("bob", "Bob", set.from_list([]), bob),
+    StringNode("output", "Output", set.from_list(["out"]), output),
+  ]
+
+  lib.register_nodes(nodes)
 }
