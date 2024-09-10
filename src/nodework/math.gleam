@@ -1,6 +1,6 @@
 import gleam/float.{round}
-import gleam/string
 import gleam/int.{to_float, to_string}
+import gleam/string
 
 pub type Vector {
   Vector(x: Int, y: Int)

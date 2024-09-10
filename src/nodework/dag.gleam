@@ -104,7 +104,6 @@ fn outdegree(vert: Vertex, edges: List(Edge)) -> Int {
   |> list.length
 }
 
-
 fn partition_source_verts(
   verts: List(Vertex),
   edges: List(Edge),
