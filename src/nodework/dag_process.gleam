@@ -10,7 +10,7 @@ import nodework/dag.{
   type Edge, type Graph, type Vertex, type VertexId, Edge, Graph, Vertex,
 }
 import nodework/model.{type Model, Model}
-import nodework/node.{type UINode, IntNode, StringNode}
+import nodework/node.{type UINode, IntNode, StringNode, IntToStringNode}
 
 fn nodes_to_vertices(nodes: List(UINode)) -> List(#(VertexId, Vertex)) {
   nodes
@@ -111,7 +111,14 @@ fn eval_graph(verts: List(Vertex), model: Model) -> Model {
         |> func
         |> dynamic.from
       }
-      Error(Nil) -> dynamic.from("") |> io.debug
+      Ok(IntToStringNode(_, _, _, func)) -> {
+        inputs
+        |> typed_inputs(int_decoder)
+        |> dict.from_list
+        |> func
+        |> dynamic.from
+      }
+      Error(Nil) -> dynamic.from("")
     }
     |> dict.insert(lookup_evaluated, vertex.id, _)
   })

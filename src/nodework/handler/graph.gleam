@@ -41,11 +41,12 @@ pub fn spawn_node(model: Model, key: String) -> #(Model, Effect(Msg)) {
   let position = viewbox.transform(model.viewbox, model.menu.position)
 
   case dict.get(model.lib.nodes, key) {
-    Ok(n) -> n.inputs
-    Error(Nil) -> set.new()
+    Ok(n) -> 
+      n
+      |> node.new_ui_node(position)
+      |> fn(n: UINode) { Model(..model, nodes: dict.insert(model.nodes, n.id, n)) }
+    Error(Nil) -> model
   }
-  |> node.new_ui_node(key, _, position)
-  |> fn(n: UINode) { Model(..model, nodes: dict.insert(model.nodes, n.id, n)) }
   |> dp.sync_verts
   |> dp.recalc_graph
   |> fn(m) { #(m, simple_effect(GraphCloseMenu)) }
