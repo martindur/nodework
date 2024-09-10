@@ -1,9 +1,6 @@
 import gleam/dict.{type Dict}
-import gleam/io
-import gleam/list.{contains, filter, fold, map, partition}
+import gleam/list.{contains, filter, map, partition}
 import gleam/pair
-import gleam/queue.{type Queue}
-import gleam/result
 
 pub type VertexId =
   String
@@ -107,10 +104,6 @@ fn outdegree(vert: Vertex, edges: List(Edge)) -> Int {
   |> list.length
 }
 
-fn source_verts(verts: List(Vertex), edges: List(Edge)) -> List(Vertex) {
-  verts
-  |> list.filter(fn(v) { indegree(v, edges) == 0 })
-}
 
 fn partition_source_verts(
   verts: List(Vertex),
@@ -120,7 +113,12 @@ fn partition_source_verts(
   |> list.partition(fn(vert) { indegree(vert, edges) == 0 })
 }
 
-fn sink_verts(verts: List(Vertex), edges: List(Edge)) -> List(Vertex) {
+pub fn source_verts(verts: List(Vertex), edges: List(Edge)) -> List(Vertex) {
+  verts
+  |> list.filter(fn(v) { indegree(v, edges) == 0 })
+}
+
+pub fn sink_verts(verts: List(Vertex), edges: List(Edge)) -> List(Vertex) {
   verts
   |> list.filter(fn(v) { outdegree(v, edges) == 0 })
 }

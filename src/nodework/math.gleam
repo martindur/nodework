@@ -1,5 +1,6 @@
 import gleam/float.{round}
-import gleam/int.{to_float}
+import gleam/string
+import gleam/int.{to_float, to_string}
 
 pub type Vector {
   Vector(x: Int, y: Int)
@@ -50,6 +51,29 @@ pub fn vector_inverse(vec: Vector) -> Vector {
 pub fn bounded_vector(vec: Vector, bound: Int) -> Vector {
   vec
   |> map_vector(fn(val) { int.min(val, bound) |> int.max({ bound * -1 }) })
+}
+
+pub fn vector_to_path(start_point: Vector, end_point: Vector) -> String {
+  let halfway_diff = int.absolute_value(start_point.x - end_point.y) / 2
+
+  string.concat([
+    "M ",
+    to_string(start_point.x),
+    " ",
+    to_string(start_point.y),
+    " C ",
+    to_string(start_point.x + halfway_diff),
+    " ",
+    to_string(start_point.y),
+    ", ",
+    to_string(end_point.x - halfway_diff),
+    " ",
+    to_string(end_point.y),
+    ", ",
+    to_string(end_point.x),
+    " ",
+    to_string(end_point.y),
+  ])
 }
 
 pub fn vec_to_html(vec: Vector, t: Transform) -> String {

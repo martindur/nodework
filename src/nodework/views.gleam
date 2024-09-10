@@ -2,12 +2,10 @@ import gleam/dict.{type Dict}
 import gleam/dynamic.{type DecodeError, type Dynamic}
 import gleam/float
 import gleam/int
-import gleam/io
 import gleam/list.{map, reduce}
 import gleam/pair
 import gleam/result
 import gleam/set.{type Set}
-import gleam/string
 
 import lustre/attribute.{type Attribute, attribute as attr}
 import lustre/element.{type Element}

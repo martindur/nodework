@@ -1,6 +1,5 @@
 import gleam/dict.{type Dict}
 import gleam/int
-import gleam/io
 import gleam/list.{filter, filter_map, index_map, map}
 import gleam/pair
 import gleam/set.{type Set}
@@ -185,7 +184,7 @@ pub fn update_all_node_offsets(
   |> dict.map_values(fn(_, n) { update_offset(n, point) })
 }
 
-fn update_offset(n: UINode, point: Vector) -> UINode {
+pub fn update_offset(n: UINode, point: Vector) -> UINode {
   n.position
   |> math.vector_subtract(point)
   |> fn(p) { UINode(..n, offset: p) }

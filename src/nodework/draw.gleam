@@ -1,5 +1,4 @@
 import gleam/dict
-import gleam/io
 import gleam/list.{filter, map}
 import gleam/pair
 import gleam/set
@@ -97,12 +96,4 @@ pub fn connections(m: Model) -> Model {
     }
   })
   |> fn(conns) { Model(..m, connections: conns) }
-}
-
-pub fn delete_selected_nodes(model: Model) -> Model {
-  todo
-}
-
-pub fn delete_orphaned_connections(model: Model) -> Model {
-  todo
 }

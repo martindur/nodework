@@ -3129,14 +3129,6 @@ function windowSize() {
   return [window.innerWidth, window.innerHeight];
 }
 
-// build/dev/javascript/gleam_stdlib/gleam/io.mjs
-function debug(term) {
-  let _pipe = term;
-  let _pipe$1 = inspect2(_pipe);
-  print_debug(_pipe$1);
-  return term;
-}
-
 // build/dev/javascript/nodework/nodework/dag.mjs
 var Vertex = class extends CustomType {
   constructor(id2, value, inputs) {
@@ -4118,6 +4110,14 @@ function shift_key_check(event2) {
   );
 }
 
+// build/dev/javascript/gleam_stdlib/gleam/io.mjs
+function debug(term) {
+  let _pipe = term;
+  let _pipe$1 = inspect2(_pipe);
+  print_debug(_pipe$1);
+  return term;
+}
+
 // build/dev/javascript/nodework/nodework/dag_process.mjs
 function nodes_to_vertices(nodes2) {
   let _pipe = nodes2;
@@ -4138,7 +4138,7 @@ function conns_to_edges(conns) {
         throw makeError(
           "assignment_no_match",
           "nodework/dag_process",
-          25,
+          23,
           "",
           "Assignment pattern did not match",
           { value: $ }
@@ -4525,7 +4525,7 @@ function connections(m) {
                   throw makeError(
                     "assignment_no_match",
                     "nodework/draw",
-                    89,
+                    88,
                     "",
                     "Assignment pattern did not match",
                     { value: nodes3 }

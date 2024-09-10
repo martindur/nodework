@@ -1,6 +1,4 @@
 import gleam/dict
-import gleam/io
-import gleam/result
 import gleam/set
 import lustre/effect.{type Effect}
 import nodework/conn

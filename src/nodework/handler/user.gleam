@@ -1,4 +1,4 @@
-import gleam/list.{map}
+import gleam/list
 
 import lustre/effect.{type Effect}
 

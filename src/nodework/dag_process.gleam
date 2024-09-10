@@ -1,16 +1,14 @@
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/io
-import gleam/list.{contains, filter, map, zip}
+import gleam/list.{contains, filter, map}
 import gleam/pair
 import gleam/result
-import gleam/set
 import gleam/string
 import nodework/conn.{type Conn}
 import nodework/dag.{
   type Edge, type Graph, type Vertex, type VertexId, Edge, Graph, Vertex,
 }
-import nodework/lib
 import nodework/model.{type Model, Model}
 import nodework/node.{type UINode, IntNode, StringNode}
 

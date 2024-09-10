@@ -4,7 +4,7 @@ import gleam/set.{type Set}
 
 import lustre/attribute.{type Attribute, attribute as attr}
 import nodework/math.{type Vector}
-import nodework/node.{type UINodeID, type UINodeInputID, type UINodeOutputID}
+import nodework/node.{type UINodeInputID, type UINodeOutputID}
 
 pub type Conn {
   Conn(

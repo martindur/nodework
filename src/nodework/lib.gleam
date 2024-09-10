@@ -1,6 +1,4 @@
 import gleam/dict.{type Dict}
-import gleam/dynamic.{type Dynamic}
-import gleam/io
 import gleam/list.{map}
 import gleam/pair.{swap}
 import gleam/string
