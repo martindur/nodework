@@ -21,6 +21,12 @@ pub type Node {
     inputs: Set(String),
     func: fn(Dict(String, String)) -> String,
   )
+  IntToStringNode(
+    key: String,
+    label: String,
+    inputs: Set(String),
+    func: fn(Dict(String, Int)) -> String,
+  )
 }
 
 pub type NodeError {
@@ -61,25 +67,25 @@ pub type UINode {
   )
 }
 
-pub fn new_ui_node(key: String, inputs: Set(String), position: Vector) -> UINode {
-  let label = case split(key, ".") {
+pub fn new_ui_node(node: Node, position: Vector) -> UINode {
+  let name = case split(node.key, ".") {
     [_, text] -> text
-    _ -> key
+    _ -> node.key
   }
 
-  let id = case label {
+  let id = case name {
     "output" -> "node-output"
     _ -> generate_random_id("node")
   }
 
   let ui_inputs =
-    inputs
+    node.inputs
     |> set.to_list
     |> index_map(fn(label, index) { new_ui_node_input(id, index, label) })
 
   UINode(
-    label: capitalise(label),
-    key: key,
+    label: node.label,
+    key: node.key,
     id: id,
     inputs: ui_inputs,
     position: position,

@@ -3487,6 +3487,15 @@ var StringNode = class extends CustomType {
     this.func = func;
   }
 };
+var IntToStringNode = class extends CustomType {
+  constructor(key, label, inputs, func) {
+    super();
+    this.key = key;
+    this.label = label;
+    this.inputs = inputs;
+    this.func = func;
+  }
+};
 var NodeNotFound = class extends CustomType {
 };
 var UINodeInput = class extends CustomType {
@@ -3548,36 +3557,36 @@ function new_ui_node_input(id2, index2, label) {
 function new_ui_node_output(id2) {
   return new UINodeOutput(id2 + ".out", new Vector(200, 50), false);
 }
-function new_ui_node(key, inputs, position) {
-  let label = (() => {
-    let $ = split3(key, ".");
+function new_ui_node(node, position) {
+  let name = (() => {
+    let $ = split3(node.key, ".");
     if ($.hasLength(2)) {
       let text3 = $.tail.head;
       return text3;
     } else {
-      return key;
+      return node.key;
     }
   })();
   let id2 = (() => {
-    if (label === "output") {
+    if (name === "output") {
       return "node-output";
     } else {
       return generate_random_id("node");
     }
   })();
   let ui_inputs = (() => {
-    let _pipe = inputs;
+    let _pipe = node.inputs;
     let _pipe$1 = to_list2(_pipe);
     return index_map(
       _pipe$1,
-      (label2, index2) => {
-        return new_ui_node_input(id2, index2, label2);
+      (label, index2) => {
+        return new_ui_node_input(id2, index2, label);
       }
     );
   })();
   return new UINode(
-    capitalise(label),
-    key,
+    node.label,
+    node.key,
     id2,
     ui_inputs,
     new_ui_node_output(id2),
@@ -3777,9 +3786,12 @@ function register_nodes(nodes2) {
       if (n instanceof IntNode) {
         let key = n.key;
         return ["int." + key, n];
-      } else {
+      } else if (n instanceof StringNode) {
         let key = n.key;
         return ["string." + key, n];
+      } else {
+        let key = n.key;
+        return ["int-str." + key, n];
       }
     }
   );
@@ -3844,6 +3856,15 @@ function ten(_) {
 function bob(_) {
   return "bob";
 }
+function int_to_string(inputs) {
+  let $ = get(inputs, "int");
+  if ($.isOk()) {
+    let num = $[0];
+    return to_string2(num);
+  } else {
+    return "";
+  }
+}
 function output(inputs) {
   let $ = get(inputs, "out");
   if ($.isOk()) {
@@ -3865,7 +3886,13 @@ function example_nodes() {
       capitalise2
     ),
     new StringNode("bob", "Bob", from_list2(toList([])), bob),
-    new StringNode("output", "Output", from_list2(toList(["out"])), output)
+    new StringNode("output", "Output", from_list2(toList(["out"])), output),
+    new IntToStringNode(
+      "int_to_string",
+      "Int to String",
+      from_list2(toList(["int"])),
+      int_to_string
+    )
   ]);
   return register_nodes(nodes2);
 }
@@ -4253,9 +4280,15 @@ function eval_graph(verts, model) {
           let _pipe$3 = from_list(_pipe$22);
           let _pipe$4 = func(_pipe$3);
           return from(_pipe$4);
+        } else if ($.isOk() && $[0] instanceof IntToStringNode) {
+          let func = $[0].func;
+          let _pipe$13 = inputs;
+          let _pipe$22 = typed_inputs(_pipe$13, int_decoder);
+          let _pipe$3 = from_list(_pipe$22);
+          let _pipe$4 = func(_pipe$3);
+          return from(_pipe$4);
         } else {
-          let _pipe$13 = from("");
-          return debug(_pipe$13);
+          return from("");
         }
       })();
       return ((_capture) => {
@@ -4324,22 +4357,20 @@ function spawn_node(model, key) {
     let $ = get(model.lib.nodes, key);
     if ($.isOk()) {
       let n = $[0];
-      return n.inputs;
+      let _pipe2 = n;
+      let _pipe$12 = new_ui_node(_pipe2, position);
+      return ((n2) => {
+        return model.withFields({ nodes: insert(model.nodes, n2.id, n2) });
+      })(_pipe$12);
     } else {
-      return new$2();
+      return model;
     }
   })();
-  let _pipe$1 = ((_capture) => {
-    return new_ui_node(key, _capture, position);
-  })(_pipe);
-  let _pipe$2 = ((n) => {
-    return model.withFields({ nodes: insert(model.nodes, n.id, n) });
-  })(_pipe$1);
-  let _pipe$3 = sync_verts(_pipe$2);
-  let _pipe$4 = recalc_graph(_pipe$3);
+  let _pipe$1 = sync_verts(_pipe);
+  let _pipe$2 = recalc_graph(_pipe$1);
   return ((m) => {
     return [m, simple_effect(new GraphCloseMenu())];
-  })(_pipe$4);
+  })(_pipe$2);
 }
 function add_node_to_selection(model, id2) {
   let _pipe = model.withFields({

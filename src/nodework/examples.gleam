@@ -1,9 +1,10 @@
 import gleam/dict.{type Dict}
+import gleam/int
 import gleam/set
 import gleam/string
 
 import nodework/lib.{type NodeLibrary}
-import nodework/node.{IntNode, StringNode}
+import nodework/node.{IntNode, IntToStringNode, StringNode}
 
 fn add(inputs: Dict(String, Int)) -> Int {
   case dict.get(inputs, "a"), dict.get(inputs, "b") {
@@ -40,6 +41,13 @@ fn bob(_inputs: Dict(String, String)) -> String {
   "bob"
 }
 
+fn int_to_string(inputs: Dict(String, Int)) -> String {
+  case dict.get(inputs, "int") {
+    Ok(num) -> int.to_string(num)
+    Error(_) -> ""
+  }
+}
+
 fn output(inputs: Dict(String, String)) -> String {
   case dict.get(inputs, "out") {
     Ok(out) -> out
@@ -55,6 +63,12 @@ pub fn example_nodes() -> NodeLibrary {
     StringNode("capitalise", "Capitalise", set.from_list(["text"]), capitalise),
     StringNode("bob", "Bob", set.from_list([]), bob),
     StringNode("output", "Output", set.from_list(["out"]), output),
+    IntToStringNode(
+      "int_to_string",
+      "Int to String",
+      set.from_list(["int"]),
+      int_to_string,
+    ),
   ]
 
   lib.register_nodes(nodes)
