@@ -1,6 +1,5 @@
 import gleam/dict.{type Dict}
 import gleam/int
-import gleam/set
 import gleam/string
 
 import nodework/lib.{type NodeLibrary}
@@ -48,25 +47,51 @@ fn int_to_string(inputs: Dict(String, Int)) -> String {
   }
 }
 
+fn rect(_inputs: Dict(String, String)) -> String {
+  "<rect width='100' height='100' rx='15' x='50%' y='50%' class='fill-red-400' />"
+}
+
+fn circle(_: Dict(String, String)) -> String {
+  "<circle cx='50%' cy='50%' r='50' class='fill-blue-200' />"
+}
+
+
+fn combine(inputs: Dict(String, String)) -> String {
+  case dict.get(inputs, "top"), dict.get(inputs, "bottom") {
+    Ok(a), Ok(b) -> { b <> "\n" <> a }
+    Ok(a), Error(_) -> a
+    Error(_), Ok(b) -> b
+    _, _ -> ""
+  }
+}
+
 fn output(inputs: Dict(String, String)) -> String {
   case dict.get(inputs, "out") {
     Ok(out) -> out
     Error(_) -> ""
   }
+  |> fn(body) {
+    "<svg width='100%' height='100%' xmlns='http://www.w3.org/2000/svg'>"
+      <> body <>
+    "</svg>"
+  }
 }
 
 pub fn example_nodes() -> NodeLibrary {
   let nodes = [
-    IntNode("add", "Add", set.from_list(["a", "b"]), add),
-    IntNode("double", "Double", set.from_list(["a"]), double),
-    IntNode("ten", "Ten", set.from_list([]), ten),
-    StringNode("capitalise", "Capitalise", set.from_list(["text"]), capitalise),
-    StringNode("bob", "Bob", set.from_list([]), bob),
-    StringNode("output", "Output", set.from_list(["out"]), output),
+    IntNode("add", "Add", ["a", "a"], add),
+    IntNode("double", "Double", ["a"], double),
+    IntNode("ten", "Ten", [], ten),
+    StringNode("bob", "Bob", [], bob),
+    StringNode("cap", "Cap", ["text"], capitalise),
+    StringNode("rect", "Rect", [], rect),
+    StringNode("circle", "Circle", [], circle),
+    StringNode("combine", "Combine", ["top", "bottom"], combine),
+    StringNode("output", "Output", ["out"], output),
     IntToStringNode(
       "int_to_string",
       "Int to String",
-      set.from_list(["int"]),
+      ["int"],
       int_to_string,
     ),
   ]

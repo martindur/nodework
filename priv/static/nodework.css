@@ -653,6 +653,14 @@ video {
   background-color: rgb(255 255 255 / var(--tw-bg-opacity));
 }
 
+.fill-blue-200 {
+  fill: #bfdbfe;
+}
+
+.fill-red-400 {
+  fill: #f87171;
+}
+
 .stroke-gray-300 {
   stroke: #d1d5db;
 }

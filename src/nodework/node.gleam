@@ -1,5 +1,6 @@
 import gleam/dict.{type Dict}
 import gleam/int
+import gleam/io
 import gleam/list.{filter, filter_map, index_map, map}
 import gleam/pair
 import gleam/set.{type Set}
@@ -12,19 +13,19 @@ pub type Node {
   IntNode(
     key: String,
     label: String,
-    inputs: Set(String),
+    inputs: List(String),
     func: fn(Dict(String, Int)) -> Int,
   )
   StringNode(
     key: String,
     label: String,
-    inputs: Set(String),
+    inputs: List(String),
     func: fn(Dict(String, String)) -> String,
   )
   IntToStringNode(
     key: String,
     label: String,
-    inputs: Set(String),
+    inputs: List(String),
     func: fn(Dict(String, Int)) -> String,
   )
 }
@@ -68,19 +69,13 @@ pub type UINode {
 }
 
 pub fn new_ui_node(node: Node, position: Vector) -> UINode {
-  let name = case split(node.key, ".") {
-    [_, text] -> text
-    _ -> node.key
-  }
-
-  let id = case name {
+  let id = case node.key {
     "output" -> "node-output"
     _ -> generate_random_id("node")
   }
 
   let ui_inputs =
     node.inputs
-    |> set.to_list
     |> index_map(fn(label, index) { new_ui_node_input(id, index, label) })
 
   UINode(

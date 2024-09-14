@@ -3419,6 +3419,14 @@ function update_zoom_level(vb, delta_y) {
   })(_pipe$4);
 }
 
+// build/dev/javascript/gleam_stdlib/gleam/io.mjs
+function debug(term) {
+  let _pipe = term;
+  let _pipe$1 = inspect2(_pipe);
+  print_debug(_pipe$1);
+  return term;
+}
+
 // build/dev/javascript/nodework/nodework/util/random.mjs
 var lib = /* @__PURE__ */ toList([
   "a",
@@ -3558,17 +3566,9 @@ function new_ui_node_output(id2) {
   return new UINodeOutput(id2 + ".out", new Vector(200, 50), false);
 }
 function new_ui_node(node, position) {
-  let name = (() => {
-    let $ = split3(node.key, ".");
-    if ($.hasLength(2)) {
-      let text3 = $.tail.head;
-      return text3;
-    } else {
-      return node.key;
-    }
-  })();
   let id2 = (() => {
-    if (name === "output") {
+    let $ = node.key;
+    if ($ === "output") {
       return "node-output";
     } else {
       return generate_random_id("node");
@@ -3576,9 +3576,8 @@ function new_ui_node(node, position) {
   })();
   let ui_inputs = (() => {
     let _pipe = node.inputs;
-    let _pipe$1 = to_list2(_pipe);
     return index_map(
-      _pipe$1,
+      _pipe,
       (label, index2) => {
         return new_ui_node_input(id2, index2, label);
       }
@@ -3780,21 +3779,9 @@ var LibraryMenu = class extends CustomType {
 };
 function register_nodes(nodes2) {
   let _pipe = nodes2;
-  let _pipe$1 = map(
-    _pipe,
-    (n) => {
-      if (n instanceof IntNode) {
-        let key = n.key;
-        return ["int." + key, n];
-      } else if (n instanceof StringNode) {
-        let key = n.key;
-        return ["string." + key, n];
-      } else {
-        let key = n.key;
-        return ["int-str." + key, n];
-      }
-    }
-  );
+  let _pipe$1 = map(_pipe, (n) => {
+    return [n.key, n];
+  });
   let _pipe$2 = from_list(_pipe$1);
   return ((nodes3) => {
     return new NodeLibrary(nodes3);
@@ -3865,32 +3852,58 @@ function int_to_string(inputs) {
     return "";
   }
 }
-function output(inputs) {
-  let $ = get(inputs, "out");
-  if ($.isOk()) {
-    let out = $[0];
-    return out;
+function rect(_) {
+  return "<rect width='100' height='100' rx='15' x='50%' y='50%' class='fill-red-400' />";
+}
+function circle(_) {
+  return "<circle cx='50%' cy='50%' r='50' class='fill-blue-200' />";
+}
+function combine(inputs) {
+  let $ = get(inputs, "top");
+  let $1 = get(inputs, "bottom");
+  if ($.isOk() && $1.isOk()) {
+    let a = $[0];
+    let b = $1[0];
+    return b + "\n" + a;
+  } else if ($.isOk() && !$1.isOk()) {
+    let a = $[0];
+    return a;
+  } else if (!$.isOk() && $1.isOk()) {
+    let b = $1[0];
+    return b;
   } else {
     return "";
   }
 }
+function output(inputs) {
+  let _pipe = (() => {
+    let $ = get(inputs, "out");
+    if ($.isOk()) {
+      let out = $[0];
+      return out;
+    } else {
+      return "";
+    }
+  })();
+  return ((body) => {
+    return "<svg width='100%' height='100%' xmlns='http://www.w3.org/2000/svg'>" + body + "</svg>";
+  })(_pipe);
+}
 function example_nodes() {
   let nodes2 = toList([
-    new IntNode("add", "Add", from_list2(toList(["a", "b"])), add3),
-    new IntNode("double", "Double", from_list2(toList(["a"])), double),
-    new IntNode("ten", "Ten", from_list2(toList([])), ten),
-    new StringNode(
-      "capitalise",
-      "Capitalise",
-      from_list2(toList(["text"])),
-      capitalise2
-    ),
-    new StringNode("bob", "Bob", from_list2(toList([])), bob),
-    new StringNode("output", "Output", from_list2(toList(["out"])), output),
+    new IntNode("add", "Add", toList(["a", "a"]), add3),
+    new IntNode("double", "Double", toList(["a"]), double),
+    new IntNode("ten", "Ten", toList([]), ten),
+    new StringNode("bob", "Bob", toList([]), bob),
+    new StringNode("cap", "Cap", toList(["text"]), capitalise2),
+    new StringNode("rect", "Rect", toList([]), rect),
+    new StringNode("circle", "Circle", toList([]), circle),
+    new StringNode("combine", "Combine", toList(["top", "bottom"]), combine),
+    new StringNode("output", "Output", toList(["out"]), output),
     new IntToStringNode(
       "int_to_string",
       "Int to String",
-      from_list2(toList(["int"])),
+      toList(["int"]),
       int_to_string
     )
   ]);
@@ -4135,14 +4148,6 @@ function shift_key_check(event2) {
       return dispatch2(_pipe);
     }
   );
-}
-
-// build/dev/javascript/gleam_stdlib/gleam/io.mjs
-function debug(term) {
-  let _pipe = term;
-  let _pipe$1 = inspect2(_pipe);
-  print_debug(_pipe$1);
-  return term;
 }
 
 // build/dev/javascript/nodework/nodework/dag_process.mjs
@@ -4814,13 +4819,13 @@ function moved_mouse(model, position) {
 
 // build/dev/javascript/lustre/lustre/element/svg.mjs
 var namespace = "http://www.w3.org/2000/svg";
-function circle(attrs) {
+function circle2(attrs) {
   return namespaced(namespace, "circle", attrs, toList([]));
 }
 function line(attrs) {
   return namespaced(namespace, "line", attrs, toList([]));
 }
-function rect(attrs) {
+function rect2(attrs) {
   return namespaced(namespace, "rect", attrs, toList([]));
 }
 function defs(attrs, children) {
@@ -4949,7 +4954,7 @@ function view_grid_canvas(width, height) {
   let h = to_string2(height) + "%";
   let x = "-" + to_string2(divideInt(width, 2)) + "%";
   let y = "-" + to_string2(divideInt(height, 2)) + "%";
-  return rect(
+  return rect2(
     toList([
       attribute("x", x),
       attribute("y", y),
@@ -4989,7 +4994,7 @@ function view_grid() {
           attribute("patternUnits", "userSpaceOnUse")
         ]),
         toList([
-          rect(
+          rect2(
             toList([
               attribute("width", "80"),
               attribute("height", "80"),
@@ -5036,7 +5041,7 @@ function view_node_input(input) {
       )
     ]),
     toList([
-      circle(
+      circle2(
         toList([
           attribute("cx", "0"),
           attribute("cy", "0"),
@@ -5085,7 +5090,7 @@ function view_node_output(output2, node_id) {
         )
       ]),
       toList([
-        circle(
+        circle2(
           toList([
             attribute("cx", "0"),
             attribute("cy", "0"),
@@ -5140,7 +5145,7 @@ function view_node(n, selection) {
     concat(
       toList([
         toList([
-          rect(
+          rect2(
             toList([
               id(n.id),
               attribute("width", "200"),

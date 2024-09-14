@@ -3,7 +3,7 @@ import gleam/list.{map}
 import gleam/pair.{swap}
 import gleam/string
 import nodework/math.{type Vector, Vector}
-import nodework/node.{type Node, IntNode, IntToStringNode, StringNode}
+import nodework/node.{type Node}
 
 pub type NodeLibrary {
   NodeLibrary(nodes: Dict(String, Node))
@@ -19,13 +19,7 @@ pub fn new() -> NodeLibrary {
 
 pub fn register_nodes(nodes: List(Node)) -> NodeLibrary {
   nodes
-  |> map(fn(n: Node) {
-    case n {
-      IntNode(key, ..) -> #("int." <> key, n)
-      StringNode(key, ..) -> #("string." <> key, n)
-      IntToStringNode(key, ..) -> #("int-str." <> key, n)
-    }
-  })
+  |> map(fn(n: Node) { #(n.key, n) })
   |> dict.from_list
   |> fn(nodes) { NodeLibrary(nodes: nodes) }
 }

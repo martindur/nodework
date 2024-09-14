@@ -5,7 +5,7 @@ import nodework/math.{Vector}
 import nodework/node.{type Node, IntNode, UINode}
 
 fn simple_node() -> Node {
-  IntNode("one", "One", set.from_list([]), fn(_) { 1 })
+  IntNode("one", "One", [], fn(_) { 1 })
 }
 
 pub fn update_offset__from_origin__test() {
