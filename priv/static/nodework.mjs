@@ -3852,11 +3852,26 @@ function int_to_string(inputs) {
     return "";
   }
 }
-function rect(_) {
-  return "<rect width='100' height='100' rx='15' x='50%' y='50%' class='fill-red-400' />";
+function rect(inputs) {
+  let $ = get(inputs, "fill");
+  if ($.isOk()) {
+    let fill = $[0];
+    return `<rect width='100' height='100' rx='15' x='50%' y='50%' fill="` + fill + '"/>';
+  } else {
+    return "<rect width='100' height='100' rx='15' x='50%' y='50%' fill='black' />";
+  }
 }
 function circle(_) {
   return "<circle cx='50%' cy='50%' r='50' class='fill-blue-200' />";
+}
+function linear_gradient(inputs) {
+  let $ = get(inputs, "id");
+  if ($.isOk()) {
+    let id2 = $[0];
+    return "<linearGradient id='" + id2 + "' gradientTransform='rotate(90)'>\n        <stop offset='5%' stop-color='gold' />\n        <stop offset='95%' stop-color='red' />\n      </linearGradient>";
+  } else {
+    return "";
+  }
 }
 function combine(inputs) {
   let $ = get(inputs, "top");
@@ -3875,18 +3890,37 @@ function combine(inputs) {
     return "";
   }
 }
+function urlify(inputs) {
+  let $ = get(inputs, "id");
+  if ($.isOk()) {
+    let id2 = $[0];
+    return "url('#" + id2 + "')";
+  } else {
+    return "";
+  }
+}
 function output(inputs) {
   let _pipe = (() => {
-    let $ = get(inputs, "out");
-    if ($.isOk()) {
+    let $ = get(inputs, "body");
+    let $1 = get(inputs, "defs");
+    if ($.isOk() && $1.isOk()) {
       let out = $[0];
-      return out;
+      let defs2 = $1[0];
+      return [out, defs2];
+    } else if ($.isOk() && !$1.isOk()) {
+      let out = $[0];
+      return [out, ""];
+    } else if (!$.isOk() && $1.isOk()) {
+      let defs2 = $1[0];
+      return ["", defs2];
     } else {
-      return "";
+      return ["", ""];
     }
   })();
-  return ((body) => {
-    return "<svg width='100%' height='100%' xmlns='http://www.w3.org/2000/svg'>" + body + "</svg>";
+  return ((content) => {
+    let body = content[0];
+    let defs2 = content[1];
+    return "<svg width='100%' height='100%' xmlns='http://www.w3.org/2000/svg'>\n      <defs>" + defs2 + "</defs>" + body + "</svg>";
   })(_pipe);
 }
 function example_nodes() {
@@ -3896,10 +3930,17 @@ function example_nodes() {
     new IntNode("ten", "Ten", toList([]), ten),
     new StringNode("bob", "Bob", toList([]), bob),
     new StringNode("cap", "Cap", toList(["text"]), capitalise2),
-    new StringNode("rect", "Rect", toList([]), rect),
+    new StringNode("rect", "Rect", toList(["fill"]), rect),
     new StringNode("circle", "Circle", toList([]), circle),
     new StringNode("combine", "Combine", toList(["top", "bottom"]), combine),
-    new StringNode("output", "Output", toList(["out"]), output),
+    new StringNode(
+      "linear_gradient",
+      "Gradient(Linear)",
+      toList(["id"]),
+      linear_gradient
+    ),
+    new StringNode("urlify", "Urlify", toList(["id"]), urlify),
+    new StringNode("output", "Output", toList(["defs", "body"]), output),
     new IntToStringNode(
       "int_to_string",
       "Int to String",

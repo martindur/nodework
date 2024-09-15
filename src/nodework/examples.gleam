@@ -47,14 +47,28 @@ fn int_to_string(inputs: Dict(String, Int)) -> String {
   }
 }
 
-fn rect(_inputs: Dict(String, String)) -> String {
-  "<rect width='100' height='100' rx='15' x='50%' y='50%' class='fill-red-400' />"
+fn rect(inputs: Dict(String, String)) -> String {
+  case dict.get(inputs, "fill") {
+    Ok(fill) -> "<rect width='100' height='100' rx='15' x='50%' y='50%' fill=\"" <> fill <> "\"/>"
+    Error(_) -> "<rect width='100' height='100' rx='15' x='50%' y='50%' fill='black' />"
+  }
 }
 
 fn circle(_: Dict(String, String)) -> String {
   "<circle cx='50%' cy='50%' r='50' class='fill-blue-200' />"
 }
 
+fn linear_gradient(inputs: Dict(String, String)) -> String {
+  case dict.get(inputs, "id") {
+    Ok(id) -> {
+      "<linearGradient id='"<>id<>"' gradientTransform='rotate(90)'>
+        <stop offset='5%' stop-color='gold' />
+        <stop offset='95%' stop-color='red' />
+      </linearGradient>"
+    }
+    Error(_) -> ""
+  }
+}
 
 fn combine(inputs: Dict(String, String)) -> String {
   case dict.get(inputs, "top"), dict.get(inputs, "bottom") {
@@ -65,13 +79,26 @@ fn combine(inputs: Dict(String, String)) -> String {
   }
 }
 
-fn output(inputs: Dict(String, String)) -> String {
-  case dict.get(inputs, "out") {
-    Ok(out) -> out
+fn urlify(inputs: Dict(String, String)) -> String {
+  case dict.get(inputs, "id") {
+    Ok(id) -> "url('#"<>id<>"')"
     Error(_) -> ""
   }
-  |> fn(body) {
-    "<svg width='100%' height='100%' xmlns='http://www.w3.org/2000/svg'>"
+}
+
+fn output(inputs: Dict(String, String)) -> String {
+  case dict.get(inputs, "body"), dict.get(inputs, "defs") {
+    Ok(out), Ok(defs) -> #(out, defs)
+    Ok(out), Error(_) -> #(out, "")
+    Error(_), Ok(defs) -> #("", defs)
+    _, _ -> #("", "")
+  }
+  |> fn(content) {
+    let #(body, defs) = content
+    "<svg width='100%' height='100%' xmlns='http://www.w3.org/2000/svg'>
+      <defs>"
+      <> defs <>
+      "</defs>"
       <> body <>
     "</svg>"
   }
@@ -84,10 +111,12 @@ pub fn example_nodes() -> NodeLibrary {
     IntNode("ten", "Ten", [], ten),
     StringNode("bob", "Bob", [], bob),
     StringNode("cap", "Cap", ["text"], capitalise),
-    StringNode("rect", "Rect", [], rect),
+    StringNode("rect", "Rect", ["fill"], rect),
     StringNode("circle", "Circle", [], circle),
     StringNode("combine", "Combine", ["top", "bottom"], combine),
-    StringNode("output", "Output", ["out"], output),
+    StringNode("linear_gradient", "Gradient(Linear)", ["id"], linear_gradient),
+    StringNode("urlify", "Urlify", ["id"], urlify),
+    StringNode("output", "Output", ["defs", "body"], output),
     IntToStringNode(
       "int_to_string",
       "Int to String",
