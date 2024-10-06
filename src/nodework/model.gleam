@@ -26,9 +26,16 @@ pub type GraphTitle {
   GraphTitle(text: String, mode: EditMode)
 }
 
+pub type UIGraph {
+  UIGraph(id: UIGraphID, nodes: Dict(UINodeID, UINode), connections: List(Conn), title: GraphTitle)
+}
+
+pub type UIGraphID = String
+
 pub type Model {
   Model(
     lib: NodeLibrary,
+    collection: Dict(UIGraphID, UIGraph),
     nodes: Dict(UINodeID, UINode),
     connections: List(Conn),
     nodes_selected: Set(UINodeID),

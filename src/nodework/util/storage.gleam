@@ -11,10 +11,10 @@ import nodework/math.{type Vector, Vector}
 
 import nodework/node.{type UINode, UINode, type UINodeInput, UINodeInput, type UINodeOutput, UINodeOutput}
 import nodework/conn.{type Conn, Conn}
-import nodework/model.{type Model, Model, type GraphTitle, GraphTitle, ReadMode}
+import nodework/model.{type Model, Model, type GraphTitle, GraphTitle, ReadMode, type UIGraph}
 
 pub type StoredGraph {
-  StoredGraph(nodes: List(UINode), connections: List(Conn), title: String)
+  StoredGraph(id: String, nodes: List(UINode), connections: List(Conn), title: String)
 }
 
 @external(javascript, "../../storage.ffi.mjs", "saveToLocalStorage")
@@ -22,6 +22,15 @@ pub fn save_to_storage(key: String, data: String) -> Nil
 
 @external(javascript, "../../storage.ffi.mjs", "getFromLocalStorage")
 pub fn get_from_storage(key: String) -> String
+
+fn ui_graph_to_stored_graph(graph: UIGraph) -> StoredGraph {
+  graph.nodes
+  |> dict.to_list
+  |> list.map(pair.second)
+  |> fn(nodes) {
+    StoredGraph(id: graph.id, nodes: nodes, connections: graph.connections, title: graph.title.text)
+  }
+}
 
 fn encode_ui_node_input(input: UINodeInput) -> Json {
   [
@@ -111,46 +120,34 @@ fn decode_ui_nodes(json_string: String) -> Result(List(UINode), DecodeError) {
   json.decode(from: json_string, using: decoder)
 }
 
-pub fn nodes_to_json(nodes: List(UINode)) -> String {
+pub fn nodes_to_json(nodes: List(UINode)) -> Json {
   nodes
   |> list.map(encode_ui_node)
   |> preprocessed_array
-  |> to_string
 }
 
-pub fn json_to_nodes(json_string: String) -> Dict(String, UINode) {
-  json_string
-  |> decode_ui_nodes
-  |> fn(res) {
-    case res {
-      Ok(nodes) -> nodes
-      Error(_) -> []
-    }
-  }
-  |> list.map(fn(node) {
-    #(node.id, node)
-  })
-  |> dict.from_list
+pub fn connections_to_json(conns: List(Conn)) -> Json {
+  conns
+  |> list.map(encode_conn)
+  |> preprocessed_array
 }
 
-pub fn graph_to_json(model: Model) -> String {
-  let nodes =
-    model.nodes
-    |> dict.to_list
-    |> list.map(pair.second)
-    |> list.map(encode_ui_node)
-    |> preprocessed_array
-
-  let connections =
-    model.connections
-    |> list.map(encode_conn)
-    |> preprocessed_array
-
+pub fn graph_to_json(graph: StoredGraph) -> Json {
   [
-    #("title", string(model.title.text)),
-    #("nodes", nodes),
-    #("connections", connections)
+    #("id", string(graph.id)),
+    #("title", string(graph.title)),
+    #("nodes", nodes_to_json(graph.nodes)),
+    #("connections", connections_to_json(graph.connections))
   ]
+  |> object
+}
+
+pub fn save_collection_to_json_string(model: Model) -> String {
+  model.collection
+  |> dict.map_values(fn(_, graph) {
+    ui_graph_to_stored_graph(graph) |> graph_to_json
+  })
+  |> dict.to_list
   |> object
   |> to_string
 }
@@ -203,8 +200,9 @@ pub fn json_to_graph(model: Model, json_string: String) -> Model {
   let conn_list_decoder = list(conn_decoder)
 
 
-  let decoder = dynamic.decode3(
+  let decoder = dynamic.decode4(
     StoredGraph,
+    field("id", dynamic.string),
     field("nodes", node_list_decoder),
     field("connections", conn_list_decoder),
     field("title", dynamic.string)
