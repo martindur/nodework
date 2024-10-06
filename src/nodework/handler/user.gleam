@@ -1,3 +1,4 @@
+import gleam/io
 import gleam/list
 
 import lustre/effect.{type Effect}
@@ -58,7 +59,7 @@ pub fn unclicked(model: Model) -> #(Model, Effect(Msg)) {
   |> fn(c) { Model(..model, connections: c) }
   |> dp.sync_edges
   |> dp.recalc_graph
-  |> none_effect_wrapper
+  |> fn(m) { #(m, simple_effect(GraphSaveGraph)) }
 }
 
 pub fn clicked_graph_title(model: Model) -> #(Model, Effect(Msg)) {

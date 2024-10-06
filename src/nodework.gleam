@@ -15,6 +15,7 @@ import lustre/element/html
 import lustre/event
 
 import nodework/dag
+import nodework/dag_process as dp
 import nodework/decoder
 import nodework/draw/viewbox.{ViewBox}
 import nodework/handler.{none_effect_wrapper, simple_effect}
@@ -106,9 +107,12 @@ fn init(node_lib: NodeLibrary) -> #(Model, Effect(Msg)) {
     )
 
   case storage.get_from_storage("graph") {
-    "" -> model |> io.debug
+    "" -> model
     json_graph -> storage.json_to_graph(model, json_graph)
   }
+  |> dp.sync_verts
+  |> dp.sync_edges
+  |> dp.recalc_graph
   |> fn(m) { #(m, effect.none()) }
 }
 
