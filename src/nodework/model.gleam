@@ -17,6 +17,15 @@ pub type GraphMode {
   NormalMode
 }
 
+pub type EditMode {
+  ReadMode
+  WriteMode
+}
+
+pub type GraphTitle {
+  GraphTitle(text: String, mode: EditMode)
+}
+
 pub type Model {
   Model(
     lib: NodeLibrary,
@@ -32,6 +41,8 @@ pub type Model {
     mode: GraphMode,
     output: Dynamic,
     graph: Graph,
+    title: GraphTitle,
+    shortcuts_active: Bool
   )
 }
 
@@ -46,10 +57,13 @@ pub type Msg {
   GraphSetNodeAsSelection(UINodeID)
   GraphDeleteSelectedUINodes
   GraphChangedConnections
+  GraphSaveGraph
+  GraphSetTitleToReadMode
   UserPressedKey(String)
   UserMovedMouse(Vector)
   UserScrolled(Float)
   UserClickedGraph(MouseEvent)
+  UserClickedGraphTitle
   UserUnclicked
   UserClickedNode(UINodeID, MouseEvent)
   UserUnclickedNode
@@ -59,4 +73,5 @@ pub type Msg {
   UserHoverNodeInput(UINodeInputID)
   UserUnhoverNodeInputs
   UserClickedConn(ConnID, MouseEvent)
+  UserChangedGraphTitle(String)
 }

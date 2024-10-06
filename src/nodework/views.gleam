@@ -1,3 +1,4 @@
+import gleam/io
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type DecodeError, type Dynamic}
 import gleam/float
@@ -22,7 +23,7 @@ import nodework/model.{
   type Model, type Msg, GraphSetMode, NormalMode, UserClickedConn,
   UserClickedGraph, UserClickedNode, UserClickedNodeOutput, UserHoverNodeInput,
   UserHoverNodeOutput, UserMovedMouse, UserScrolled, UserUnclickedNode,
-  UserUnhoverNodeInputs, UserUnhoverNodeOutputs,
+  UserUnhoverNodeInputs, UserUnhoverNodeOutputs, UserClickedGraphTitle, type GraphTitle, ReadMode, WriteMode, UserChangedGraphTitle
 }
 import nodework/node.{
   type UINode, type UINodeID, type UINodeInput, type UINodeOutput, UINode,
@@ -345,4 +346,20 @@ pub fn view_output_canvas(model: Model) -> element.Element(Msg) {
     ],
     [],
   )
+}
+
+pub fn view_graph_title(title: GraphTitle) -> element.Element(Msg) {
+  // let update_value = fn(e) -> Result(Msg, List(DecodeError)) {
+  //   use target <- result.try(dynamic.field("target", dynamic.dynamic)(e))
+  //   use value <- result.try(dynamic.field("value", dynamic.string)(target))
+
+  //   Ok(UserChangedGraphTitle(value))
+  // }
+  
+  // let update_value = fn(val) -> Msg
+
+  case title.mode {
+    ReadMode -> html.h1([event.on_click(UserClickedGraphTitle)], [element.text(title.text)])
+    WriteMode -> html.input([attribute.name("graph-name"), attribute.value(title.text), event.on_input(fn(val) { UserChangedGraphTitle(val) })])
+  }
 }

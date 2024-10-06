@@ -1,8 +1,11 @@
 import gleam/dict
 import gleam/dynamic.{type DecodeError}
+import gleam/io
+import gleam/option.{None, Some}
 import gleam/result
 import gleam/set
 import gleam/string
+import nodework/util/storage
 
 import lustre
 import lustre/attribute.{attribute as attr}
@@ -22,11 +25,12 @@ import nodework/math.{type Vector, Vector}
 import nodework/model.{
   type Model, type Msg, GraphAddNodeToSelection, GraphChangedConnections,
   GraphClearSelection, GraphCloseMenu, GraphDeleteSelectedUINodes, GraphOpenMenu,
-  GraphResizeViewBox, GraphSetMode, GraphSetNodeAsSelection, GraphSpawnNode,
-  Model, NormalMode, UserClickedConn, UserClickedGraph, UserClickedNode,
-  UserClickedNodeOutput, UserHoverNodeInput, UserHoverNodeOutput, UserMovedMouse,
-  UserPressedKey, UserScrolled, UserUnclicked, UserUnclickedNode,
-  UserUnhoverNodeInputs, UserUnhoverNodeOutputs,
+  GraphResizeViewBox, GraphSaveGraph, GraphSetMode, GraphSetNodeAsSelection,
+  GraphSpawnNode, Model, NormalMode, UserClickedConn, UserClickedGraph,
+  UserClickedNode, UserClickedNodeOutput, UserHoverNodeInput,
+  UserHoverNodeOutput, UserMovedMouse, UserPressedKey, UserScrolled,
+  UserUnclicked, UserUnclickedNode, UserUnhoverNodeInputs,
+  UserUnhoverNodeOutputs, UserClickedGraphTitle, GraphTitle, ReadMode, GraphSetTitleToReadMode, UserChangedGraphTitle
 }
 import nodework/views
 
@@ -82,8 +86,8 @@ pub fn main() {
 }
 
 fn init(node_lib: NodeLibrary) -> #(Model, Effect(Msg)) {
-  #(
-    Model(
+
+  let model = Model(
       lib: node_lib,
       menu: lib.generate_lib_menu(node_lib),
       nodes: dict.new(),
@@ -97,9 +101,15 @@ fn init(node_lib: NodeLibrary) -> #(Model, Effect(Msg)) {
       mode: NormalMode,
       output: dynamic.from(""),
       graph: dag.new(),
-    ),
-    effect.none(),
-  )
+      title: GraphTitle("Untitled", ReadMode),
+      shortcuts_active: True
+    )
+
+  case storage.get_from_storage("graph") {
+    "" -> model |> io.debug
+    json_graph -> storage.json_to_graph(model, json_graph)
+  }
+  |> fn(m) { #(m, effect.none()) }
 }
 
 fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
@@ -116,9 +126,12 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       graph.add_node_as_selection(model, node_id)
     GraphChangedConnections -> graph.changed_connections(model)
     GraphDeleteSelectedUINodes -> graph.delete_selected_ui_nodes(model)
+    GraphSaveGraph -> graph.save_graph(model)
+    GraphSetTitleToReadMode -> graph.set_title_to_readmode(model)
     UserPressedKey(key) -> user.pressed_key(model, key, key_lib)
     UserScrolled(delta_y) -> user.scrolled(model, delta_y)
     UserClickedGraph(event) -> user.clicked_graph(model, event)
+    UserClickedGraphTitle -> user.clicked_graph_title(model)
     UserUnclicked -> user.unclicked(model)
     UserMovedMouse(position) -> user.moved_mouse(model, position)
     UserClickedNode(node_id, event) -> user.clicked_node(model, node_id, event)
@@ -130,6 +143,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     UserHoverNodeInput(input_id) -> user.hover_node_input(model, input_id)
     UserUnhoverNodeInputs -> user.unhover_node_inputs(model)
     UserClickedConn(conn_id, event) -> user.clicked_conn(model, conn_id, event)
+    UserChangedGraphTitle(value) -> user.changed_graph_title(model, value)
   }
 }
 
@@ -161,6 +175,9 @@ fn view(model: Model) -> element.Element(Msg) {
   }
 
   html.div([attr("tabindex", "0"), event.on("keydown", keydown)], [
+    html.div([attribute.class("absolute left-2 top-2 text-2xl")], [
+      views.view_graph_title(model.title)
+    ]),
     views.view_graph(
       model.viewbox,
       model.nodes,

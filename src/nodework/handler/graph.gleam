@@ -1,3 +1,5 @@
+import gleam/list
+import gleam/pair
 import gleam/dict
 import gleam/set
 import lustre/effect.{type Effect}
@@ -7,8 +9,9 @@ import nodework/draw/viewbox
 import nodework/handler.{none_effect_wrapper, simple_effect}
 import nodework/lib.{LibraryMenu}
 import nodework/math.{type Vector}
-import nodework/model.{type Model, type Msg, GraphCloseMenu, Model}
+import nodework/model.{type Model, type Msg, GraphCloseMenu, GraphSaveGraph, Model, GraphTitle, ReadMode}
 import nodework/node.{type UINode, type UINodeID}
+import nodework/util/storage.{save_to_storage, graph_to_json}
 
 pub fn resize_view_box(
   model: Model,
@@ -45,13 +48,14 @@ pub fn spawn_node(model: Model, key: String) -> #(Model, Effect(Msg)) {
       n
       |> node.new_ui_node(position)
       |> fn(n: UINode) {
+        save_to_storage("node", n.id)
         Model(..model, nodes: dict.insert(model.nodes, n.id, n))
       }
     Error(Nil) -> model
   }
   |> dp.sync_verts
   |> dp.recalc_graph
-  |> fn(m) { #(m, simple_effect(GraphCloseMenu)) }
+  |> fn(m) { #(m, effect.batch([simple_effect(GraphCloseMenu), simple_effect(GraphSaveGraph)])) }
 }
 
 pub fn add_node_to_selection(
@@ -102,4 +106,18 @@ pub fn changed_connections(model: Model) -> #(Model, Effect(msg)) {
   |> none_effect_wrapper
   // model.connections
   // |> recalc?
+}
+
+pub fn save_graph(model: Model) -> #(Model, Effect(msg)) {
+  model
+  |> graph_to_json 
+  |> save_to_storage("graph", _)
+
+  model
+  |> none_effect_wrapper
+}
+
+pub fn set_title_to_readmode(model: Model) -> #(Model, Effect(msg)) {
+  Model(..model, title: GraphTitle(..model.title, mode: ReadMode))
+  |> none_effect_wrapper
 }

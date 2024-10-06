@@ -1,3 +1,4 @@
+import gleam/io
 import gleam/list.{shuffle, take}
 import gleam/string.{join}
 

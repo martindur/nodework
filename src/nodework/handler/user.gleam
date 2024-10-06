@@ -10,8 +10,8 @@ import nodework/draw/viewbox
 import nodework/handler.{none_effect_wrapper, shift_key_check, simple_effect}
 import nodework/math.{type Vector, Vector}
 import nodework/model.{
-  type Model, type Msg, GraphAddNodeToSelection, GraphCloseMenu,
-  GraphSetNodeAsSelection, Model,
+  type Model, type Msg, GraphAddNodeToSelection, GraphCloseMenu, GraphSaveGraph,
+  GraphSetNodeAsSelection, Model, GraphTitle, WriteMode, GraphSetTitleToReadMode
 }
 import nodework/node.{
   type UINodeID, type UINodeInputID, type UINodeOutputID, NodeInput,
@@ -26,15 +26,17 @@ pub fn pressed_key(
   key: String,
   func: fn(String) -> Effect(msg),
 ) -> #(Model, Effect(msg)) {
-  model
-  |> fn(m) { #(m, func(key)) }
+  case model.shortcuts_active {
+    True -> #(model, func(key))
+    False -> model |> none_effect_wrapper
+  }
 }
 
 pub fn clicked_graph(model: Model, event: MouseEvent) -> #(Model, Effect(Msg)) {
   model
   |> update_last_clicked_point(event)
   |> fn(m) {
-    #(m, effect.batch([shift_key_check(event), simple_effect(GraphCloseMenu)]))
+    #(Model(..m, shortcuts_active: True), effect.batch([shift_key_check(event), simple_effect(GraphCloseMenu), simple_effect(GraphSetTitleToReadMode)]))
   }
 }
 
@@ -59,6 +61,11 @@ pub fn unclicked(model: Model) -> #(Model, Effect(Msg)) {
   |> none_effect_wrapper
 }
 
+pub fn clicked_graph_title(model: Model) -> #(Model, Effect(Msg)) {
+  Model(..model, title: GraphTitle(..model.title, mode: WriteMode), shortcuts_active: False)
+  |> none_effect_wrapper
+}
+
 pub fn clicked_node(
   model: Model,
   node_id: UINodeID,
@@ -74,10 +81,11 @@ pub fn clicked_node(
   }
   |> fn(m) {
     #(
-      m,
+      Model(..m, shortcuts_active: True),
       effect.batch([
         update_selected_nodes(event, node_id),
         simple_effect(GraphCloseMenu),
+        simple_effect(GraphSetTitleToReadMode)
       ]),
     )
   }
@@ -85,7 +93,7 @@ pub fn clicked_node(
 
 pub fn unclicked_node(model: Model) -> #(Model, Effect(Msg)) {
   Model(..model, mouse_down: False)
-  |> none_effect_wrapper
+  |> fn(m) { #(m, simple_effect(GraphSaveGraph)) }
 }
 
 pub fn clicked_node_output(
@@ -165,7 +173,7 @@ pub fn clicked_conn(
   })
   |> fn(conns) { Model(..model, connections: conns) }
   |> draw.dragged_connection
-  |> none_effect_wrapper
+  |> fn(m) { #(m, simple_effect(GraphSetTitleToReadMode)) }
 }
 
 pub fn scrolled(model: Model, delta_y: Float) -> #(Model, Effect(Msg)) {
@@ -190,4 +198,9 @@ fn update_selected_nodes(event: MouseEvent, node_id: UINodeID) -> Effect(Msg) {
     }
     |> dispatch
   })
+}
+
+pub fn changed_graph_title(model: Model, value: String) -> #(Model, Effect(Msg)) {
+  Model(..model, title: GraphTitle(..model.title, text: value))
+  |> fn(m) { #(m, simple_effect(GraphSaveGraph)) }
 }
