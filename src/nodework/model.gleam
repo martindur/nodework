@@ -36,6 +36,7 @@ pub type Model {
   Model(
     lib: NodeLibrary,
     collection: Dict(UIGraphID, UIGraph),
+    active_graph: UIGraphID,
     nodes: Dict(UINodeID, UINode),
     connections: List(Conn),
     nodes_selected: Set(UINodeID),
@@ -64,7 +65,8 @@ pub type Msg {
   GraphSetNodeAsSelection(UINodeID)
   GraphDeleteSelectedUINodes
   GraphChangedConnections
-  GraphSaveGraph
+  GraphSaveCollection
+  GraphLoadGraph(UIGraphID)
   GraphSetTitleToReadMode
   UserPressedKey(String)
   UserMovedMouse(Vector)
@@ -81,4 +83,5 @@ pub type Msg {
   UserUnhoverNodeInputs
   UserClickedConn(ConnID, MouseEvent)
   UserChangedGraphTitle(String)
+  UserClickedCollectionItem(UIGraphID)
 }

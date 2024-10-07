@@ -132,7 +132,7 @@ pub fn connections_to_json(conns: List(Conn)) -> Json {
   |> preprocessed_array
 }
 
-pub fn graph_to_json(graph: StoredGraph) -> Json {
+fn graph_to_json(graph: StoredGraph) -> Json {
   [
     #("id", string(graph.id)),
     #("title", string(graph.title)),

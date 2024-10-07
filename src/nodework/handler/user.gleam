@@ -11,8 +11,8 @@ import nodework/draw/viewbox
 import nodework/handler.{none_effect_wrapper, shift_key_check, simple_effect}
 import nodework/math.{type Vector, Vector}
 import nodework/model.{
-  type Model, type Msg, GraphAddNodeToSelection, GraphCloseMenu, GraphSaveGraph,
-  GraphSetNodeAsSelection, Model, GraphTitle, WriteMode, GraphSetTitleToReadMode
+  type Model, type Msg, GraphAddNodeToSelection, GraphCloseMenu, GraphSaveCollection, GraphLoadGraph,
+  GraphSetNodeAsSelection, Model, GraphTitle, WriteMode, GraphSetTitleToReadMode, type UIGraphID
 }
 import nodework/node.{
   type UINodeID, type UINodeInputID, type UINodeOutputID, NodeInput,
@@ -59,7 +59,7 @@ pub fn unclicked(model: Model) -> #(Model, Effect(Msg)) {
   |> fn(c) { Model(..model, connections: c) }
   |> dp.sync_edges
   |> dp.recalc_graph
-  |> fn(m) { #(m, simple_effect(GraphSaveGraph)) }
+  |> fn(m) { #(m, simple_effect(GraphSaveCollection)) }
 }
 
 pub fn clicked_graph_title(model: Model) -> #(Model, Effect(Msg)) {
@@ -94,7 +94,7 @@ pub fn clicked_node(
 
 pub fn unclicked_node(model: Model) -> #(Model, Effect(Msg)) {
   Model(..model, mouse_down: False)
-  |> fn(m) { #(m, simple_effect(GraphSaveGraph)) }
+  |> fn(m) { #(m, simple_effect(GraphSaveCollection)) }
 }
 
 pub fn clicked_node_output(
@@ -203,5 +203,9 @@ fn update_selected_nodes(event: MouseEvent, node_id: UINodeID) -> Effect(Msg) {
 
 pub fn changed_graph_title(model: Model, value: String) -> #(Model, Effect(Msg)) {
   Model(..model, title: GraphTitle(..model.title, text: value))
-  |> fn(m) { #(m, simple_effect(GraphSaveGraph)) }
+  |> fn(m) { #(m, simple_effect(GraphSaveCollection)) }
+}
+
+pub fn clicked_collection_item(model: Model, graph_id: UIGraphID) -> #(Model, Effect(Msg)) {
+  #( Model(..model, active_graph: graph_id), simple_effect(GraphLoadGraph(graph_id)))
 }

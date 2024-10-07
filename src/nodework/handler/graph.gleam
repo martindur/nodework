@@ -1,3 +1,4 @@
+import gleam/io
 import gleam/list
 import gleam/pair
 import gleam/dict
@@ -9,9 +10,9 @@ import nodework/draw/viewbox
 import nodework/handler.{none_effect_wrapper, simple_effect}
 import nodework/lib.{LibraryMenu}
 import nodework/math.{type Vector}
-import nodework/model.{type Model, type Msg, GraphCloseMenu, GraphSaveGraph, Model, GraphTitle, ReadMode}
+import nodework/model.{type Model, type Msg, GraphCloseMenu, GraphSaveCollection, Model, GraphTitle, ReadMode, type UIGraphID}
 import nodework/node.{type UINode, type UINodeID}
-import nodework/util/storage.{save_to_storage, graph_to_json}
+import nodework/util/storage
 
 pub fn resize_view_box(
   model: Model,
@@ -48,14 +49,14 @@ pub fn spawn_node(model: Model, key: String) -> #(Model, Effect(Msg)) {
       n
       |> node.new_ui_node(position)
       |> fn(n: UINode) {
-        save_to_storage("node", n.id)
+        storage.save_to_storage("node", n.id)
         Model(..model, nodes: dict.insert(model.nodes, n.id, n))
       }
     Error(Nil) -> model
   }
   |> dp.sync_verts
   |> dp.recalc_graph
-  |> fn(m) { #(m, effect.batch([simple_effect(GraphCloseMenu), simple_effect(GraphSaveGraph)])) }
+  |> fn(m) { #(m, effect.batch([simple_effect(GraphCloseMenu), simple_effect(GraphSaveCollection)])) }
 }
 
 pub fn add_node_to_selection(
@@ -108,10 +109,20 @@ pub fn changed_connections(model: Model) -> #(Model, Effect(msg)) {
   // |> recalc?
 }
 
-pub fn save_graph(model: Model) -> #(Model, Effect(msg)) {
+pub fn save_collection(model: Model) -> #(Model, Effect(msg)) {
   model
-  |> graph_to_json 
-  |> save_to_storage("graph", _)
+  |> storage.save_collection_to_json_string
+  |> storage.save_to_storage("collection", _)
+
+  model
+  |> none_effect_wrapper
+}
+
+pub fn load_graph(model: Model, graph_id: UIGraphID) -> #(Model, Effect(msg)) {
+  // model
+  // |> storage.save_collection_to_json_string
+  // |> storage.save_to_storage("graph", _)
+  io.debug("LOADED " <> graph_id)
 
   model
   |> none_effect_wrapper

@@ -23,7 +23,7 @@ import nodework/model.{
   type Model, type Msg, GraphSetMode, NormalMode, UserClickedConn,
   UserClickedGraph, UserClickedNode, UserClickedNodeOutput, UserHoverNodeInput,
   UserHoverNodeOutput, UserMovedMouse, UserScrolled, UserUnclickedNode,
-  UserUnhoverNodeInputs, UserUnhoverNodeOutputs, UserClickedGraphTitle, type GraphTitle, ReadMode, WriteMode, UserChangedGraphTitle
+  UserUnhoverNodeInputs, UserUnhoverNodeOutputs, UserClickedGraphTitle, type GraphTitle, ReadMode, WriteMode, UserChangedGraphTitle, type UIGraphID, type UIGraph, UserClickedCollectionItem
 }
 import nodework/node.{
   type UINode, type UINodeID, type UINodeInput, type UINodeOutput, UINode,
@@ -83,16 +83,26 @@ fn view_grid_canvas(width: Int, height: Int) -> element.Element(msg) {
   let x = "-" <> int.to_string(width / 2) <> "%"
   let y = "-" <> int.to_string(height / 2) <> "%"
 
-  svg.rect([
-    attr("x", x),
-    attr("y", y),
-    attr("width", w),
-    attr("height", h),
-    attr("fill", "url(#grid)"),
+  svg.g([], [
+    svg.rect([
+      attr("x", x),
+      attr("y", y),
+      attr("width", w),
+      attr("height", h),
+      // attr("fill", "#2b2b2b"),
+      attribute.class("fill-neutral-900")
+    ]),
+    svg.rect([
+      attr("x", x),
+      attr("y", y),
+      attr("width", w),
+      attr("height", h),
+      attr("fill", "url(#grid)"),
+    ])
   ])
 }
 
-fn view_grid() -> element.Element(msg) {
+fn view_grid_legacy() -> element.Element(msg) {
   svg.defs([], [
     svg.pattern(
       [
@@ -131,6 +141,42 @@ fn view_grid() -> element.Element(msg) {
         ]),
       ],
     ),
+  ])
+}
+
+fn view_grid() -> element.Element(msg) {
+  svg.defs([], [
+    svg.pattern([
+      attribute.id("small-grid"),
+      attr("width", "10"),
+      attr("height", "10"),
+      attr("patternUnits", "userSpaceOnUse")
+    ], [
+      svg.path([
+        attribute.class("stroke-neutral-300/20"),
+        attr("d", "M 10 0 L 0 0 0 10"), 
+        attr("fill", "none"),
+        attr("stroke-width", "0.5")
+      ])
+    ]),
+    svg.pattern([
+      attribute.id("grid"),
+      attr("width", "50"),
+      attr("height", "50"),
+      attr("patternUnits", "userSpaceOnUse")
+    ],[
+      svg.rect([
+        attr("width", "50"),
+        attr("height", "50"),
+        attr("fill", "url(#small-grid)")
+      ]),
+      svg.path([
+        attribute.class("stroke-neutral-300/50"),
+        attr("d", "M 50 0 L 0 0 0 50"), 
+        attr("fill", "none"),
+        attr("stroke-width", "1.0")
+      ])
+    ])
   ])
 }
 
@@ -182,7 +228,7 @@ pub fn view_graph(
     ],
     [
       view_grid(),
-      view_grid_canvas(500, 500),
+     view_grid_canvas(500, 500),
       svg.g(
         [],
         connections
@@ -201,8 +247,8 @@ pub fn view_graph(
 
 pub fn view_node(n: UINode, selection: Set(UINodeID)) -> Element(Msg) {
   let node_selected_class = case set.contains(selection, n.id) {
-    True -> attribute.class("text-gray-300 stroke-gray-400")
-    False -> attribute.class("text-gray-300 stroke-gray-300")
+    True -> attribute.class("text-neutral-200 stroke-neutral-300 fill-neutral-500")
+    False -> attribute.class("text-neutral-200 stroke-neutral-400 fill-neutral-500")
   }
 
   let mousedown = fn(e) -> Result(Msg, List(DecodeError)) {
@@ -225,7 +271,6 @@ pub fn view_node(n: UINode, selection: Set(UINodeID)) -> Element(Msg) {
           attr("height", "150"),
           attr("rx", "25"),
           attr("ry", "25"),
-          attr("fill", "currentColor"),
           attr("stroke", "currentColor"),
           attr("stroke-width", "2"),
           node_selected_class,
@@ -238,7 +283,7 @@ pub fn view_node(n: UINode, selection: Set(UINodeID)) -> Element(Msg) {
             attr("y", "24"),
             attr("font-size", "16"),
             attr("fill", "currentColor"),
-            attribute.class("text-gray-900"),
+            attribute.class("text-neutral-200"),
           ],
           n.label,
         ),
@@ -257,13 +302,11 @@ fn view_node_input(input: UINodeInput) -> element.Element(Msg) {
         attr("cx", "0"),
         attr("cy", "0"),
         attr("r", "10"),
-        attr("fill", "currentColor"),
-        attr("stroke", "black"),
         case input.hovered {
           True -> attr("stroke-width", "3")
           False -> attr("stroke-width", "0")
         },
-        attribute.class("text-gray-500"),
+        attribute.class("fill-neutral-300 stroke-neutral-100"),
         attribute.id(input.id),
         event.on_mouse_enter(UserHoverNodeInput(input.id)),
         event.on_mouse_leave(UserUnhoverNodeInputs),
@@ -274,8 +317,7 @@ fn view_node_input(input: UINodeInput) -> element.Element(Msg) {
           attr("y", "0"),
           attr("font-size", "16"),
           attr("dominant-baseline", "middle"),
-          attr("fill", "currentColor"),
-          attribute.class("text-gray-900"),
+          attribute.class("fill-neutral-200"),
         ],
         input.label,
       ),
@@ -297,13 +339,11 @@ fn view_node_output(
             attr("cx", "0"),
             attr("cy", "0"),
             attr("r", "10"),
-            attr("fill", "currentColor"),
-            attr("stroke", "black"),
             case output.hovered {
               True -> attr("stroke-width", "3")
               False -> attr("stroke-width", "0")
             },
-            attribute.class("text-gray-500"),
+            attribute.class("fill-neutral-300 stroke-neutral-100"),
             event.on_mouse_down(UserClickedNodeOutput(node_id, output.position)),
             event.on_mouse_enter(UserHoverNodeOutput(output.id)),
             event.on_mouse_leave(UserUnhoverNodeOutputs),
@@ -349,17 +389,21 @@ pub fn view_output_canvas(model: Model) -> element.Element(Msg) {
 }
 
 pub fn view_graph_title(title: GraphTitle) -> element.Element(Msg) {
-  // let update_value = fn(e) -> Result(Msg, List(DecodeError)) {
-  //   use target <- result.try(dynamic.field("target", dynamic.dynamic)(e))
-  //   use value <- result.try(dynamic.field("value", dynamic.string)(target))
-
-  //   Ok(UserChangedGraphTitle(value))
-  // }
-  
-  // let update_value = fn(val) -> Msg
-
   case title.mode {
     ReadMode -> html.h1([event.on_click(UserClickedGraphTitle)], [element.text(title.text)])
     WriteMode -> html.input([attribute.name("graph-name"), attribute.value(title.text), event.on_input(fn(val) { UserChangedGraphTitle(val) })])
   }
+}
+
+pub fn view_collection(collection: Dict(UIGraphID, UIGraph)) -> element.Element(Msg) {
+  html.div([attribute.class("bg-neutral-800 rounded p-2 flex flex-col gap-1 min-w-[180px] min-h-[400px]")], 
+    [
+    dict.map_values(collection, fn(key, graph) {
+      html.button([event.on_click(UserClickedCollectionItem(key))], [element.text(graph.title.text)])
+    })
+    |> dict.to_list
+    |> list.map(pair.second),
+    [html.button([attribute.class("w-full p-2 bg-neutral-600 border border-neutral-200 rounded")], [element.text("New Graph")])]
+    ] |> list.flatten
+  )
 }
