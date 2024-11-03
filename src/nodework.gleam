@@ -25,13 +25,15 @@ import nodework/lib.{type NodeLibrary}
 import nodework/math.{type Vector, Vector}
 import nodework/model.{
   type Model, type Msg, GraphAddNodeToSelection, GraphChangedConnections,
-  GraphClearSelection, GraphCloseMenu, GraphDeleteSelectedUINodes, GraphOpenMenu,
-  GraphResizeViewBox, GraphSaveCollection, GraphSetMode, GraphSetNodeAsSelection,
-  GraphSpawnNode, Model, NormalMode, UserClickedConn, UserClickedGraph,
-  UserClickedNode, UserClickedNodeOutput, UserHoverNodeInput,
-  UserHoverNodeOutput, UserMovedMouse, UserPressedKey, UserScrolled,
-  UserUnclicked, UserUnclickedNode, UserUnhoverNodeInputs,
-  UserUnhoverNodeOutputs, UserClickedGraphTitle, GraphTitle, ReadMode, GraphSetTitleToReadMode, UserChangedGraphTitle, UserClickedCollectionItem, GraphLoadGraph
+  GraphClearSelection, GraphCloseMenu, GraphDeleteSelectedUINodes,
+  GraphLoadGraph, GraphOpenMenu, GraphResizeViewBox, GraphSaveGraph,
+  GraphSetMode, GraphSetNodeAsSelection, GraphSetTitleToReadMode, GraphSpawnNode,
+  GraphTitle, Model, NormalMode, ReadMode, UserChangedGraphTitle,
+  UserClickedCollectionItem, UserClickedConn, UserClickedGraph,
+  UserClickedGraphTitle, UserClickedNode, UserClickedNodeOutput,
+  UserHoverNodeInput, UserHoverNodeOutput, UserMovedMouse, UserPressedKey,
+  UserScrolled, UserUnclicked, UserUnclickedNode, UserUnhoverNodeInputs,
+  UserUnhoverNodeOutputs, UserClickedNewGraph
 }
 import nodework/views
 
@@ -87,11 +89,11 @@ pub fn main() {
 }
 
 fn init(node_lib: NodeLibrary) -> #(Model, Effect(Msg)) {
-
-  let model = Model(
+  let model =
+    Model(
       lib: node_lib,
       menu: lib.generate_lib_menu(node_lib),
-      collection: dict.new(),
+      collection: [],
       active_graph: "temp",
       nodes: dict.new(),
       connections: [],
@@ -105,12 +107,15 @@ fn init(node_lib: NodeLibrary) -> #(Model, Effect(Msg)) {
       output: dynamic.from(""),
       graph: dag.new(),
       title: GraphTitle("Untitled", ReadMode),
-      shortcuts_active: True
+      shortcuts_active: True,
     )
 
-  case storage.get_from_storage("graph") {
-    "" -> model
+  case storage.get_from_storage("graph_0") {
+    "" -> Model(..model, active_graph: "graph_0", collection: [#("graph_0", "Untitled")])
     json_graph -> storage.json_to_graph(model, json_graph)
+  }
+  |> fn(m) {
+    Model(..m, collection: storage.load_collection(0, []))
   }
   |> dp.sync_verts
   |> dp.sync_edges
@@ -132,7 +137,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       graph.add_node_as_selection(model, node_id)
     GraphChangedConnections -> graph.changed_connections(model)
     GraphDeleteSelectedUINodes -> graph.delete_selected_ui_nodes(model)
-    GraphSaveCollection -> graph.save_collection(model)
+    GraphSaveGraph -> graph.save_graph(model)
     GraphLoadGraph(graph_id) -> graph.load_graph(model, graph_id)
     GraphSetTitleToReadMode -> graph.set_title_to_readmode(model)
     UserPressedKey(key) -> user.pressed_key(model, key, key_lib)
@@ -151,7 +156,9 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     UserUnhoverNodeInputs -> user.unhover_node_inputs(model)
     UserClickedConn(conn_id, event) -> user.clicked_conn(model, conn_id, event)
     UserChangedGraphTitle(value) -> user.changed_graph_title(model, value)
-    UserClickedCollectionItem(graph_id) -> user.clicked_collection_item(model, graph_id)
+    UserClickedCollectionItem(graph_id) ->
+      user.clicked_collection_item(model, graph_id)
+    UserClickedNewGraph -> user.new_graph(model)
   }
 }
 
@@ -182,20 +189,27 @@ fn view(model: Model) -> element.Element(Msg) {
     Ok(GraphSpawnNode(identifier))
   }
 
-  html.div([attribute.class("text-neutral-200"), attr("tabindex", "0"), event.on("keydown", keydown)], [
-    html.div([attribute.class("absolute left-2 top-2 text-2xl")], [
-      views.view_graph_title(model.title)
-    ]),
-    html.div([attribute.class("absolute right-2 top-2")], [
-      views.view_collection(model.collection)
-    ]),
-    views.view_graph(
-      model.viewbox,
-      model.nodes,
-      model.nodes_selected,
-      model.connections,
-    ),
-    views.view_menu(model.menu, spawn),
-    views.view_output_canvas(model),
-  ])
+  html.div(
+    [
+      attribute.class("text-neutral-800"),
+      attr("tabindex", "0"),
+      event.on("keydown", keydown),
+    ],
+    [
+      html.div([attribute.class("absolute left-2 top-2 text-2xl")], [
+        views.view_graph_title(model.title),
+      ]),
+      html.div([attribute.class("absolute right-2 top-2")], [
+        views.view_collection(model.collection, model.active_graph),
+      ]),
+      views.view_graph(
+        model.viewbox,
+        model.nodes,
+        model.nodes_selected,
+        model.connections,
+      ),
+      views.view_menu(model.menu, spawn),
+      views.view_output_canvas(model),
+    ],
+  )
 }

@@ -1,8 +1,8 @@
-import gleam/io
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type DecodeError, type Dynamic}
 import gleam/float
 import gleam/int
+import gleam/io
 import gleam/list.{map, reduce}
 import gleam/pair
 import gleam/result
@@ -20,10 +20,12 @@ import nodework/draw/viewbox.{type ViewBox, ViewBox}
 import nodework/lib.{type LibraryMenu}
 import nodework/math.{type Vector, Vector}
 import nodework/model.{
-  type Model, type Msg, GraphSetMode, NormalMode, UserClickedConn,
-  UserClickedGraph, UserClickedNode, UserClickedNodeOutput, UserHoverNodeInput,
-  UserHoverNodeOutput, UserMovedMouse, UserScrolled, UserUnclickedNode,
-  UserUnhoverNodeInputs, UserUnhoverNodeOutputs, UserClickedGraphTitle, type GraphTitle, ReadMode, WriteMode, UserChangedGraphTitle, type UIGraphID, type UIGraph, UserClickedCollectionItem
+  type GraphTitle, type Model, type Msg, type UIGraph, type UIGraphID,
+  GraphSetMode, NormalMode, ReadMode, UserChangedGraphTitle,
+  UserClickedCollectionItem, UserClickedConn, UserClickedGraph,
+  UserClickedGraphTitle, UserClickedNode, UserClickedNodeOutput,
+  UserHoverNodeInput, UserHoverNodeOutput, UserMovedMouse, UserScrolled,
+  UserUnclickedNode, UserUnhoverNodeInputs, UserUnhoverNodeOutputs, WriteMode, UserClickedNewGraph
 }
 import nodework/node.{
   type UINode, type UINodeID, type UINodeInput, type UINodeOutput, UINode,
@@ -76,109 +78,6 @@ pub fn view_menu(
   )
 }
 
-fn view_grid_canvas(width: Int, height: Int) -> element.Element(msg) {
-  let w = int.to_string(width) <> "%"
-  let h = int.to_string(height) <> "%"
-
-  let x = "-" <> int.to_string(width / 2) <> "%"
-  let y = "-" <> int.to_string(height / 2) <> "%"
-
-  svg.g([], [
-    svg.rect([
-      attr("x", x),
-      attr("y", y),
-      attr("width", w),
-      attr("height", h),
-      // attr("fill", "#2b2b2b"),
-      attribute.class("fill-neutral-900")
-    ]),
-    svg.rect([
-      attr("x", x),
-      attr("y", y),
-      attr("width", w),
-      attr("height", h),
-      attr("fill", "url(#grid)"),
-    ])
-  ])
-}
-
-fn view_grid_legacy() -> element.Element(msg) {
-  svg.defs([], [
-    svg.pattern(
-      [
-        attribute.id("smallGrid"),
-        attr("width", "8"),
-        attr("height", "8"),
-        attr("patternUnits", "userSpaceOnUse"),
-      ],
-      [
-        svg.path([
-          attr("d", "M 8 0 L 0 0 0 8"),
-          attr("fill", "none"),
-          attr("stroke", "gray"),
-          attr("stroke-width", "0.5"),
-        ]),
-      ],
-    ),
-    svg.pattern(
-      [
-        attribute.id("grid"),
-        attr("width", "80"),
-        attr("height", "80"),
-        attr("patternUnits", "userSpaceOnUse"),
-      ],
-      [
-        svg.rect([
-          attr("width", "80"),
-          attr("height", "80"),
-          attr("fill", "url(#smallGrid)"),
-        ]),
-        svg.path([
-          attr("d", "M 80 0 L 0 0 0 80"),
-          attr("fill", "none"),
-          attr("stroke", "gray"),
-          attr("stroke-width", "1"),
-        ]),
-      ],
-    ),
-  ])
-}
-
-fn view_grid() -> element.Element(msg) {
-  svg.defs([], [
-    svg.pattern([
-      attribute.id("small-grid"),
-      attr("width", "10"),
-      attr("height", "10"),
-      attr("patternUnits", "userSpaceOnUse")
-    ], [
-      svg.path([
-        attribute.class("stroke-neutral-300/20"),
-        attr("d", "M 10 0 L 0 0 0 10"), 
-        attr("fill", "none"),
-        attr("stroke-width", "0.5")
-      ])
-    ]),
-    svg.pattern([
-      attribute.id("grid"),
-      attr("width", "50"),
-      attr("height", "50"),
-      attr("patternUnits", "userSpaceOnUse")
-    ],[
-      svg.rect([
-        attr("width", "50"),
-        attr("height", "50"),
-        attr("fill", "url(#small-grid)")
-      ]),
-      svg.path([
-        attribute.class("stroke-neutral-300/50"),
-        attr("d", "M 50 0 L 0 0 0 50"), 
-        attr("fill", "none"),
-        attr("stroke-width", "1.0")
-      ])
-    ])
-  ])
-}
 
 fn attr_viewbox(offset: Vector, resolution: Vector) -> Attribute(msg) {
   [offset.x, offset.y, resolution.x, resolution.y]
@@ -227,8 +126,6 @@ pub fn view_graph(
       event.on("wheel", wheel),
     ],
     [
-      view_grid(),
-     view_grid_canvas(500, 500),
       svg.g(
         [],
         connections
@@ -247,8 +144,8 @@ pub fn view_graph(
 
 pub fn view_node(n: UINode, selection: Set(UINodeID)) -> Element(Msg) {
   let node_selected_class = case set.contains(selection, n.id) {
-    True -> attribute.class("text-neutral-200 stroke-neutral-300 fill-neutral-500")
-    False -> attribute.class("text-neutral-200 stroke-neutral-400 fill-neutral-500")
+    True -> attribute.class("fill-indigo-100")
+    False -> attribute.class("fill-neutral-100")
   }
 
   let mousedown = fn(e) -> Result(Msg, List(DecodeError)) {
@@ -273,9 +170,30 @@ pub fn view_node(n: UINode, selection: Set(UINodeID)) -> Element(Msg) {
           attr("ry", "25"),
           attr("stroke", "currentColor"),
           attr("stroke-width", "2"),
+          attribute.class("stroke-neutral-900 hover:cursor-pointer"),
           node_selected_class,
           event.on("mousedown", mousedown),
           event.on_mouse_up(UserUnclickedNode),
+        ]),
+        svg.rect([
+          attr("transform", "rotate(2, 100, 75)"),
+          attr("width", "200"),
+          attr("height", "150"),
+          attr("rx", "25"),
+          attr("fill", "none"),
+          attr("stroke", "black"),
+          attr("stroke-width", "2"),
+          attribute.class("stroke-neutral-900"),
+        ]),
+        svg.rect([
+          attr("transform", "skewX(-2)"),
+          attr("width", "200"),
+          attr("height", "150"),
+          attr("rx", "25"),
+          attr("fill", "none"),
+          attr("stroke", "black"),
+          attr("stroke-width", "2"),
+          attribute.class("stroke-neutral-900"),
         ]),
         svg.text(
           [
@@ -283,7 +201,6 @@ pub fn view_node(n: UINode, selection: Set(UINodeID)) -> Element(Msg) {
             attr("y", "24"),
             attr("font-size", "16"),
             attr("fill", "currentColor"),
-            attribute.class("text-neutral-200"),
           ],
           n.label,
         ),
@@ -298,18 +215,32 @@ fn view_node_input(input: UINodeInput) -> element.Element(Msg) {
   svg.g(
     [attr("transform", input.position |> math.vec_to_html(math.Translate))],
     [
-      svg.circle([
-        attr("cx", "0"),
-        attr("cy", "0"),
-        attr("r", "10"),
+      svg.rect([
+        attr("x", "-19"),
+        attr("y", "-10"),
+        attr("width", "20"),
+        attr("height", "20"),
+        attr("rx", "5"),
+        attr("stroke-width", "2"),
         case input.hovered {
-          True -> attr("stroke-width", "3")
-          False -> attr("stroke-width", "0")
+          True -> attribute.class("fill-pink-500")
+          False -> attribute.class("fill-pink-300")
         },
-        attribute.class("fill-neutral-300 stroke-neutral-100"),
+        attribute.class("stroke-neutral-900 hover:cursor-pointer"),
         attribute.id(input.id),
         event.on_mouse_enter(UserHoverNodeInput(input.id)),
         event.on_mouse_leave(UserUnhoverNodeInputs),
+      ]),
+      svg.rect([
+        attr("transform", "rotate(5)"),
+        attr("x", "-19"),
+        attr("y", "-10"),
+        attr("width", "20"),
+        attr("height", "20"),
+        attr("rx", "5"),
+        attr("stroke-width", "2"),
+        attr("fill", "none"),
+        attribute.class("stroke-neutral-900"),
       ]),
       svg.text(
         [
@@ -317,7 +248,6 @@ fn view_node_input(input: UINodeInput) -> element.Element(Msg) {
           attr("y", "0"),
           attr("font-size", "16"),
           attr("dominant-baseline", "middle"),
-          attribute.class("fill-neutral-200"),
         ],
         input.label,
       ),
@@ -335,18 +265,32 @@ fn view_node_output(
       svg.g(
         [attr("transform", output.position |> math.vec_to_html(math.Translate))],
         [
-          svg.circle([
-            attr("cx", "0"),
-            attr("cy", "0"),
-            attr("r", "10"),
+          svg.rect([
+            attr("x", "0"),
+            attr("y", "-10"),
+            attr("width", "20"),
+            attr("height", "20"),
+            attr("rx", "5"),
+            attr("stroke-width", "2"),
             case output.hovered {
-              True -> attr("stroke-width", "3")
-              False -> attr("stroke-width", "0")
+              True -> attribute.class("fill-amber-500")
+              False -> attribute.class("fill-amber-300")
             },
-            attribute.class("fill-neutral-300 stroke-neutral-100"),
+            attribute.class("stroke-neutral-900 hover:cursor-pointer"),
             event.on_mouse_down(UserClickedNodeOutput(node_id, output.position)),
             event.on_mouse_enter(UserHoverNodeOutput(output.id)),
             event.on_mouse_leave(UserUnhoverNodeOutputs),
+          ]),
+          svg.rect([
+            attr("transform", "rotate(-5)"),
+            attr("x", "0"),
+            attr("y", "-10"),
+            attr("width", "20"),
+            attr("height", "20"),
+            attr("rx", "5"),
+            attr("stroke-width", "2"),
+            attr("fill", "none"),
+            attribute.class("stroke-neutral-900"),
           ]),
         ],
       )
@@ -390,20 +334,52 @@ pub fn view_output_canvas(model: Model) -> element.Element(Msg) {
 
 pub fn view_graph_title(title: GraphTitle) -> element.Element(Msg) {
   case title.mode {
-    ReadMode -> html.h1([event.on_click(UserClickedGraphTitle)], [element.text(title.text)])
-    WriteMode -> html.input([attribute.name("graph-name"), attribute.value(title.text), event.on_input(fn(val) { UserChangedGraphTitle(val) })])
+    ReadMode ->
+      html.h1([event.on_click(UserClickedGraphTitle)], [
+        element.text(title.text),
+      ])
+    WriteMode ->
+      html.input([
+        attribute.name("graph-name"),
+        attribute.value(title.text),
+        event.on_input(fn(val) { UserChangedGraphTitle(val) }),
+      ])
   }
 }
 
-pub fn view_collection(collection: Dict(UIGraphID, UIGraph)) -> element.Element(Msg) {
-  html.div([attribute.class("bg-neutral-800 rounded p-2 flex flex-col gap-1 min-w-[180px] min-h-[400px]")], 
+pub fn view_collection(
+  collection: List(#(UIGraphID, String)),
+  active_id: UIGraphID
+) -> element.Element(Msg) {
+  html.div(
     [
-    dict.map_values(collection, fn(key, graph) {
-      html.button([event.on_click(UserClickedCollectionItem(key))], [element.text(graph.title.text)])
-    })
-    |> dict.to_list
-    |> list.map(pair.second),
-    [html.button([attribute.class("w-full p-2 bg-neutral-600 border border-neutral-200 rounded")], [element.text("New Graph")])]
-    ] |> list.flatten
+      attribute.class(
+        "bg-neutral-100 rounded p-2 flex flex-col gap-1 min-w-[180px] min-h-[400px]",
+      ),
+    ],
+    [
+      list.map(collection, fn(item) {
+        let #(id, title) = item
+        let class = case id == active_id {
+          True -> attribute.class("bg-gray-200")
+          False -> attribute.class("")
+        }
+        html.button([class, event.on_click(UserClickedCollectionItem(id))], [
+          element.text(title),
+        ])
+      }),
+      [
+        html.button(
+          [
+            attribute.class(
+              "w-full mt-8 p-2 bg-neutral-200 border border-neutral-200 rounded",
+            ),
+            event.on_click(UserClickedNewGraph)
+          ],
+          [element.text("New Graph")],
+        ),
+      ],
+    ]
+      |> list.flatten,
   )
 }

@@ -27,15 +27,23 @@ pub type GraphTitle {
 }
 
 pub type UIGraph {
-  UIGraph(id: UIGraphID, nodes: Dict(UINodeID, UINode), connections: List(Conn), title: GraphTitle)
+  UIGraph(
+    id: UIGraphID,
+    nodes: Dict(UINodeID, UINode),
+    connections: List(Conn),
+    title: GraphTitle,
+  )
 }
 
-pub type UIGraphID = String
+pub type UIGraphID =
+  String
+
+pub type Collection = List(#(UIGraphID, String))
 
 pub type Model {
   Model(
     lib: NodeLibrary,
-    collection: Dict(UIGraphID, UIGraph),
+    collection: Collection,
     active_graph: UIGraphID,
     nodes: Dict(UINodeID, UINode),
     connections: List(Conn),
@@ -50,7 +58,7 @@ pub type Model {
     output: Dynamic,
     graph: Graph,
     title: GraphTitle,
-    shortcuts_active: Bool
+    shortcuts_active: Bool,
   )
 }
 
@@ -65,7 +73,7 @@ pub type Msg {
   GraphSetNodeAsSelection(UINodeID)
   GraphDeleteSelectedUINodes
   GraphChangedConnections
-  GraphSaveCollection
+  GraphSaveGraph
   GraphLoadGraph(UIGraphID)
   GraphSetTitleToReadMode
   UserPressedKey(String)
@@ -84,4 +92,5 @@ pub type Msg {
   UserClickedConn(ConnID, MouseEvent)
   UserChangedGraphTitle(String)
   UserClickedCollectionItem(UIGraphID)
+  UserClickedNewGraph
 }

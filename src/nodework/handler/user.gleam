@@ -1,3 +1,5 @@
+import gleam/dict
+import gleam/int
 import gleam/io
 import gleam/list
 
@@ -11,8 +13,9 @@ import nodework/draw/viewbox
 import nodework/handler.{none_effect_wrapper, shift_key_check, simple_effect}
 import nodework/math.{type Vector, Vector}
 import nodework/model.{
-  type Model, type Msg, GraphAddNodeToSelection, GraphCloseMenu, GraphSaveCollection, GraphLoadGraph,
-  GraphSetNodeAsSelection, Model, GraphTitle, WriteMode, GraphSetTitleToReadMode, type UIGraphID
+  type Model, type Msg, type UIGraphID, GraphAddNodeToSelection, GraphCloseMenu,
+  GraphLoadGraph, GraphSaveGraph, GraphSetNodeAsSelection,
+  GraphSetTitleToReadMode, GraphTitle, Model, ReadMode, WriteMode,
 }
 import nodework/node.{
   type UINodeID, type UINodeInputID, type UINodeOutputID, NodeInput,
@@ -37,7 +40,14 @@ pub fn clicked_graph(model: Model, event: MouseEvent) -> #(Model, Effect(Msg)) {
   model
   |> update_last_clicked_point(event)
   |> fn(m) {
-    #(Model(..m, shortcuts_active: True), effect.batch([shift_key_check(event), simple_effect(GraphCloseMenu), simple_effect(GraphSetTitleToReadMode)]))
+    #(
+      Model(..m, shortcuts_active: True),
+      effect.batch([
+        shift_key_check(event),
+        simple_effect(GraphCloseMenu),
+        simple_effect(GraphSetTitleToReadMode),
+      ]),
+    )
   }
 }
 
@@ -59,11 +69,15 @@ pub fn unclicked(model: Model) -> #(Model, Effect(Msg)) {
   |> fn(c) { Model(..model, connections: c) }
   |> dp.sync_edges
   |> dp.recalc_graph
-  |> fn(m) { #(m, simple_effect(GraphSaveCollection)) }
+  |> fn(m) { #(m, simple_effect(GraphSaveGraph)) }
 }
 
 pub fn clicked_graph_title(model: Model) -> #(Model, Effect(Msg)) {
-  Model(..model, title: GraphTitle(..model.title, mode: WriteMode), shortcuts_active: False)
+  Model(
+    ..model,
+    title: GraphTitle(..model.title, mode: WriteMode),
+    shortcuts_active: False,
+  )
   |> none_effect_wrapper
 }
 
@@ -86,7 +100,7 @@ pub fn clicked_node(
       effect.batch([
         update_selected_nodes(event, node_id),
         simple_effect(GraphCloseMenu),
-        simple_effect(GraphSetTitleToReadMode)
+        simple_effect(GraphSetTitleToReadMode),
       ]),
     )
   }
@@ -94,7 +108,7 @@ pub fn clicked_node(
 
 pub fn unclicked_node(model: Model) -> #(Model, Effect(Msg)) {
   Model(..model, mouse_down: False)
-  |> fn(m) { #(m, simple_effect(GraphSaveCollection)) }
+  |> fn(m) { #(m, simple_effect(GraphSaveGraph)) }
 }
 
 pub fn clicked_node_output(
@@ -203,9 +217,29 @@ fn update_selected_nodes(event: MouseEvent, node_id: UINodeID) -> Effect(Msg) {
 
 pub fn changed_graph_title(model: Model, value: String) -> #(Model, Effect(Msg)) {
   Model(..model, title: GraphTitle(..model.title, text: value))
-  |> fn(m) { #(m, simple_effect(GraphSaveCollection)) }
+  |> fn(m) { #(m, simple_effect(GraphSaveGraph)) }
 }
 
-pub fn clicked_collection_item(model: Model, graph_id: UIGraphID) -> #(Model, Effect(Msg)) {
-  #( Model(..model, active_graph: graph_id), simple_effect(GraphLoadGraph(graph_id)))
+pub fn clicked_collection_item(
+  model: Model,
+  graph_id: UIGraphID,
+) -> #(Model, Effect(Msg)) {
+  #(
+    Model(..model, active_graph: graph_id),
+    simple_effect(GraphLoadGraph(graph_id)),
+  )
+}
+
+pub fn new_graph(model: Model) -> #(Model, Effect(Msg)) {
+  let new_id = "graph_" <> list.length(model.collection) |> int.to_string
+
+  Model(
+    ..model,
+    active_graph: new_id,
+    nodes: dict.new(),
+    connections: [],
+    title: GraphTitle("Untitled", ReadMode),
+    collection: list.append(model.collection, [#(new_id, "Untitled")])
+  )
+  |> fn(m) { #(m, simple_effect(GraphSaveGraph)) }
 }

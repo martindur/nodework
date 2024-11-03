@@ -1,7 +1,8 @@
+import gleam/int
+import gleam/dict
 import gleam/io
 import gleam/list
 import gleam/pair
-import gleam/dict
 import gleam/set
 import lustre/effect.{type Effect}
 import nodework/conn
@@ -10,7 +11,10 @@ import nodework/draw/viewbox
 import nodework/handler.{none_effect_wrapper, simple_effect}
 import nodework/lib.{LibraryMenu}
 import nodework/math.{type Vector}
-import nodework/model.{type Model, type Msg, GraphCloseMenu, GraphSaveCollection, Model, GraphTitle, ReadMode, type UIGraphID}
+import nodework/model.{
+  type Model, type Msg, type UIGraphID, GraphCloseMenu, GraphSaveGraph,
+  GraphTitle, Model, ReadMode, type UIGraph
+}
 import nodework/node.{type UINode, type UINodeID}
 import nodework/util/storage
 
@@ -49,14 +53,21 @@ pub fn spawn_node(model: Model, key: String) -> #(Model, Effect(Msg)) {
       n
       |> node.new_ui_node(position)
       |> fn(n: UINode) {
-        storage.save_to_storage("node", n.id)
         Model(..model, nodes: dict.insert(model.nodes, n.id, n))
       }
     Error(Nil) -> model
   }
   |> dp.sync_verts
   |> dp.recalc_graph
-  |> fn(m) { #(m, effect.batch([simple_effect(GraphCloseMenu), simple_effect(GraphSaveCollection)])) }
+  |> fn(m) {
+    #(
+      m,
+      effect.batch([
+        simple_effect(GraphCloseMenu),
+        simple_effect(GraphSaveGraph),
+      ]),
+    )
+  }
 }
 
 pub fn add_node_to_selection(
@@ -109,22 +120,30 @@ pub fn changed_connections(model: Model) -> #(Model, Effect(msg)) {
   // |> recalc?
 }
 
-pub fn save_collection(model: Model) -> #(Model, Effect(msg)) {
+pub fn save_graph(model: Model) -> #(Model, Effect(msg)) {
   model
-  |> storage.save_collection_to_json_string
-  |> storage.save_to_storage("collection", _)
+  |> storage.graph_to_json_string
+  |> storage.save_to_storage(model.active_graph, _)
 
   model
   |> none_effect_wrapper
 }
 
 pub fn load_graph(model: Model, graph_id: UIGraphID) -> #(Model, Effect(msg)) {
-  // model
-  // |> storage.save_collection_to_json_string
-  // |> storage.save_to_storage("graph", _)
-  io.debug("LOADED " <> graph_id)
-
-  model
+  storage.get_from_storage(graph_id)
+  |> storage.load_graph
+  |> fn(res) {
+    case res {
+      Error(Nil) -> model
+      Ok(stored_graph) -> {
+        stored_graph
+        |> storage.stored_graph_to_ui_graph
+        |> fn(graph: UIGraph) {
+          Model(..model, active_graph: graph.id, nodes: graph.nodes, connections: graph.connections, title: graph.title)
+        }
+      }
+    }
+  }
   |> none_effect_wrapper
 }
 

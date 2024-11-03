@@ -1,20 +1,32 @@
-import gleam/io
-import gleam/pair
-import gleam/result
+import gleam/int
+import gleam/dict.{type Dict}
 import gleam/dynamic.{field, list}
+import gleam/io
 import gleam/json.{
-  type Json, bool, int, object, preprocessed_array, string, to_string, type DecodeError
+  type DecodeError, type Json, bool, int, object, preprocessed_array, string,
+  to_string,
 }
 import gleam/list
-import gleam/dict.{type Dict}
+import gleam/pair
+import gleam/result
 import nodework/math.{type Vector, Vector}
 
-import nodework/node.{type UINode, UINode, type UINodeInput, UINodeInput, type UINodeOutput, UINodeOutput}
 import nodework/conn.{type Conn, Conn}
-import nodework/model.{type Model, Model, type GraphTitle, GraphTitle, ReadMode, type UIGraph}
+import nodework/model.{
+  type GraphTitle, type Model, type UIGraph, GraphTitle, Model, ReadMode, UIGraph, type Collection
+}
+import nodework/node.{
+  type UINode, type UINodeInput, type UINodeOutput, UINode, UINodeInput,
+  UINodeOutput,
+}
 
 pub type StoredGraph {
-  StoredGraph(id: String, nodes: List(UINode), connections: List(Conn), title: String)
+  StoredGraph(
+    id: String,
+    nodes: List(UINode),
+    connections: List(Conn),
+    title: String,
+  )
 }
 
 @external(javascript, "../../storage.ffi.mjs", "saveToLocalStorage")
@@ -28,7 +40,23 @@ fn ui_graph_to_stored_graph(graph: UIGraph) -> StoredGraph {
   |> dict.to_list
   |> list.map(pair.second)
   |> fn(nodes) {
-    StoredGraph(id: graph.id, nodes: nodes, connections: graph.connections, title: graph.title.text)
+    StoredGraph(
+      id: graph.id,
+      nodes: nodes,
+      connections: graph.connections,
+      title: graph.title.text,
+    )
+  }
+}
+
+pub fn stored_graph_to_ui_graph(graph: StoredGraph) -> UIGraph {
+  graph.nodes
+  |> list.map(fn(node) {
+    #(node.id, node)
+  })
+  |> dict.from_list
+  |> fn(nodes) {
+    UIGraph(id: graph.id, nodes: nodes, connections: graph.connections, title: GraphTitle(graph.title, ReadMode))
   }
 }
 
@@ -77,43 +105,43 @@ fn encode_conn(c: Conn) -> Json {
     #("from", string(c.from)),
     #("to", string(c.to)),
     #("value", string(c.value)),
-    #("dragged", bool(c.dragged))
+    #("dragged", bool(c.dragged)),
   ]
   |> object
 }
 
 fn decode_ui_nodes(json_string: String) -> Result(List(UINode), DecodeError) {
-  let vec_decoder = dynamic.decode2(
-    Vector,
-    field("x", dynamic.int),
-    field("y", dynamic.int)
-  )
+  let vec_decoder =
+    dynamic.decode2(Vector, field("x", dynamic.int), field("y", dynamic.int))
 
-  let input_decoder = dynamic.decode4(
-    UINodeInput,
-    field("id", dynamic.string),
-    field("position", vec_decoder),
-    field("label", dynamic.string),
-    field("hovered", dynamic.bool)
-  )
+  let input_decoder =
+    dynamic.decode4(
+      UINodeInput,
+      field("id", dynamic.string),
+      field("position", vec_decoder),
+      field("label", dynamic.string),
+      field("hovered", dynamic.bool),
+    )
 
-  let output_decoder = dynamic.decode3(
-    UINodeOutput,
-    field("id", dynamic.string),
-    field("position", vec_decoder),
-    field("hovered", dynamic.bool)
-  )
+  let output_decoder =
+    dynamic.decode3(
+      UINodeOutput,
+      field("id", dynamic.string),
+      field("position", vec_decoder),
+      field("hovered", dynamic.bool),
+    )
 
-  let node_decoder = dynamic.decode7(
-    UINode,
-    field("label", dynamic.string),
-    field("key", dynamic.string),
-    field("id", dynamic.string),
-    field("inputs", list(input_decoder)),
-    field("output", output_decoder),
-    field("position", vec_decoder),
-    field("offset", vec_decoder)
-  )
+  let node_decoder =
+    dynamic.decode7(
+      UINode,
+      field("label", dynamic.string),
+      field("key", dynamic.string),
+      field("id", dynamic.string),
+      field("inputs", list(input_decoder)),
+      field("output", output_decoder),
+      field("position", vec_decoder),
+      field("offset", vec_decoder),
+    )
 
   let decoder = list(node_decoder)
 
@@ -132,90 +160,162 @@ pub fn connections_to_json(conns: List(Conn)) -> Json {
   |> preprocessed_array
 }
 
-fn graph_to_json(graph: StoredGraph) -> Json {
-  [
-    #("id", string(graph.id)),
-    #("title", string(graph.title)),
-    #("nodes", nodes_to_json(graph.nodes)),
-    #("connections", connections_to_json(graph.connections))
-  ]
-  |> object
-}
-
-pub fn save_collection_to_json_string(model: Model) -> String {
-  model.collection
-  |> dict.map_values(fn(_, graph) {
-    ui_graph_to_stored_graph(graph) |> graph_to_json
-  })
-  |> dict.to_list
+pub fn graph_to_json_string(model: Model) -> String {
+  ui_graph_to_stored_graph(UIGraph(model.active_graph, model.nodes, model.connections, model.title))
+  |> fn(graph) {
+    [
+      #("id", string(model.active_graph)),
+      #("title", string(graph.title)),
+      #("nodes", nodes_to_json(graph.nodes)),
+      #("connections", connections_to_json(graph.connections)),
+    ]
+  }
   |> object
   |> to_string
 }
 
 pub fn json_to_graph(model: Model, json_string: String) -> Model {
-  let vec_decoder = dynamic.decode2(
-    Vector,
-    field("x", dynamic.int),
-    field("y", dynamic.int)
-  )
+  let vec_decoder =
+    dynamic.decode2(Vector, field("x", dynamic.int), field("y", dynamic.int))
 
-  let node_input_decoder = dynamic.decode4(
-    UINodeInput,
-    field("id", dynamic.string),
-    field("position", vec_decoder),
-    field("label", dynamic.string),
-    field("hovered", dynamic.bool)
-  )
+  let node_input_decoder =
+    dynamic.decode4(
+      UINodeInput,
+      field("id", dynamic.string),
+      field("position", vec_decoder),
+      field("label", dynamic.string),
+      field("hovered", dynamic.bool),
+    )
 
-  let node_output_decoder = dynamic.decode3(
-    UINodeOutput,
-    field("id", dynamic.string),
-    field("position", vec_decoder),
-    field("hovered", dynamic.bool)
-  )
+  let node_output_decoder =
+    dynamic.decode3(
+      UINodeOutput,
+      field("id", dynamic.string),
+      field("position", vec_decoder),
+      field("hovered", dynamic.bool),
+    )
 
-  let node_decoder = dynamic.decode7(
-    UINode,
-    field("label", dynamic.string),
-    field("key", dynamic.string),
-    field("id", dynamic.string),
-    field("inputs", list(node_input_decoder)),
-    field("output", node_output_decoder),
-    field("position", vec_decoder),
-    field("offset", vec_decoder)
-  )
+  let node_decoder =
+    dynamic.decode7(
+      UINode,
+      field("label", dynamic.string),
+      field("key", dynamic.string),
+      field("id", dynamic.string),
+      field("inputs", list(node_input_decoder)),
+      field("output", node_output_decoder),
+      field("position", vec_decoder),
+      field("offset", vec_decoder),
+    )
 
-  let conn_decoder = dynamic.decode7(
-    Conn,
-    field("id", dynamic.string),
-    field("p0", vec_decoder),
-    field("p1", vec_decoder),
-    field("from", dynamic.string),
-    field("to", dynamic.string),
-    field("value", dynamic.string),
-    field("dragged", dynamic.bool)
-  )
+  let conn_decoder =
+    dynamic.decode7(
+      Conn,
+      field("id", dynamic.string),
+      field("p0", vec_decoder),
+      field("p1", vec_decoder),
+      field("from", dynamic.string),
+      field("to", dynamic.string),
+      field("value", dynamic.string),
+      field("dragged", dynamic.bool),
+    )
 
   let node_list_decoder = list(node_decoder)
   let conn_list_decoder = list(conn_decoder)
 
-
-  let decoder = dynamic.decode4(
-    StoredGraph,
-    field("id", dynamic.string),
-    field("nodes", node_list_decoder),
-    field("connections", conn_list_decoder),
-    field("title", dynamic.string)
-  )
+  let decoder =
+    dynamic.decode4(
+      StoredGraph,
+      field("id", dynamic.string),
+      field("nodes", node_list_decoder),
+      field("connections", conn_list_decoder),
+      field("title", dynamic.string),
+    )
 
   case json.decode(from: json_string, using: decoder) {
     Error(_) -> model
-    Ok(graph) -> 
+    Ok(graph) ->
       Model(
         ..model,
+        active_graph: graph.id,
         title: GraphTitle(text: graph.title, mode: ReadMode),
         nodes: graph.nodes |> list.map(fn(n) { #(n.id, n) }) |> dict.from_list,
-        connections: graph.connections
+        connections: graph.connections,
+      )
+  }
+}
+
+pub fn load_graph(json_string: String) -> Result(StoredGraph, Nil) {
+  let vec_decoder =
+    dynamic.decode2(Vector, field("x", dynamic.int), field("y", dynamic.int))
+
+  let node_input_decoder =
+    dynamic.decode4(
+      UINodeInput,
+      field("id", dynamic.string),
+      field("position", vec_decoder),
+      field("label", dynamic.string),
+      field("hovered", dynamic.bool),
     )
+
+  let node_output_decoder =
+    dynamic.decode3(
+      UINodeOutput,
+      field("id", dynamic.string),
+      field("position", vec_decoder),
+      field("hovered", dynamic.bool),
+    )
+
+  let node_decoder =
+    dynamic.decode7(
+      UINode,
+      field("label", dynamic.string),
+      field("key", dynamic.string),
+      field("id", dynamic.string),
+      field("inputs", list(node_input_decoder)),
+      field("output", node_output_decoder),
+      field("position", vec_decoder),
+      field("offset", vec_decoder),
+    )
+
+  let conn_decoder =
+    dynamic.decode7(
+      Conn,
+      field("id", dynamic.string),
+      field("p0", vec_decoder),
+      field("p1", vec_decoder),
+      field("from", dynamic.string),
+      field("to", dynamic.string),
+      field("value", dynamic.string),
+      field("dragged", dynamic.bool),
+    )
+
+  let node_list_decoder = list(node_decoder)
+  let conn_list_decoder = list(conn_decoder)
+
+  let decoder =
+    dynamic.decode4(
+      StoredGraph,
+      field("id", dynamic.string),
+      field("nodes", node_list_decoder),
+      field("connections", conn_list_decoder),
+      field("title", dynamic.string),
+    )
+
+  case json.decode(from: json_string, using: decoder) {
+    Error(_) -> Error(Nil)
+    Ok(graph) -> Ok(StoredGraph(graph.id, graph.nodes, graph.connections, graph.title))
+  }
+}
+
+pub fn load_collection(index: Int, collection: Collection) -> Collection {
+  let key = "graph_" <> int.to_string(index)
+  case get_from_storage(key) {
+    "" -> collection
+    json_graph -> {
+      case load_graph(json_graph) {
+        Error(Nil) -> load_collection(index + 1, collection)
+        Ok(graph) -> load_collection(index + 1, list.append(collection, [#(graph.id, graph.title)]))
+      }
+    }
   }
 }
