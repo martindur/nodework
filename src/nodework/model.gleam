@@ -3,7 +3,7 @@ import gleam/dynamic.{type Dynamic}
 import gleam/set.{type Set}
 
 import nodework/conn.{type Conn, type ConnID}
-import nodework/dag.{type Graph}
+import nodework/dag.{type DAG}
 import nodework/decoder.{type MouseEvent}
 import nodework/draw/viewbox.{type ViewBox}
 import nodework/lib.{type LibraryMenu, type NodeLibrary}
@@ -38,15 +38,14 @@ pub type UIGraph {
 pub type UIGraphID =
   String
 
-pub type Collection = List(#(UIGraphID, String))
+pub type Collection =
+  Dict(UIGraphID, UIGraph)
 
 pub type Model {
   Model(
     lib: NodeLibrary,
     collection: Collection,
-    active_graph: UIGraphID,
-    nodes: Dict(UINodeID, UINode),
-    connections: List(Conn),
+    graph: UIGraph,
     nodes_selected: Set(UINodeID),
     menu: LibraryMenu,
     window_resolution: Vector,
@@ -56,8 +55,7 @@ pub type Model {
     mouse_down: Bool,
     mode: GraphMode,
     output: Dynamic,
-    graph: Graph,
-    title: GraphTitle,
+    dag: DAG,
     shortcuts_active: Bool,
   )
 }

@@ -7,9 +7,9 @@ import gleam/result
 import gleam/string
 import nodework/conn.{type Conn}
 import nodework/dag.{
-  type Edge, type Graph, type Vertex, type VertexId, Edge, Graph, Vertex,
+  type DAG, type Edge, type Vertex, type VertexId, DAG, Edge, Vertex,
 }
-import nodework/model.{type Model, Model}
+import nodework/model.{type Model, Model, UIGraph}
 import nodework/node.{type UINode, IntNode, IntToStringNode, StringNode}
 
 fn nodes_to_vertices(nodes: List(UINode)) -> List(#(VertexId, Vertex)) {
@@ -34,25 +34,32 @@ fn filter_conns_by_edges(conns: List(Conn), edges: List(Edge)) -> List(Conn) {
 }
 
 pub fn sync_verts(model: Model) -> Model {
-  model.nodes
+  model.graph.nodes
   |> dict.to_list
   |> map(pair.second)
   |> nodes_to_vertices
   |> dict.from_list
-  |> fn(verts) { Graph(..model.graph, verts: verts) }
-  |> fn(graph) { Model(..model, graph: graph) }
+  |> fn(verts) { DAG(..model.dag, verts: verts) }
+  |> fn(dag) { Model(..model, dag: dag) }
 }
 
 pub fn sync_edges(model: Model) -> Model {
-  model.connections
+  model.graph.connections
   |> conns_to_edges
-  |> fn(edges) { Graph(..model.graph, edges: edges) }
-  |> fn(graph) {
-    case dag.topological_sort(graph) {
-      Ok(_) -> Model(..model, graph: graph)
+  |> fn(edges) { DAG(..model.dag, edges: edges) }
+  |> fn(model_dag) {
+    case dag.topological_sort(model_dag) {
+      Ok(_) -> Model(..model, dag: model_dag)
       Error(_) -> {
-        filter_conns_by_edges(model.connections, model.graph.edges)
-        |> fn(conns) { Model(..model, graph: model.graph, connections: conns) }
+        filter_conns_by_edges(model.graph.connections, model.dag.edges)
+        |> fn(conns) {
+          Model(
+            ..model,
+            // TODO: Why do we assign dag here? 
+            dag: model.dag,
+            graph: UIGraph(..model.graph, connections: conns),
+          )
+        }
       }
     }
   }
@@ -83,7 +90,7 @@ fn typed_inputs(
   |> map(pair.map_second(_, decoder))
 }
 
-fn eval_graph(verts: List(Vertex), model: Model) -> Model {
+fn eval_dag(verts: List(Vertex), model: Model) -> Model {
   let int_decoder = fn(x) { result.unwrap(dynamic.int(x), 0) }
   let string_decoder = fn(x) { result.unwrap(dynamic.string(x), "") }
 
@@ -129,8 +136,8 @@ fn eval_graph(verts: List(Vertex), model: Model) -> Model {
   |> fn(output) { Model(..model, output: output) }
 }
 
-pub fn recalc_graph(model: Model) -> Model {
-  model.graph
+pub fn recalc_dag(model: Model) -> Model {
+  model.dag
   |> dag.sync_vertex_inputs
   |> dag.topological_sort
   |> fn(res: Result(List(Vertex), String)) {
@@ -142,5 +149,5 @@ pub fn recalc_graph(model: Model) -> Model {
       }
     }
   }
-  |> eval_graph(model)
+  |> eval_dag(model)
 }

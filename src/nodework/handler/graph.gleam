@@ -1,31 +1,31 @@
+import gleam/dict.{type Dict}
 import gleam/int
-import gleam/dict
 import gleam/io
 import gleam/list
 import gleam/pair
 import gleam/set
 import lustre/effect.{type Effect}
-import nodework/conn
+import nodework/conn.{type Conn}
 import nodework/dag_process as dp
 import nodework/draw/viewbox
 import nodework/handler.{none_effect_wrapper, simple_effect}
 import nodework/lib.{LibraryMenu}
 import nodework/math.{type Vector}
 import nodework/model.{
-  type Model, type Msg, type UIGraphID, GraphCloseMenu, GraphSaveGraph,
-  GraphTitle, Model, ReadMode, type UIGraph
+  type Model, type Msg, type UIGraph, type UIGraphID, GraphCloseMenu,
+  GraphSaveGraph, GraphTitle, Model, ReadMode, UIGraph,
 }
 import nodework/node.{type UINode, type UINodeID}
 import nodework/util/storage
 
 pub fn resize_view_box(
   model: Model,
-  resolution: Vector,
+  window_resolution: Vector,
 ) -> #(Model, Effect(msg)) {
   Model(
     ..model,
-    window_resolution: resolution,
-    viewbox: viewbox.update_resolution(model.viewbox, resolution),
+    window_resolution:,
+    viewbox: viewbox.update_resolution(model.viewbox, window_resolution),
   )
   |> none_effect_wrapper
 }
@@ -35,13 +35,13 @@ pub fn open_menu(model: Model) -> #(Model, Effect(msg)) {
   // we don't zoom the menu, so we don't want a scaled cursor
   |> viewbox.unscale(model.viewbox, _)
   |> fn(cursor) { LibraryMenu(..model.menu, position: cursor, visible: True) }
-  |> fn(menu) { Model(..model, menu: menu) }
+  |> fn(menu) { Model(..model, menu:) }
   |> none_effect_wrapper
 }
 
 pub fn close_menu(model: Model) -> #(Model, Effect(msg)) {
   LibraryMenu(..model.menu, visible: False)
-  |> fn(menu) { Model(..model, menu: menu) }
+  |> fn(menu) { Model(..model, menu:) }
   |> none_effect_wrapper
 }
 
@@ -53,12 +53,18 @@ pub fn spawn_node(model: Model, key: String) -> #(Model, Effect(Msg)) {
       n
       |> node.new_ui_node(position)
       |> fn(n: UINode) {
-        Model(..model, nodes: dict.insert(model.nodes, n.id, n))
+        Model(
+          ..model,
+          graph: UIGraph(
+            ..model.graph,
+            nodes: dict.insert(model.graph.nodes, n.id, n),
+          ),
+        )
       }
     Error(Nil) -> model
   }
   |> dp.sync_verts
-  |> dp.recalc_graph
+  |> dp.recalc_dag
   |> fn(m) {
     #(
       m,
@@ -92,15 +98,15 @@ pub fn clear_selection(model: Model) -> #(Model, Effect(msg)) {
 }
 
 fn delete_selected_nodes(m: Model) -> Model {
-  m.nodes
+  m.graph.nodes
   |> node.exclude_by_ids(m.nodes_selected)
-  |> fn(nodes) { Model(..m, nodes: nodes) }
+  |> fn(nodes) { Model(..m, graph: UIGraph(..m.graph, nodes:)) }
 }
 
 fn delete_orphaned_connections(m: Model) -> Model {
-  m.connections
+  m.graph.connections
   |> conn.exclude_by_node_ids(m.nodes_selected)
-  |> fn(conns) { Model(..m, connections: conns) }
+  |> fn(connections) { Model(..m, graph: UIGraph(..m.graph, connections:)) }
 }
 
 pub fn delete_selected_ui_nodes(model: Model) -> #(Model, Effect(msg)) {
@@ -109,7 +115,7 @@ pub fn delete_selected_ui_nodes(model: Model) -> #(Model, Effect(msg)) {
   |> delete_orphaned_connections
   |> dp.sync_verts
   |> dp.sync_edges
-  |> dp.recalc_graph
+  |> dp.recalc_dag
   |> none_effect_wrapper
 }
 
@@ -120,34 +126,51 @@ pub fn changed_connections(model: Model) -> #(Model, Effect(msg)) {
   // |> recalc?
 }
 
-pub fn save_graph(model: Model) -> #(Model, Effect(msg)) {
+// pub fn save_graph(model: Model) -> #(Model, Effect(msg)) {
+//   model
+//   |> storage.graph_to_json_string
+//   |> storage.save_to_storage(model.graph, _)
+
+//   model
+//   |> none_effect_wrapper
+// }
+
+pub fn save_collection(model: Model) -> #(Model, Effect(msg)) {
   model
-  |> storage.graph_to_json_string
-  |> storage.save_to_storage(model.active_graph, _)
+  |> storage.collection_to_json_string
+  |> storage.save_to_storage("nodework_graph_collection", _)
 
   model
   |> none_effect_wrapper
 }
 
 pub fn load_graph(model: Model, graph_id: UIGraphID) -> #(Model, Effect(msg)) {
-  storage.get_from_storage(graph_id)
-  |> storage.load_graph
-  |> fn(res) {
-    case res {
-      Error(Nil) -> model
-      Ok(stored_graph) -> {
-        stored_graph
-        |> storage.stored_graph_to_ui_graph
-        |> fn(graph: UIGraph) {
-          Model(..model, active_graph: graph.id, nodes: graph.nodes, connections: graph.connections, title: graph.title)
+  storage.load_collection()
+  |> fn(collection) {
+    let graph =
+      collection
+      |> dict.to_list
+      |> list.key_find(graph_id)
+      |> fn(res) {
+        case res {
+          Ok(graph) -> graph
+          // TODO: Maybe add some error messages, e.g. notifies?
+          Error(Nil) -> model.graph
         }
       }
-    }
+
+    Model(..model, collection:, graph:)
   }
   |> none_effect_wrapper
 }
 
 pub fn set_title_to_readmode(model: Model) -> #(Model, Effect(msg)) {
-  Model(..model, title: GraphTitle(..model.title, mode: ReadMode))
+  Model(
+    ..model,
+    graph: UIGraph(
+      ..model.graph,
+      title: GraphTitle(..model.graph.title, mode: ReadMode),
+    ),
+  )
   |> none_effect_wrapper
 }

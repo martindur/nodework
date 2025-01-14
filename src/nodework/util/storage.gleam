@@ -1,6 +1,6 @@
-import gleam/int
 import gleam/dict.{type Dict}
 import gleam/dynamic.{field, list}
+import gleam/int
 import gleam/io
 import gleam/json.{
   type DecodeError, type Json, bool, int, object, preprocessed_array, string,
@@ -13,7 +13,8 @@ import nodework/math.{type Vector, Vector}
 
 import nodework/conn.{type Conn, Conn}
 import nodework/model.{
-  type GraphTitle, type Model, type UIGraph, GraphTitle, Model, ReadMode, UIGraph, type Collection
+  type Collection, type GraphTitle, type Model, type UIGraph, GraphTitle, Model,
+  ReadMode, UIGraph,
 }
 import nodework/node.{
   type UINode, type UINodeInput, type UINodeOutput, UINode, UINodeInput,
@@ -51,12 +52,15 @@ fn ui_graph_to_stored_graph(graph: UIGraph) -> StoredGraph {
 
 pub fn stored_graph_to_ui_graph(graph: StoredGraph) -> UIGraph {
   graph.nodes
-  |> list.map(fn(node) {
-    #(node.id, node)
-  })
+  |> list.map(fn(node) { #(node.id, node) })
   |> dict.from_list
   |> fn(nodes) {
-    UIGraph(id: graph.id, nodes: nodes, connections: graph.connections, title: GraphTitle(graph.title, ReadMode))
+    UIGraph(
+      id: graph.id,
+      nodes: nodes,
+      connections: graph.connections,
+      title: GraphTitle(graph.title, ReadMode),
+    )
   }
 }
 
@@ -110,6 +114,19 @@ fn encode_conn(c: Conn) -> Json {
   |> object
 }
 
+pub fn encode_graph(graph: UIGraph) -> Json {
+  ui_graph_to_stored_graph(graph)
+  |> fn(graph) {
+    [
+      #("id", string(graph.id)),
+      #("title", string(graph.title)),
+      #("nodes", nodes_to_json(graph.nodes)),
+      #("connections", connections_to_json(graph.connections)),
+    ]
+  }
+  |> object
+}
+
 fn decode_ui_nodes(json_string: String) -> Result(List(UINode), DecodeError) {
   let vec_decoder =
     dynamic.decode2(Vector, field("x", dynamic.int), field("y", dynamic.int))
@@ -160,21 +177,15 @@ pub fn connections_to_json(conns: List(Conn)) -> Json {
   |> preprocessed_array
 }
 
-pub fn graph_to_json_string(model: Model) -> String {
-  ui_graph_to_stored_graph(UIGraph(model.active_graph, model.nodes, model.connections, model.title))
-  |> fn(graph) {
-    [
-      #("id", string(model.active_graph)),
-      #("title", string(graph.title)),
-      #("nodes", nodes_to_json(graph.nodes)),
-      #("connections", connections_to_json(graph.connections)),
-    ]
-  }
-  |> object
-  |> to_string
+pub fn graphs_to_json(collection: Collection) -> Json {
+  collection
+  |> dict.to_list
+  |> list.map(pair.second)
+  |> list.map(encode_graph)
+  |> preprocessed_array
 }
 
-pub fn json_to_graph(model: Model, json_string: String) -> Model {
+pub fn json_to_graph_collection(json_string: String) -> Collection {
   let vec_decoder =
     dynamic.decode2(Vector, field("x", dynamic.int), field("y", dynamic.int))
 
@@ -222,7 +233,7 @@ pub fn json_to_graph(model: Model, json_string: String) -> Model {
   let node_list_decoder = list(node_decoder)
   let conn_list_decoder = list(conn_decoder)
 
-  let decoder =
+  let graph_decoder =
     dynamic.decode4(
       StoredGraph,
       field("id", dynamic.string),
@@ -231,16 +242,16 @@ pub fn json_to_graph(model: Model, json_string: String) -> Model {
       field("title", dynamic.string),
     )
 
-  case json.decode(from: json_string, using: decoder) {
-    Error(_) -> model
-    Ok(graph) ->
-      Model(
-        ..model,
-        active_graph: graph.id,
-        title: GraphTitle(text: graph.title, mode: ReadMode),
-        nodes: graph.nodes |> list.map(fn(n) { #(n.id, n) }) |> dict.from_list,
-        connections: graph.connections,
-      )
+  let collection_decoder = list(graph_decoder)
+
+  case json.decode(from: json_string, using: collection_decoder) {
+    Error(_) -> dict.new()
+    Ok(graphs) -> {
+      graphs
+      |> list.map(stored_graph_to_ui_graph)
+      |> list.map(fn(graph) { #(graph.id, graph) })
+      |> dict.from_list
+    }
   }
 }
 
@@ -303,19 +314,26 @@ pub fn load_graph(json_string: String) -> Result(StoredGraph, Nil) {
 
   case json.decode(from: json_string, using: decoder) {
     Error(_) -> Error(Nil)
-    Ok(graph) -> Ok(StoredGraph(graph.id, graph.nodes, graph.connections, graph.title))
+    Ok(graph) ->
+      Ok(StoredGraph(graph.id, graph.nodes, graph.connections, graph.title))
   }
 }
 
-pub fn load_collection(index: Int, collection: Collection) -> Collection {
-  let key = "graph_" <> int.to_string(index)
-  case get_from_storage(key) {
-    "" -> collection
-    json_graph -> {
-      case load_graph(json_graph) {
-        Error(Nil) -> load_collection(index + 1, collection)
-        Ok(graph) -> load_collection(index + 1, list.append(collection, [#(graph.id, graph.title)]))
-      }
+pub fn collection_to_json_string(model: Model) -> String {
+  model.collection
+  |> dict.map_values(fn(graph_id, graph) {
+    case model.graph.id == graph_id {
+      True -> model.graph
+      False -> graph
     }
+  })
+  |> graphs_to_json
+  |> to_string
+}
+
+pub fn load_collection() -> Collection {
+  case get_from_storage("nodework_graph_collection") {
+    "" -> dict.new()
+    json_collection -> json_to_graph_collection(json_collection)
   }
 }

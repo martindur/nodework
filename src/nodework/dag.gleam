@@ -17,15 +17,15 @@ pub type Edge {
   Edge(from: VertexId, to: VertexId, input: String)
 }
 
-pub type Graph {
-  Graph(verts: Dict(VertexId, Vertex), edges: List(Edge))
+pub type DAG {
+  DAG(verts: Dict(VertexId, Vertex), edges: List(Edge))
 }
 
-pub fn new() -> Graph {
-  Graph(dict.new(), [])
+pub fn new() -> DAG {
+  DAG(dict.new(), [])
 }
 
-pub fn test_data() -> Graph {
+pub fn test_data() -> DAG {
   ["a", "b", "c", "d", "e"]
   |> map(fn(val) { #(val, Vertex(val, val, dict.new())) })
   |> dict.from_list
@@ -37,27 +37,27 @@ pub fn test_data() -> Graph {
       Edge("b", "e", ""),
       Edge("d", "e", ""),
     ]
-    Graph(verts: verts, edges: edges)
+    DAG(verts: verts, edges: edges)
   }
   |> sync_vertex_inputs
 }
 
-pub fn sync_vertex_inputs(graph: Graph) -> Graph {
-  graph.verts
+pub fn sync_vertex_inputs(dag: DAG) -> DAG {
+  dag.verts
   |> dict.map_values(fn(id, vertex) {
-    graph.edges
+    dag.edges
     |> filter(fn(edge) { id == edge.to })
     |> map(fn(edge) { #(edge.input, edge.from) })
     |> dict.from_list
     |> fn(inputs) { Vertex(..vertex, inputs: inputs) }
   })
-  |> fn(verts) { Graph(..graph, verts: verts) }
+  |> fn(verts) { DAG(..dag, verts: verts) }
 }
 
-pub fn add_vertex(graph: Graph, vert: Vertex) -> Graph {
-  graph.verts
+pub fn add_vertex(dag: DAG, vert: Vertex) -> DAG {
+  dag.verts
   |> dict.insert(vert.id, vert)
-  |> fn(verts) { Graph(..graph, verts: verts) }
+  |> fn(verts) { DAG(..dag, verts: verts) }
 }
 
 fn sort(
@@ -122,6 +122,6 @@ pub fn sink_verts(verts: List(Vertex), edges: List(Edge)) -> List(Vertex) {
   |> list.filter(fn(v) { outdegree(v, edges) == 0 })
 }
 
-pub fn topological_sort(graph: Graph) -> Result(List(Vertex), String) {
-  sort([], graph.verts |> dict.to_list |> map(pair.second), graph.edges)
+pub fn topological_sort(dag: DAG) -> Result(List(Vertex), String) {
+  sort([], dag.verts |> dict.to_list |> map(pair.second), dag.edges)
 }

@@ -23,9 +23,10 @@ import nodework/model.{
   type GraphTitle, type Model, type Msg, type UIGraph, type UIGraphID,
   GraphSetMode, NormalMode, ReadMode, UserChangedGraphTitle,
   UserClickedCollectionItem, UserClickedConn, UserClickedGraph,
-  UserClickedGraphTitle, UserClickedNode, UserClickedNodeOutput,
-  UserHoverNodeInput, UserHoverNodeOutput, UserMovedMouse, UserScrolled,
-  UserUnclickedNode, UserUnhoverNodeInputs, UserUnhoverNodeOutputs, WriteMode, UserClickedNewGraph
+  UserClickedGraphTitle, UserClickedNewGraph, UserClickedNode,
+  UserClickedNodeOutput, UserHoverNodeInput, UserHoverNodeOutput, UserMovedMouse,
+  UserScrolled, UserUnclickedNode, UserUnhoverNodeInputs, UserUnhoverNodeOutputs,
+  WriteMode,
 }
 import nodework/node.{
   type UINode, type UINodeID, type UINodeInput, type UINodeOutput, UINode,
@@ -77,7 +78,6 @@ pub fn view_menu(
     ],
   )
 }
-
 
 fn attr_viewbox(offset: Vector, resolution: Vector) -> Attribute(msg) {
   [offset.x, offset.y, resolution.x, resolution.y]
@@ -160,7 +160,7 @@ pub fn view_node(n: UINode, selection: Set(UINodeID)) -> Element(Msg) {
       attr("transform", translate(n.position.x, n.position.y)),
       attribute.class("select-none"),
     ],
-    list.concat([
+    list.flatten([
       [
         svg.rect([
           attribute.id(n.id),
@@ -349,7 +349,7 @@ pub fn view_graph_title(title: GraphTitle) -> element.Element(Msg) {
 
 pub fn view_collection(
   collection: List(#(UIGraphID, String)),
-  active_id: UIGraphID
+  active_id: UIGraphID,
 ) -> element.Element(Msg) {
   html.div(
     [
@@ -374,7 +374,7 @@ pub fn view_collection(
             attribute.class(
               "w-full mt-8 p-2 bg-neutral-200 border border-neutral-200 rounded",
             ),
-            event.on_click(UserClickedNewGraph)
+            event.on_click(UserClickedNewGraph),
           ],
           [element.text("New Graph")],
         ),

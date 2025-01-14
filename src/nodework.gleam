@@ -30,10 +30,10 @@ import nodework/model.{
   GraphSetMode, GraphSetNodeAsSelection, GraphSetTitleToReadMode, GraphSpawnNode,
   GraphTitle, Model, NormalMode, ReadMode, UserChangedGraphTitle,
   UserClickedCollectionItem, UserClickedConn, UserClickedGraph,
-  UserClickedGraphTitle, UserClickedNode, UserClickedNodeOutput,
-  UserHoverNodeInput, UserHoverNodeOutput, UserMovedMouse, UserPressedKey,
-  UserScrolled, UserUnclicked, UserUnclickedNode, UserUnhoverNodeInputs,
-  UserUnhoverNodeOutputs, UserClickedNewGraph
+  UserClickedGraphTitle, UserClickedNewGraph, UserClickedNode,
+  UserClickedNodeOutput, UserHoverNodeInput, UserHoverNodeOutput, UserMovedMouse,
+  UserPressedKey, UserScrolled, UserUnclicked, UserUnclickedNode,
+  UserUnhoverNodeInputs, UserUnhoverNodeOutputs,
 }
 import nodework/views
 
@@ -111,12 +111,13 @@ fn init(node_lib: NodeLibrary) -> #(Model, Effect(Msg)) {
     )
 
   case storage.get_from_storage("graph_0") {
-    "" -> Model(..model, active_graph: "graph_0", collection: [#("graph_0", "Untitled")])
+    "" ->
+      Model(..model, active_graph: "graph_0", collection: [
+        #("graph_0", "Untitled"),
+      ])
     json_graph -> storage.json_to_graph(model, json_graph)
   }
-  |> fn(m) {
-    Model(..m, collection: storage.load_collection(0, []))
-  }
+  |> fn(m) { Model(..m, collection: storage.load_collection()) }
   |> dp.sync_verts
   |> dp.sync_edges
   |> dp.recalc_graph
