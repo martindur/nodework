@@ -1,6 +1,8 @@
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
+import gleam/option.{type Option}
 import gleam/set.{type Set}
+import nodework/util/random
 
 import nodework/conn.{type Conn, type ConnID}
 import nodework/dag.{type DAG}
@@ -17,22 +19,18 @@ pub type GraphMode {
   NormalMode
 }
 
-pub type EditMode {
-  ReadMode
-  WriteMode
-}
-
-pub type GraphTitle {
-  GraphTitle(text: String, mode: EditMode)
-}
-
 pub type UIGraph {
   UIGraph(
     id: UIGraphID,
     nodes: Dict(UINodeID, UINode),
     connections: List(Conn),
-    title: GraphTitle,
+    title: String,
   )
+}
+
+pub fn new_graph() {
+  let id = random.generate_random_id("graph")
+  UIGraph(id, dict.new(), [], "Untitled")
 }
 
 pub type UIGraphID =
@@ -71,14 +69,13 @@ pub type Msg {
   GraphSetNodeAsSelection(UINodeID)
   GraphDeleteSelectedUINodes
   GraphChangedConnections
-  GraphSaveGraph
+  GraphSaveCollection
   GraphLoadGraph(UIGraphID)
-  GraphSetTitleToReadMode
+  GraphEnableShortcuts(Bool)
   UserPressedKey(String)
   UserMovedMouse(Vector)
   UserScrolled(Float)
   UserClickedGraph(MouseEvent)
-  UserClickedGraphTitle
   UserUnclicked
   UserClickedNode(UINodeID, MouseEvent)
   UserUnclickedNode

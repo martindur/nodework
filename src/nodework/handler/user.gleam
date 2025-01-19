@@ -14,8 +14,8 @@ import nodework/handler.{none_effect_wrapper, shift_key_check, simple_effect}
 import nodework/math.{type Vector, Vector}
 import nodework/model.{
   type Model, type Msg, type UIGraphID, GraphAddNodeToSelection, GraphCloseMenu,
-  GraphLoadGraph, GraphSaveGraph, GraphSetNodeAsSelection,
-  GraphSetTitleToReadMode, GraphTitle, Model, ReadMode, WriteMode,
+  GraphLoadGraph, GraphSaveCollection, GraphSetNodeAsSelection, Model, UIGraph,
+  new_graph,
 }
 import nodework/node.{
   type UINodeID, type UINodeInputID, type UINodeOutputID, NodeInput,
@@ -42,20 +42,16 @@ pub fn clicked_graph(model: Model, event: MouseEvent) -> #(Model, Effect(Msg)) {
   |> fn(m) {
     #(
       Model(..m, shortcuts_active: True),
-      effect.batch([
-        shift_key_check(event),
-        simple_effect(GraphCloseMenu),
-        simple_effect(GraphSetTitleToReadMode),
-      ]),
+      effect.batch([shift_key_check(event), simple_effect(GraphCloseMenu)]),
     )
   }
 }
 
-pub fn unclicked(model: Model) -> #(Model, Effect(Msg)) {
-  case node.get_node_from_input_hovered(model.nodes) {
-    Error(NodeNotFound) -> model.connections
+pub fn unclicked(m: Model) -> #(Model, Effect(Msg)) {
+  case node.get_node_from_input_hovered(m.graph.nodes) {
+    Error(NodeNotFound) -> m.graph.connections
     Ok(#(n, input)) -> {
-      model.connections
+      m.graph.connections
       |> conn.map_dragged(fn(c) {
         case node.extract_node_id(c.from) != n.id {
           False -> c
@@ -66,18 +62,16 @@ pub fn unclicked(model: Model) -> #(Model, Effect(Msg)) {
   }
   |> list.filter(fn(c) { node.extract_node_id(c.to) != "" && c.dragged != True })
   |> conn.unique
-  |> fn(c) { Model(..model, connections: c) }
+  |> fn(connections) { Model(..m, graph: UIGraph(..m.graph, connections:)) }
   |> dp.sync_edges
-  |> dp.recalc_graph
-  |> fn(m) { #(m, simple_effect(GraphSaveGraph)) }
+  |> dp.recalc_dag
+  |> none_effect_wrapper
+  // |> fn(m) { #(m, simple_effect(GraphSaveCollection)) } // Testing if this has a "bad" impact
 }
 
-pub fn clicked_graph_title(model: Model) -> #(Model, Effect(Msg)) {
-  Model(
-    ..model,
-    title: GraphTitle(..model.title, mode: WriteMode),
-    shortcuts_active: False,
-  )
+// TODO: shortcuts active should be based on focus/blur of input
+pub fn clicked_graph_title(m: Model) -> #(Model, Effect(Msg)) {
+  Model(..m, shortcuts_active: False)
   |> none_effect_wrapper
 }
 
@@ -91,7 +85,10 @@ pub fn clicked_node(
     Model(
       ..m,
       mouse_down: True,
-      nodes: m.nodes |> node.update_all_node_offsets(m.cursor),
+      graph: UIGraph(
+        ..m.graph,
+        nodes: m.graph.nodes |> node.update_all_node_offsets(m.cursor),
+      ),
     )
   }
   |> fn(m) {
@@ -100,7 +97,6 @@ pub fn clicked_node(
       effect.batch([
         update_selected_nodes(event, node_id),
         simple_effect(GraphCloseMenu),
-        simple_effect(GraphSetTitleToReadMode),
       ]),
     )
   }
@@ -108,64 +104,64 @@ pub fn clicked_node(
 
 pub fn unclicked_node(model: Model) -> #(Model, Effect(Msg)) {
   Model(..model, mouse_down: False)
-  |> fn(m) { #(m, simple_effect(GraphSaveGraph)) }
+  |> fn(m) { #(m, simple_effect(GraphSaveCollection)) }
 }
 
 pub fn clicked_node_output(
-  model: Model,
+  m: Model,
   node_id: UINodeID,
   offset: Vector,
 ) -> #(Model, Effect(Msg)) {
-  let #(p1, output_id) = case node.get_ui_node(model.nodes, node_id) {
+  let #(p1, output_id) = case node.get_ui_node(m.graph.nodes, node_id) {
     Ok(node) -> #(node.position |> math.vector_add(offset), node.output.id)
     Error(Nil) -> #(Vector(0, 0), "")
   }
-  let p2 = model.viewbox |> viewbox.translate(model.cursor)
+  let p2 = m.viewbox |> viewbox.translate(m.cursor)
   let id = random.generate_random_id("conn")
   let new_conn = Conn(id, p1, p2, output_id, "", "", True)
 
-  model.connections
+  m.graph.connections
   |> list.prepend(new_conn)
-  |> fn(c) { Model(..model, connections: c) }
+  |> fn(connections) { Model(..m, graph: UIGraph(..m.graph, connections:)) }
   |> none_effect_wrapper
 }
 
 pub fn hover_node_output(
-  model: Model,
+  m: Model,
   output_id: UINodeOutputID,
 ) -> #(Model, Effect(Msg)) {
-  model.nodes
+  m.graph.nodes
   |> node.set_hover(NodeOutput(output_id), True)
-  |> fn(nodes) { Model(..model, nodes: nodes) }
+  |> fn(nodes) { Model(..m, graph: UIGraph(..m.graph, nodes:)) }
   |> none_effect_wrapper
 }
 
-pub fn unhover_node_outputs(model: Model) -> #(Model, Effect(Msg)) {
-  model.nodes
+pub fn unhover_node_outputs(m: Model) -> #(Model, Effect(Msg)) {
+  m.graph.nodes
   |> node.set_hover(NodeOutput(""), False)
-  |> fn(nodes) { Model(..model, nodes: nodes) }
+  |> fn(nodes) { Model(..m, graph: UIGraph(..m.graph, nodes:)) }
   |> none_effect_wrapper
 }
 
 pub fn hover_node_input(
-  model: Model,
+  m: Model,
   input_id: UINodeInputID,
 ) -> #(Model, Effect(Msg)) {
-  model.nodes
+  m.graph.nodes
   |> node.set_hover(NodeInput(input_id), True)
-  |> fn(nodes) { Model(..model, nodes: nodes) }
+  |> fn(nodes) { Model(..m, graph: UIGraph(..m.graph, nodes:)) }
   |> none_effect_wrapper
 }
 
-pub fn unhover_node_inputs(model: Model) -> #(Model, Effect(Msg)) {
-  model.nodes
+pub fn unhover_node_inputs(m: Model) -> #(Model, Effect(Msg)) {
+  m.graph.nodes
   |> node.set_hover(NodeInput(""), False)
-  |> fn(nodes) { Model(..model, nodes: nodes) }
+  |> fn(nodes) { Model(..m, graph: UIGraph(..m.graph, nodes:)) }
   |> none_effect_wrapper
 }
 
-pub fn moved_mouse(model: Model, position: Vector) -> #(Model, Effect(Msg)) {
-  model
+pub fn moved_mouse(m: Model, position: Vector) -> #(Model, Effect(Msg)) {
+  m
   |> draw.cursor(position)
   |> draw.viewbox_offset(graph_limit)
   |> draw.nodes
@@ -175,34 +171,34 @@ pub fn moved_mouse(model: Model, position: Vector) -> #(Model, Effect(Msg)) {
 }
 
 pub fn clicked_conn(
-  model: Model,
+  m: Model,
   clicked_id: ConnID,
   event: MouseEvent,
 ) -> #(Model, Effect(Msg)) {
-  model.connections
+  m.graph.connections
   |> list.map(fn(c) {
     case c.id == clicked_id {
       False -> c
       True -> Conn(..c, p1: event.position, to: "", dragged: True)
     }
   })
-  |> fn(conns) { Model(..model, connections: conns) }
+  |> fn(connections) { Model(..m, graph: UIGraph(..m.graph, connections:)) }
   |> draw.dragged_connection
-  |> fn(m) { #(m, simple_effect(GraphSetTitleToReadMode)) }
-}
-
-pub fn scrolled(model: Model, delta_y: Float) -> #(Model, Effect(Msg)) {
-  model.viewbox
-  |> viewbox.update_zoom_level(delta_y)
-  |> viewbox.update_resolution(model.window_resolution)
-  |> fn(vb) { Model(..model, viewbox: vb) }
   |> none_effect_wrapper
 }
 
-fn update_last_clicked_point(model: Model, event: MouseEvent) -> Model {
+pub fn scrolled(m: Model, delta_y: Float) -> #(Model, Effect(Msg)) {
+  m.viewbox
+  |> viewbox.update_zoom_level(delta_y)
+  |> viewbox.update_resolution(m.window_resolution)
+  |> fn(vb) { Model(..m, viewbox: vb) }
+  |> none_effect_wrapper
+}
+
+fn update_last_clicked_point(m: Model, event: MouseEvent) -> Model {
   event.position
-  |> viewbox.transform(model.viewbox, _)
-  |> fn(p) { Model(..model, last_clicked_point: p) }
+  |> viewbox.transform(m.viewbox, _)
+  |> fn(p) { Model(..m, last_clicked_point: p) }
 }
 
 fn update_selected_nodes(event: MouseEvent, node_id: UINodeID) -> Effect(Msg) {
@@ -215,31 +211,22 @@ fn update_selected_nodes(event: MouseEvent, node_id: UINodeID) -> Effect(Msg) {
   })
 }
 
-pub fn changed_graph_title(model: Model, value: String) -> #(Model, Effect(Msg)) {
-  Model(..model, title: GraphTitle(..model.title, text: value))
-  |> fn(m) { #(m, simple_effect(GraphSaveGraph)) }
+pub fn changed_graph_title(m: Model, value: String) -> #(Model, Effect(Msg)) {
+  let graph = UIGraph(..m.graph, title: value)
+  Model(..m, graph:, collection: dict.insert(m.collection, graph.id, graph))
+  |> fn(m) { #(m, simple_effect(GraphSaveCollection)) }
 }
 
 pub fn clicked_collection_item(
-  model: Model,
+  m: Model,
   graph_id: UIGraphID,
 ) -> #(Model, Effect(Msg)) {
-  #(
-    Model(..model, active_graph: graph_id),
-    simple_effect(GraphLoadGraph(graph_id)),
-  )
+  #(m, simple_effect(GraphLoadGraph(graph_id)))
 }
 
-pub fn new_graph(model: Model) -> #(Model, Effect(Msg)) {
-  let new_id = "graph_" <> list.length(model.collection) |> int.to_string
+pub fn create_graph(m: Model) -> #(Model, Effect(Msg)) {
+  let graph = new_graph()
 
-  Model(
-    ..model,
-    active_graph: new_id,
-    nodes: dict.new(),
-    connections: [],
-    title: GraphTitle("Untitled", ReadMode),
-    collection: list.append(model.collection, [#(new_id, "Untitled")])
-  )
-  |> fn(m) { #(m, simple_effect(GraphSaveGraph)) }
+  Model(..m, graph:, collection: dict.insert(m.collection, graph.id, graph))
+  |> fn(m) { #(m, simple_effect(GraphSaveCollection)) }
 }

@@ -1,10 +1,9 @@
 import gleam/dict.{type Dict}
 import gleam/int
-import gleam/io
 import gleam/list.{filter, filter_map, index_map, map}
 import gleam/pair
 import gleam/set.{type Set}
-import gleam/string.{capitalise, split}
+import gleam/string
 
 import nodework/math.{type Vector, Vector}
 import nodework/util/random.{generate_random_id}

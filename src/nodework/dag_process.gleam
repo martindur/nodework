@@ -55,7 +55,7 @@ pub fn sync_edges(model: Model) -> Model {
         |> fn(conns) {
           Model(
             ..model,
-            // TODO: Why do we assign dag here? 
+            // TODO: Why do we assign dag here?
             dag: model.dag,
             graph: UIGraph(..model.graph, connections: conns),
           )

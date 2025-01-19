@@ -26,14 +26,13 @@ import nodework/math.{type Vector, Vector}
 import nodework/model.{
   type Model, type Msg, GraphAddNodeToSelection, GraphChangedConnections,
   GraphClearSelection, GraphCloseMenu, GraphDeleteSelectedUINodes,
-  GraphLoadGraph, GraphOpenMenu, GraphResizeViewBox, GraphSaveGraph,
-  GraphSetMode, GraphSetNodeAsSelection, GraphSetTitleToReadMode, GraphSpawnNode,
-  GraphTitle, Model, NormalMode, ReadMode, UserChangedGraphTitle,
-  UserClickedCollectionItem, UserClickedConn, UserClickedGraph,
-  UserClickedGraphTitle, UserClickedNewGraph, UserClickedNode,
+  GraphEnableShortcuts, GraphLoadGraph, GraphOpenMenu, GraphResizeViewBox,
+  GraphSaveCollection, GraphSetMode, GraphSetNodeAsSelection, GraphSpawnNode,
+  Model, NormalMode, UserChangedGraphTitle, UserClickedCollectionItem,
+  UserClickedConn, UserClickedGraph, UserClickedNewGraph, UserClickedNode,
   UserClickedNodeOutput, UserHoverNodeInput, UserHoverNodeOutput, UserMovedMouse,
   UserPressedKey, UserScrolled, UserUnclicked, UserUnclickedNode,
-  UserUnhoverNodeInputs, UserUnhoverNodeOutputs,
+  UserUnhoverNodeInputs, UserUnhoverNodeOutputs, new_graph,
 }
 import nodework/views
 
@@ -89,14 +88,12 @@ pub fn main() {
 }
 
 fn init(node_lib: NodeLibrary) -> #(Model, Effect(Msg)) {
-  let model =
+  let m =
     Model(
       lib: node_lib,
       menu: lib.generate_lib_menu(node_lib),
-      collection: [],
-      active_graph: "temp",
-      nodes: dict.new(),
-      connections: [],
+      collection: dict.new(),
+      graph: new_graph(),
       nodes_selected: set.new(),
       window_resolution: get_window_size(),
       viewbox: ViewBox(Vector(0, 0), get_window_size(), 1.0),
@@ -105,22 +102,14 @@ fn init(node_lib: NodeLibrary) -> #(Model, Effect(Msg)) {
       mouse_down: False,
       mode: NormalMode,
       output: dynamic.from(""),
-      graph: dag.new(),
-      title: GraphTitle("Untitled", ReadMode),
+      dag: dag.new(),
       shortcuts_active: True,
     )
 
-  case storage.get_from_storage("graph_0") {
-    "" ->
-      Model(..model, active_graph: "graph_0", collection: [
-        #("graph_0", "Untitled"),
-      ])
-    json_graph -> storage.json_to_graph(model, json_graph)
-  }
-  |> fn(m) { Model(..m, collection: storage.load_collection()) }
+  Model(..m, collection: storage.load_collection())
   |> dp.sync_verts
   |> dp.sync_edges
-  |> dp.recalc_graph
+  |> dp.recalc_dag
   |> fn(m) { #(m, effect.none()) }
 }
 
@@ -138,13 +127,13 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       graph.add_node_as_selection(model, node_id)
     GraphChangedConnections -> graph.changed_connections(model)
     GraphDeleteSelectedUINodes -> graph.delete_selected_ui_nodes(model)
-    GraphSaveGraph -> graph.save_graph(model)
+    GraphSaveCollection -> graph.save_collection(model)
     GraphLoadGraph(graph_id) -> graph.load_graph(model, graph_id)
-    GraphSetTitleToReadMode -> graph.set_title_to_readmode(model)
+    GraphEnableShortcuts(shortcuts_active) ->
+      Model(..model, shortcuts_active:) |> none_effect_wrapper
     UserPressedKey(key) -> user.pressed_key(model, key, key_lib)
     UserScrolled(delta_y) -> user.scrolled(model, delta_y)
     UserClickedGraph(event) -> user.clicked_graph(model, event)
-    UserClickedGraphTitle -> user.clicked_graph_title(model)
     UserUnclicked -> user.unclicked(model)
     UserMovedMouse(position) -> user.moved_mouse(model, position)
     UserClickedNode(node_id, event) -> user.clicked_node(model, node_id, event)
@@ -159,7 +148,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     UserChangedGraphTitle(value) -> user.changed_graph_title(model, value)
     UserClickedCollectionItem(graph_id) ->
       user.clicked_collection_item(model, graph_id)
-    UserClickedNewGraph -> user.new_graph(model)
+    UserClickedNewGraph -> user.create_graph(model)
   }
 }
 
@@ -198,16 +187,16 @@ fn view(model: Model) -> element.Element(Msg) {
     ],
     [
       html.div([attribute.class("absolute left-2 top-2 text-2xl")], [
-        views.view_graph_title(model.title),
+        views.view_graph_title(model.graph.title),
       ]),
       html.div([attribute.class("absolute right-2 top-2")], [
-        views.view_collection(model.collection, model.active_graph),
+        views.view_collection(dict.to_list(model.collection), model.graph.id),
       ]),
       views.view_graph(
         model.viewbox,
-        model.nodes,
+        model.graph.nodes,
         model.nodes_selected,
-        model.connections,
+        model.graph.connections,
       ),
       views.view_menu(model.menu, spawn),
       views.view_output_canvas(model),

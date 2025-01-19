@@ -1,21 +1,17 @@
-import gleam/dict.{type Dict}
+import gleam/dict
 import gleam/dynamic.{field, list}
-import gleam/int
 import gleam/io
 import gleam/json.{
   type DecodeError, type Json, bool, int, object, preprocessed_array, string,
   to_string,
 }
 import gleam/list
+import gleam/option.{None, Some}
 import gleam/pair
-import gleam/result
 import nodework/math.{type Vector, Vector}
 
 import nodework/conn.{type Conn, Conn}
-import nodework/model.{
-  type Collection, type GraphTitle, type Model, type UIGraph, GraphTitle, Model,
-  ReadMode, UIGraph,
-}
+import nodework/model.{type Collection, type Model, type UIGraph, Model, UIGraph}
 import nodework/node.{
   type UINode, type UINodeInput, type UINodeOutput, UINode, UINodeInput,
   UINodeOutput,
@@ -45,7 +41,7 @@ fn ui_graph_to_stored_graph(graph: UIGraph) -> StoredGraph {
       id: graph.id,
       nodes: nodes,
       connections: graph.connections,
-      title: graph.title.text,
+      title: graph.title,
     )
   }
 }
@@ -59,7 +55,7 @@ pub fn stored_graph_to_ui_graph(graph: StoredGraph) -> UIGraph {
       id: graph.id,
       nodes: nodes,
       connections: graph.connections,
-      title: GraphTitle(graph.title, ReadMode),
+      title: graph.title,
     )
   }
 }
@@ -321,12 +317,7 @@ pub fn load_graph(json_string: String) -> Result(StoredGraph, Nil) {
 
 pub fn collection_to_json_string(model: Model) -> String {
   model.collection
-  |> dict.map_values(fn(graph_id, graph) {
-    case model.graph.id == graph_id {
-      True -> model.graph
-      False -> graph
-    }
-  })
+  |> dict.insert(model.graph.id, model.graph)
   |> graphs_to_json
   |> to_string
 }
@@ -334,6 +325,6 @@ pub fn collection_to_json_string(model: Model) -> String {
 pub fn load_collection() -> Collection {
   case get_from_storage("nodework_graph_collection") {
     "" -> dict.new()
-    json_collection -> json_to_graph_collection(json_collection)
+    json_collection -> json_collection |> io.debug |> json_to_graph_collection
   }
 }

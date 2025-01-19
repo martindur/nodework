@@ -20,13 +20,11 @@ import nodework/draw/viewbox.{type ViewBox, ViewBox}
 import nodework/lib.{type LibraryMenu}
 import nodework/math.{type Vector, Vector}
 import nodework/model.{
-  type GraphTitle, type Model, type Msg, type UIGraph, type UIGraphID,
-  GraphSetMode, NormalMode, ReadMode, UserChangedGraphTitle,
-  UserClickedCollectionItem, UserClickedConn, UserClickedGraph,
-  UserClickedGraphTitle, UserClickedNewGraph, UserClickedNode,
+  type Model, type Msg, type UIGraph, type UIGraphID, GraphEnableShortcuts,
+  GraphSetMode, NormalMode, UserChangedGraphTitle, UserClickedCollectionItem,
+  UserClickedConn, UserClickedGraph, UserClickedNewGraph, UserClickedNode,
   UserClickedNodeOutput, UserHoverNodeInput, UserHoverNodeOutput, UserMovedMouse,
   UserScrolled, UserUnclickedNode, UserUnhoverNodeInputs, UserUnhoverNodeOutputs,
-  WriteMode,
 }
 import nodework/node.{
   type UINode, type UINodeID, type UINodeInput, type UINodeOutput, UINode,
@@ -332,23 +330,21 @@ pub fn view_output_canvas(model: Model) -> element.Element(Msg) {
   )
 }
 
-pub fn view_graph_title(title: GraphTitle) -> element.Element(Msg) {
-  case title.mode {
-    ReadMode ->
-      html.h1([event.on_click(UserClickedGraphTitle)], [
-        element.text(title.text),
-      ])
-    WriteMode ->
-      html.input([
-        attribute.name("graph-name"),
-        attribute.value(title.text),
-        event.on_input(fn(val) { UserChangedGraphTitle(val) }),
-      ])
-  }
+pub fn view_graph_title(title: String) -> element.Element(Msg) {
+  html.input([
+    attribute.name("graph-name"),
+    attribute.value(title),
+    attribute.class(
+      "border-b-2 border-gray-400 outline-none focus:border-pink-400",
+    ),
+    event.on_input(fn(val) { UserChangedGraphTitle(val) }),
+    event.on_focus(GraphEnableShortcuts(False)),
+    event.on_blur(GraphEnableShortcuts(True)),
+  ])
 }
 
 pub fn view_collection(
-  collection: List(#(UIGraphID, String)),
+  collection: List(#(UIGraphID, UIGraph)),
   active_id: UIGraphID,
 ) -> element.Element(Msg) {
   html.div(
@@ -359,13 +355,13 @@ pub fn view_collection(
     ],
     [
       list.map(collection, fn(item) {
-        let #(id, title) = item
+        let #(id, graph) = item
         let class = case id == active_id {
           True -> attribute.class("bg-gray-200")
           False -> attribute.class("")
         }
         html.button([class, event.on_click(UserClickedCollectionItem(id))], [
-          element.text(title),
+          element.text(graph.title),
         ])
       }),
       [

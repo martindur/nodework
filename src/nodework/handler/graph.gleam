@@ -13,7 +13,7 @@ import nodework/lib.{LibraryMenu}
 import nodework/math.{type Vector}
 import nodework/model.{
   type Model, type Msg, type UIGraph, type UIGraphID, GraphCloseMenu,
-  GraphSaveGraph, GraphTitle, Model, ReadMode, UIGraph,
+  GraphSaveCollection, Model, UIGraph,
 }
 import nodework/node.{type UINode, type UINodeID}
 import nodework/util/storage
@@ -70,7 +70,7 @@ pub fn spawn_node(model: Model, key: String) -> #(Model, Effect(Msg)) {
       m,
       effect.batch([
         simple_effect(GraphCloseMenu),
-        simple_effect(GraphSaveGraph),
+        simple_effect(GraphSaveCollection),
       ]),
     )
   }
@@ -138,6 +138,7 @@ pub fn changed_connections(model: Model) -> #(Model, Effect(msg)) {
 pub fn save_collection(model: Model) -> #(Model, Effect(msg)) {
   model
   |> storage.collection_to_json_string
+  |> io.debug
   |> storage.save_to_storage("nodework_graph_collection", _)
 
   model
@@ -161,16 +162,5 @@ pub fn load_graph(model: Model, graph_id: UIGraphID) -> #(Model, Effect(msg)) {
 
     Model(..model, collection:, graph:)
   }
-  |> none_effect_wrapper
-}
-
-pub fn set_title_to_readmode(model: Model) -> #(Model, Effect(msg)) {
-  Model(
-    ..model,
-    graph: UIGraph(
-      ..model.graph,
-      title: GraphTitle(..model.graph.title, mode: ReadMode),
-    ),
-  )
   |> none_effect_wrapper
 }
