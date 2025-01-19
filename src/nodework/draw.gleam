@@ -6,7 +6,7 @@ import gleam/set
 import nodework/conn.{type Conn, Conn}
 import nodework/draw/viewbox.{type ViewBox, ViewBox}
 import nodework/math.{type Vector, Vector}
-import nodework/model.{type Model, DragMode, Model, NormalMode}
+import nodework/model.{type Model, DragMode, Model, NormalMode, UIGraph}
 import nodework/node.{type UINode, type UINodeInput, UINode}
 
 pub fn cursor(m: Model, p: Vector) -> Model {
@@ -31,7 +31,7 @@ pub fn viewbox_offset(m: Model, limit: Int) -> Model {
 pub fn nodes(m: Model) -> Model {
   m.nodes_selected
   |> set.to_list
-  |> dict.take(m.nodes, _)
+  |> dict.take(m.graph.nodes, _)
   |> dict.map_values(fn(_key, node) {
     case m.mouse_down {
       False -> node
@@ -39,21 +39,21 @@ pub fn nodes(m: Model) -> Model {
         UINode(..node, position: math.vector_subtract(node.offset, m.cursor))
     }
   })
-  |> dict.merge(m.nodes, _)
-  |> fn(nodes) { Model(..m, nodes: nodes) }
+  |> dict.merge(m.graph.nodes, _)
+  |> fn(nodes) { Model(..m, graph: UIGraph(..m.graph, nodes:)) }
 }
 
 pub fn dragged_connection(m: Model) -> Model {
   let point = fn(p) { viewbox.translate(m.viewbox, p) }
 
-  m.connections
+  m.graph.connections
   |> map(fn(c) {
     case c.dragged {
       True -> Conn(..c, p1: point(m.cursor))
       False -> c
     }
   })
-  |> fn(conns) { Model(..m, connections: conns) }
+  |> fn(connections) { Model(..m, graph: UIGraph(..m.graph, connections:)) }
 }
 
 fn order_connection_nodes(nodes: List(UINode), c: Conn) -> List(UINode) {
@@ -68,9 +68,9 @@ fn order_connection_nodes(nodes: List(UINode), c: Conn) -> List(UINode) {
 }
 
 pub fn connections(m: Model) -> Model {
-  m.connections
+  m.graph.connections
   |> map(fn(c) {
-    dict.take(m.nodes, node.extract_node_ids([c.from, c.to]))
+    dict.take(m.graph.nodes, node.extract_node_ids([c.from, c.to]))
     |> dict.to_list
     |> map(pair.second)
     |> order_connection_nodes(c)
@@ -95,5 +95,5 @@ pub fn connections(m: Model) -> Model {
       }
     }
   })
-  |> fn(conns) { Model(..m, connections: conns) }
+  |> fn(connections) { Model(..m, graph: UIGraph(..m.graph, connections:)) }
 }

@@ -1,9 +1,11 @@
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
+import gleam/option.{type Option}
 import gleam/set.{type Set}
+import nodework/util/random
 
 import nodework/conn.{type Conn, type ConnID}
-import nodework/dag.{type Graph}
+import nodework/dag.{type DAG}
 import nodework/decoder.{type MouseEvent}
 import nodework/draw/viewbox.{type ViewBox}
 import nodework/lib.{type LibraryMenu, type NodeLibrary}
@@ -17,11 +19,31 @@ pub type GraphMode {
   NormalMode
 }
 
+pub type UIGraph {
+  UIGraph(
+    id: UIGraphID,
+    nodes: Dict(UINodeID, UINode),
+    connections: List(Conn),
+    title: String,
+  )
+}
+
+pub fn new_graph() {
+  let id = random.generate_random_id("graph")
+  UIGraph(id, dict.new(), [], "Untitled")
+}
+
+pub type UIGraphID =
+  String
+
+pub type Collection =
+  Dict(UIGraphID, UIGraph)
+
 pub type Model {
   Model(
     lib: NodeLibrary,
-    nodes: Dict(UINodeID, UINode),
-    connections: List(Conn),
+    collection: Collection,
+    graph: UIGraph,
     nodes_selected: Set(UINodeID),
     menu: LibraryMenu,
     window_resolution: Vector,
@@ -31,7 +53,8 @@ pub type Model {
     mouse_down: Bool,
     mode: GraphMode,
     output: Dynamic,
-    graph: Graph,
+    dag: DAG,
+    shortcuts_active: Bool,
   )
 }
 
@@ -46,6 +69,9 @@ pub type Msg {
   GraphSetNodeAsSelection(UINodeID)
   GraphDeleteSelectedUINodes
   GraphChangedConnections
+  GraphSaveCollection
+  GraphLoadGraph(UIGraphID)
+  GraphEnableShortcuts(Bool)
   UserPressedKey(String)
   UserMovedMouse(Vector)
   UserScrolled(Float)
@@ -59,4 +85,7 @@ pub type Msg {
   UserHoverNodeInput(UINodeInputID)
   UserUnhoverNodeInputs
   UserClickedConn(ConnID, MouseEvent)
+  UserChangedGraphTitle(String)
+  UserClickedCollectionItem(UIGraphID)
+  UserClickedNewGraph
 }
