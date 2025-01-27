@@ -81,7 +81,9 @@ pub fn connections(m: Model) -> Model {
         [a, b] ->
           Conn(
             ..c,
-            p0: math.vector_add(a.position, a.output.position),
+            p0: math.vector_add(a.position, a.output.position)
+              // TODO: Make this smarter - connection positions are calculated based on nodes (in/outputs), so we need to consider offsets.
+              |> math.vector_add(Vector(18, 0)),
             p1: b.inputs
               |> filter(fn(in) { in.id == c.to })
               |> fn(nodes) {
@@ -89,7 +91,9 @@ pub fn connections(m: Model) -> Model {
                 x
               }
               |> fn(x: UINodeInput) { x.position }
-              |> math.vector_add(b.position, _),
+              |> math.vector_add(b.position, _)
+              // TODO: Add the smartness here too
+              |> math.vector_add(Vector(-18, 0)),
           )
         _ -> c
       }

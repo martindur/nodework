@@ -275,7 +275,10 @@ fn view_node_output(
               False -> attribute.class("fill-amber-300")
             },
             attribute.class("stroke-neutral-900 hover:cursor-pointer"),
-            event.on_mouse_down(UserClickedNodeOutput(node_id, output.position)),
+            event.on_mouse_down(UserClickedNodeOutput(
+              node_id,
+              math.vector_add(output.position, Vector(18, 0)),
+            )),
             event.on_mouse_enter(UserHoverNodeOutput(output.id)),
             event.on_mouse_leave(UserUnhoverNodeOutputs),
           ]),
@@ -304,17 +307,23 @@ pub fn view_connection(c: Conn) -> element.Element(Msg) {
     Ok(UserClickedConn(c.id, decoded_event))
   }
 
-  svg.line([
-    case c.dragged {
-      True -> attribute.class("text-gray-500")
-      False -> attribute.class("text-gray-500 hover:text-indigo-500")
-    },
-    attr("stroke", "currentColor"),
-    attr("stroke-width", "10"),
-    attr("stroke-linecap", "round"),
-    attr("stroke-dasharray", "12,12"),
-    event.on("mousedown", mousedown),
-    ..conn.to_attributes(c)
+  svg.g([], [
+    svg.line([
+      case c.dragged {
+        True -> attribute.class("text-gray-800")
+        False -> attribute.class("text-gray-800 hover:text-gray-500")
+      },
+      attr("stroke", "currentColor"),
+      attr("stroke-width", "3"),
+      ..conn.to_attributes(c)
+    ]),
+    svg.line([
+      attribute.class("hover:cursor-pointer"),
+      attr("stroke", "transparent"),
+      attr("stroke-width", "20"),
+      event.on("mousedown", mousedown),
+      ..conn.to_attributes(c)
+    ]),
   ])
 }
 
